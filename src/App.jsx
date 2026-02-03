@@ -23,6 +23,7 @@ import AdminGrading from './pages/AdminGrading';
 import AcademicExam from './components/AcademicExam';
 import AdminQuestionBank from './pages/AdminQuestionBank';
 import SuperAdmin from './pages/SuperAdmin';
+
 // --- NEW TERMINALS & PAGES ---
 import StudentLogin from './pages/StudentLogin';
 import AdminLogin from './pages/AdminLogin';
@@ -56,16 +57,24 @@ function App() {
           <Route path="/enroll" element={<CourseEnrollment />} />
           <Route path="/verify/:certificateId" element={<VerifyCertificate />} />
           
-          {/* --- NEW SECTION ROUTES (Optional: idan kana son direct link zuwa gare su) --- */}
           <Route path="/courses" element={<CourseSection />} />
           <Route path="/pricing" element={<PricingCard />} />
 
           {/* --- AUTHENTICATION TERMINALS --- */}
           <Route path="/portal" element={<AuthPortal />} />
           <Route path="/login" element={<StudentLogin />} />
-          <Route path="/admin-login" element={<Login />} />
+          
+          {/* Muna amfani da AdminLogin.jsx don Gateway */}
+          <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
-          <Route path="/super-admin" element={<SuperAdmin />} />
+          
+          {/* Super Admin Route da aka kare shi */}
+          <Route path="/super-admin" element={
+            <ProtectedRoute requiredRole="admin">
+              <SuperAdmin />
+            </ProtectedRoute>
+          } />
+
           {/* --- STUDENT SECURE INFRASTRUCTURE --- */}
           <Route path="/dashboard" element={
             <ProtectedRoute requiredRole="student">
@@ -109,9 +118,11 @@ function App() {
           } />
 
           {/* --- ADMIN SECURE INFRASTRUCTURE --- */}
+          
+          {/* Nan na canza zuwa SuperAdmin don shine sabon dashboard din da kake so */}
           <Route path="/admin-dashboard" element={
             <ProtectedRoute requiredRole="admin">
-              <AdminDashboard />
+              <SuperAdmin />
             </ProtectedRoute>
           } />
 
