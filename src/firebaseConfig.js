@@ -23,5 +23,4 @@ export const auth = getAuth(app);
 export const storage = getStorage(app);
 export const analytics = getAnalytics(app);
 
-// KADA KA SAKE SA "export { db, storage }" A KASA! 
-// Tunda ka riga ka sa "export" a layin 19, 20, da 21.
+export default app;
