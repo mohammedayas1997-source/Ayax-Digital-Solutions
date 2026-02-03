@@ -1,24 +1,28 @@
 import React, { useState } from 'react';
 import { auth } from "../firebaseConfig";
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { ShieldAlert, Terminal, LogIn, Loader2, Key } from 'lucide-react';
+import { ShieldAlert, Terminal, Loader2, Key } from 'lucide-react';
+// 1. Mun ƙara useNavigate don magance 404 error
+import { useNavigate } from 'react-router-dom'; 
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const navigate = useNavigate(); // 2. Initialize navigate
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Wannan yana tabbatar da shigar Admin ta amfani da Firebase Auth
+      // Tabbatar da Admin ta amfani da Firebase Auth
       await signInWithEmailAndPassword(auth, email, password);
       
-      // Idan komai ya tafi daidai, zai kai shi dashboard
-      window.location.href = "/admin-dashboard"; 
+      // 3. Mun canza window.location.href zuwa navigate()
+      // Wannan zai sa React Router ya tura ka ba tare da 404 error ba
+      navigate("/admin-dashboard"); 
+
     } catch (error) {
-      // Idan an samu kuskure ko mara izini ne ya gwada shiga
       alert("CRITICAL: Unauthorized access attempt detected. Admin credentials rejected.");
       console.error("Login Error:", error.message);
     } finally {
@@ -29,7 +33,7 @@ const AdminLogin = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#020617] px-6 relative overflow-hidden">
       
-      {/* Tactical Glow Elements (Kamar yadda ka tsara) */}
+      {/* Tactical Glow Elements */}
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-red-600/5 rounded-full blur-[120px]"></div>
       <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-blue-600/5 rounded-full blur-[100px]"></div>
       
@@ -102,7 +106,6 @@ const AdminLogin = () => {
         </form>
       </div>
 
-      {/* Background Subtle Overlay */}
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
     </div>
   );
