@@ -35,6 +35,14 @@ const SuperAdmin = () => {
     title: '',
     content: '', 
     week: '1',
+    course: 'Web Development',
+    dueDate: '' // Added for assignments
+  });
+
+  // Forum Creation State
+  const [forumData, setForumData] = useState({
+    title: '',
+    content: '',
     course: 'Web Development'
   });
 
@@ -67,7 +75,6 @@ const SuperAdmin = () => {
       setLessons(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    // Real-time History Logs
     const qLogs = query(collection(db, "system_logs"), orderBy("timestamp", "desc"));
     const unsubLogs = onSnapshot(qLogs, (snap) => {
       setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -122,11 +129,28 @@ const SuperAdmin = () => {
         ...academicData,
         instructor: "SUPER_ADMIN",
         createdAt: serverTimestamp(),
-        isGradable: academicData.type === 'exam'
+        isGradable: academicData.type === 'exam' || academicData.type === 'assignment'
       });
       await logActivity("ACADEMIC", `Deployed ${academicData.type}: ${academicData.title}`);
       alert(`SUCCESS: ${academicData.type.toUpperCase()} deployed to ${academicData.course}`);
-      setAcademicData({ ...academicData, title: '', content: '' });
+      setAcademicData({ ...academicData, title: '', content: '', dueDate: '' });
+    } catch (err) { alert(err.message); } finally { setLoading(false); }
+  };
+
+  // NEW: Forum Creation Function
+  const handleCreateForum = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "forum_threads"), {
+        ...forumData,
+        studentName: "SUPER_ADMIN",
+        role: 'authority',
+        createdAt: serverTimestamp()
+      });
+      await logActivity("FORUM", `Started discussion: ${forumData.title}`);
+      alert("OFFICIAL: Discussion thread launched.");
+      setForumData({ title: '', content: '', course: 'Web Development' });
     } catch (err) { alert(err.message); } finally { setLoading(false); }
   };
 
@@ -267,7 +291,10 @@ const SuperAdmin = () => {
                   </select>
                   <input required className="admin-input" placeholder="TITLE (e.g. Week 1: Basics)" value={academicData.title} onChange={e => setAcademicData({...academicData, title: e.target.value})}/>
                   <input required className="admin-input" placeholder={academicData.type === 'video' ? "YOUTUBE LINK" : "RESOURCE LINK / DESC"} value={academicData.content} onChange={e => setAcademicData({...academicData, content: e.target.value})}/>
-                  <input type="number" className="admin-input" placeholder="WEEK NUMBER" value={academicData.week} onChange={e => setAcademicData({...academicData, week: e.target.value})}/>
+                  <div className="flex gap-2">
+                     <input type="number" className="admin-input w-1/2" placeholder="WEEK" value={academicData.week} onChange={e => setAcademicData({...academicData, week: e.target.value})}/>
+                     <input type="date" className="admin-input w-1/2" value={academicData.dueDate} onChange={e => setAcademicData({...academicData, dueDate: e.target.value})}/>
+                  </div>
                   <button disabled={loading} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-3">
                     {loading ? <Loader2 className="animate-spin"/> : <><PlusCircle size={18}/> Deploy to Curriculum</>}
                   </button>
@@ -276,21 +303,21 @@ const SuperAdmin = () => {
             </div>
 
             <div className="lg:col-span-2 space-y-4">
-               <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Curriculum Stream</h3>
-               {lessons.length > 0 ? lessons.map(item => (
-                 <div key={item.id} className={`p-6 rounded-[2rem] border shadow-sm flex items-center justify-between group ${darkMode ? 'bg-slate-800 border-white/5' : 'bg-white border-gray-100'}`}>
-                    <div className="flex items-center gap-5">
-                       <div className={`p-4 rounded-2xl ${item.type === 'video' ? 'bg-blue-50 text-blue-600' : item.type === 'exam' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'}`}>
-                          {item.type === 'video' ? <Video size={20}/> : item.type === 'exam' ? <Award size={20}/> : <FileText size={20}/>}
-                       </div>
-                       <div>
-                          <p className="text-[10px] font-black text-blue-600 uppercase">{item.course} • Week {item.week}</p>
-                          <h4 className="font-black">{item.title}</h4>
-                       </div>
-                    </div>
-                    <button onClick={async () => {if(window.confirm("Delete?")) await deleteDoc(doc(db, "lessons", item.id))}} className="p-3 text-gray-200 hover:text-red-500 transition-all"><Trash2 size={18}/></button>
-                 </div>
-               )) : <div className="p-10 text-center text-gray-400 font-bold uppercase text-xs">No lessons deployed yet.</div>}
+                <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Curriculum Stream</h3>
+                {lessons.length > 0 ? lessons.map(item => (
+                  <div key={item.id} className={`p-6 rounded-[2rem] border shadow-sm flex items-center justify-between group ${darkMode ? 'bg-slate-800 border-white/5' : 'bg-white border-gray-100'}`}>
+                     <div className="flex items-center gap-5">
+                        <div className={`p-4 rounded-2xl ${item.type === 'video' ? 'bg-blue-50 text-blue-600' : item.type === 'exam' ? 'bg-red-50 text-red-600' : 'bg-amber-50 text-amber-600'}`}>
+                           {item.type === 'video' ? <Video size={20}/> : item.type === 'exam' ? <Award size={20}/> : <FileText size={20}/>}
+                        </div>
+                        <div>
+                           <p className="text-[10px] font-black text-blue-600 uppercase">{item.course} • Week {item.week}</p>
+                           <h4 className="font-black">{item.title}</h4>
+                        </div>
+                     </div>
+                     <button onClick={async () => {if(window.confirm("Delete?")) await deleteDoc(doc(db, "lessons", item.id))}} className="p-3 text-gray-200 hover:text-red-500 transition-all"><Trash2 size={18}/></button>
+                  </div>
+                )) : <div className="p-10 text-center text-gray-400 font-bold uppercase text-xs">No lessons deployed yet.</div>}
             </div>
           </div>
         )}
@@ -314,19 +341,19 @@ const SuperAdmin = () => {
                   {systemUsers.map(user => (
                     <tr key={user.id} className="hover:bg-gray-50/5 transition-colors">
                       <td className="p-6">
-                         <p className="font-black text-sm">{user.fullName}</p>
-                         <p className="text-[10px] text-gray-400 font-medium">{user.email}</p>
+                          <p className="font-black text-sm">{user.fullName}</p>
+                          <p className="text-[10px] text-gray-400 font-medium">{user.email}</p>
                       </td>
                       <td className="p-6">
-                         <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${user.role === 'admin' ? 'bg-red-100 text-red-600' : user.role === 'teacher' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
-                           {user.role}
-                         </span>
+                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${user.role === 'admin' ? 'bg-red-100 text-red-600' : user.role === 'teacher' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
+                            {user.role}
+                          </span>
                       </td>
                       <td className="p-6">
-                         <p className="text-xs font-bold italic">"{user.currentActivity || 'In Transit'}"</p>
+                          <p className="text-xs font-bold italic">"{user.currentActivity || 'In Transit'}"</p>
                       </td>
                       <td className="p-6">
-                         <p className="text-[10px] font-black text-gray-400">{user.lastInteraction ? user.lastInteraction.toDate().toLocaleTimeString() : 'Waiting...'}</p>
+                          <p className="text-[10px] font-black text-gray-400">{user.lastInteraction ? user.lastInteraction.toDate().toLocaleTimeString() : 'Waiting...'}</p>
                       </td>
                     </tr>
                   ))}
@@ -335,32 +362,41 @@ const SuperAdmin = () => {
           </div>
         )}
 
-        {/* FORUM */}
+        {/* FORUM MANAGEMENT (Complete) */}
         {activeTab === 'global_forum' && (
-          <div className="flex gap-8 h-[70vh]">
-            <div className={`w-1/3 rounded-[2.5rem] shadow-sm border overflow-hidden flex flex-col ${darkMode ? 'bg-slate-800 border-white/5' : 'bg-white border-gray-100'}`}>
-              <div className="p-6 border-b bg-slate-900 text-white font-black uppercase text-[10px]">Global Thread Stream</div>
-              <div className="overflow-y-auto flex-1 divide-y divide-gray-50/10">
+          <div className="flex gap-8 h-[75vh]">
+            <div className={`w-1/3 p-8 rounded-[2.5rem] border shadow-xl flex flex-col ${darkMode ? 'bg-slate-800 border-white/5' : 'bg-white'}`}>
+               <h3 className="font-black italic uppercase text-xs mb-6">Initiate Discussion</h3>
+               <form onSubmit={handleCreateForum} className="space-y-4">
+                  <select className="admin-input" value={forumData.course} onChange={e => setForumData({...forumData, course: e.target.value})}>
+                    {availableCourses.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                  <input required className="admin-input" placeholder="Title" value={forumData.title} onChange={e => setForumData({...forumData, title: e.target.value})}/>
+                  <textarea required className="admin-input h-32" placeholder="Opening content..." value={forumData.content} onChange={e => setForumData({...forumData, content: e.target.value})}/>
+                  <button className="w-full py-5 bg-purple-600 text-white rounded-2xl font-black text-[10px] uppercase shadow-lg">Launch Thread</button>
+               </form>
+               <hr className="my-6 border-gray-100/10" />
+               <div className="overflow-y-auto flex-1">
                 {allThreads.map(thread => (
-                  <div key={thread.id} onClick={() => setActiveThread(thread)} className={`p-6 cursor-pointer transition-all ${activeThread?.id === thread.id ? 'bg-red-50/10 border-r-4 border-r-red-600' : 'hover:bg-gray-50/5'}`}>
-                    <span className="text-[8px] font-black px-2 py-0.5 bg-blue-100 text-blue-600 rounded-md uppercase mb-2 inline-block">{thread.course}</span>
-                    <p className="font-black text-sm">{thread.title}</p>
-                    <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase">By: {thread.studentName}</p>
+                  <div key={thread.id} onClick={() => setActiveThread(thread)} className={`p-4 mb-2 rounded-2xl cursor-pointer transition-all ${activeThread?.id === thread.id ? 'bg-blue-500 text-white' : 'hover:bg-gray-50/5 border'}`}>
+                    <p className="text-[10px] font-black uppercase opacity-60">{thread.course}</p>
+                    <p className="font-bold text-sm truncate">{thread.title}</p>
                   </div>
                 ))}
-              </div>
+               </div>
             </div>
-            <div className={`flex-1 rounded-[2.5rem] shadow-2xl border flex flex-col overflow-hidden ${darkMode ? 'bg-slate-800 border-white/5' : 'bg-white border-gray-100'}`}>
+            
+            <div className={`flex-1 rounded-[2.5rem] shadow-2xl border flex flex-col overflow-hidden ${darkMode ? 'bg-slate-800 border-white/5' : 'bg-white'}`}>
               {activeThread ? (
                 <>
                   <div className="p-8 border-b bg-gray-50/5">
                     <h3 className="font-black text-2xl mb-2">{activeThread.title}</h3>
-                    <p className="text-sm leading-relaxed opacity-70">{activeThread.content}</p>
+                    <p className="text-sm opacity-70">{activeThread.content}</p>
                   </div>
                   <div className="flex-1 p-8 overflow-y-auto">
-                     <div className="bg-red-600 text-white p-5 rounded-[2rem] rounded-tr-none ml-auto max-w-[80%] shadow-xl shadow-red-100 mb-4">
-                        <p className="text-[10px] font-black uppercase mb-1 opacity-70">Administrator Override</p>
-                        <p className="text-sm font-bold">You are interacting as Super Admin. Your reply is visible globally.</p>
+                     <div className="bg-red-600 text-white p-5 rounded-[2rem] rounded-tr-none ml-auto max-w-[80%] shadow-xl mb-4">
+                        <p className="text-[10px] font-black uppercase mb-1 opacity-70">Administrator Authority</p>
+                        <p className="text-sm font-bold">Post your reply as Super Admin.</p>
                      </div>
                   </div>
                   <form onSubmit={handleAdminReply} className="p-6 border-t border-gray-100/10 flex gap-4">
@@ -438,6 +474,22 @@ const SuperAdmin = () => {
                   {loading ? <Loader2 className="animate-spin"/> : <><Send size={18}/> Register & Notify</>}
                 </button>
               </form>
+            </div>
+            
+            {/* System Users List (Added to make it complete) */}
+            <div className={`p-10 rounded-[3rem] shadow-xl border ${darkMode ? 'bg-slate-800 border-white/5' : 'bg-white border-gray-100'}`}>
+              <h3 className="font-black text-xs uppercase mb-6">Active System Users</h3>
+              <div className="space-y-3">
+                {systemUsers.map(user => (
+                  <div key={user.id} className="flex items-center justify-between p-4 border rounded-2xl">
+                    <div>
+                      <p className="font-bold text-sm">{user.fullName}</p>
+                      <p className="text-[10px] opacity-60 uppercase">{user.role}</p>
+                    </div>
+                    <button onClick={() => deleteUser(user.id)} className="text-red-500 p-2"><Trash2 size={16}/></button>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
