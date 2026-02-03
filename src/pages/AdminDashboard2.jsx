@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
-import { collection, addDoc, getDocs, serverTimestamp, query, orderBy } from 'firebase/firestore';
-import { Users, BookOpen, Send, Mail, MessageSquare, PlusCircle, LayoutGrid, CheckCircle } from 'lucide-react';
+import { collection, addDoc, getDocs, serverTimestamp, query, orderBy, deleteDoc, doc } from 'firebase/firestore';
+import { Users, BookOpen, Mail, PlusCircle, CheckCircle } from 'lucide-react';
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('inquiries');
@@ -18,15 +18,37 @@ const AdminDashboard = () => {
   });
 
   // Fetch Inquiries from Firebase
-  useEffect(() => {
-    const fetchInquiries = async () => {
+  const fetchInquiries = async () => {
+    try {
       const q = query(collection(db, "inquiries"), orderBy("createdAt", "desc"));
       const querySnapshot = await getDocs(q);
       const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setInquiries(data);
-    };
+    } catch (err) {
+      console.error("🔥 Inquiry Fetch Error:", err);
+      // Fallback idan index bai riga ya kammala ba
+      const querySnapshot = await getDocs(collection(db, "inquiries"));
+      const data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setInquiries(data);
+    }
+  };
+
+  useEffect(() => {
     fetchInquiries();
   }, []);
+
+  // Handle Delete Inquiry
+  const handleDeleteInquiry = async (id) => {
+    if (window.confirm("Shin kana da tabbacin kana son goge wannan sako?")) {
+      try {
+        await deleteDoc(doc(db, "inquiries", id));
+        setInquiries(inquiries.filter(item => item.id !== id));
+        alert("An goge sako cikin nasara.");
+      } catch (error) {
+        alert("An samu matsala wajen goge sako.");
+      }
+    }
+  };
 
   // Handle Course Upload
   const handleCourseUpload = async (e) => {
@@ -78,29 +100,34 @@ const AdminDashboard = () => {
         </header>
 
         {activeTab === 'inquiries' ? (
-          /* SECTION 1: INQUIRIES LIST */
           <div className="grid grid-cols-1 gap-6">
             {inquiries.length > 0 ? inquiries.map((item) => (
-              <div key={item.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between gap-6">
-                <div className="space-y-2">
+              <div key={item.id} className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col md:flex-row justify-between gap-6 hover:shadow-md transition-shadow">
+                <div className="space-y-2 flex-grow">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-black text-gray-900">{item.fullName}</h3>
-                    <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded font-black">{item.serviceTier}</span>
+                    <h3 className="text-lg font-black text-gray-900">{item.fullName || "No Name"}</h3>
+                    <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-1 rounded font-black uppercase tracking-widest">{item.serviceTier}</span>
                   </div>
                   <p className="text-gray-500 text-sm flex items-center gap-2"><Mail size={14}/> {item.email}</p>
-                  <p className="text-gray-700 bg-gray-50 p-4 rounded-2xl italic text-sm mt-4 border border-dashed border-gray-200">
-                    "{item.message}"
-                  </p>
+                  <div className="bg-gray-50 p-4 rounded-2xl border border-dashed border-gray-200 mt-4">
+                    <p className="text-gray-700 italic text-sm leading-relaxed">
+                      "{item.message}"
+                    </p>
+                  </div>
                 </div>
-                <div className="flex flex-col justify-center gap-2">
-                  <button className="px-6 py-2 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-gray-700">Reply Email</button>
-                  <button className="px-6 py-2 border border-gray-200 text-gray-500 rounded-xl font-bold text-sm hover:bg-red-50 hover:text-red-500">Delete</button>
+                <div className="flex flex-col justify-center gap-2 min-w-[140px]">
+                  <a href={`mailto:${item.email}`} className="text-center px-6 py-3 bg-gray-900 text-white rounded-xl font-bold text-sm hover:bg-gray-700 transition-colors">Reply Email</a>
+                  <button 
+                    onClick={() => handleDeleteInquiry(item.id)}
+                    className="px-6 py-3 border border-gray-200 text-gray-400 rounded-xl font-bold text-sm hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-all"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
-            )) : <p className="text-gray-400 font-bold">No inquiries found yet.</p>}
+            )) : <p className="text-gray-400 font-bold p-10 bg-white rounded-3xl text-center border-2 border-dashed">No inquiries found yet.</p>}
           </div>
         ) : (
-          /* SECTION 2: COURSE UPLOADER (LMS) */
           <div className="max-w-3xl bg-white p-10 rounded-[2.5rem] shadow-sm border border-gray-100">
             <h2 className="text-2xl font-black mb-8 flex items-center gap-3">
               <PlusCircle className="text-blue-600" /> Add New Global Lesson
@@ -120,7 +147,7 @@ const AdminDashboard = () => {
                 <div className="space-y-2">
                   <label className="text-xs font-black uppercase tracking-widest text-gray-400">Category</label>
                   <select 
-                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold"
+                    className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold appearance-none"
                     value={courseData.category}
                     onChange={(e) => setCourseData({...courseData, category: e.target.value})}
                   >
@@ -145,7 +172,7 @@ const AdminDashboard = () => {
                 <label className="text-xs font-black uppercase tracking-widest text-gray-400">Lesson Description</label>
                 <textarea 
                   rows="4"
-                  className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold"
+                  className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold resize-none"
                   value={courseData.description}
                   onChange={(e) => setCourseData({...courseData, description: e.target.value})}
                   placeholder="Explain what students will learn..."
@@ -155,7 +182,7 @@ const AdminDashboard = () => {
               <button 
                 type="submit" 
                 disabled={loading}
-                className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-lg hover:bg-blue-700 shadow-xl shadow-blue-100 disabled:opacity-50"
+                className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-lg hover:bg-blue-700 shadow-xl shadow-blue-100 disabled:opacity-50 transition-all transform active:scale-95"
               >
                 {loading ? "Uploading to Global Server..." : "Publish Lesson"}
               </button>
