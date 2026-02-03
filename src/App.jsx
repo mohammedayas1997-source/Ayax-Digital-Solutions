@@ -9,9 +9,9 @@ import Privacy from './pages/Privacy';
 import Navbar from './components/Navbar';
 import Home from './pages/Home'; 
 import ProjectForm from './components/ProjectForm';
-import CourseEnrollment from './pages/CourseEnrollment'; // Enrollment logic
+import CourseEnrollment from './pages/CourseEnrollment'; 
 import AdminDashboard from './pages/AdminDashboard2';
-import Login from './pages/Login'; // Legacy Login
+import Login from './pages/Login'; 
 import AuthPortal from './components/AuthPortal';
 import StudentPortal from './components/StudentPortal';
 import ProtectedRoute from './components/ProtectedRoute'; 
@@ -64,13 +64,12 @@ function App() {
           <Route path="/portal" element={<AuthPortal />} />
           <Route path="/login" element={<StudentLogin />} />
           
-          {/* Muna amfani da AdminLogin.jsx don Gateway */}
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
           
-          {/* Super Admin Route da aka kare shi */}
+          {/* Super Admin Route - Na gyara requiredRole don ya yarda da super-admin */}
           <Route path="/super-admin" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="super-admin">
               <SuperAdmin />
             </ProtectedRoute>
           } />
@@ -119,57 +118,57 @@ function App() {
 
           {/* --- ADMIN SECURE INFRASTRUCTURE --- */}
           
-          {/* Nan na canza zuwa SuperAdmin don shine sabon dashboard din da kake so */}
+          {/* SHI MA NAN NA GYARA ZUWA super-admin TUNDA SHI NE A DB DIN KA */}
           <Route path="/admin-dashboard" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="super-admin">
               <SuperAdmin />
             </ProtectedRoute>
           } />
 
           <Route path="/admin/courses" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="super-admin">
               <AdminCourseList />
             </ProtectedRoute>
           } />
 
           <Route path="/admin/dashboard/:courseId" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="super-admin">
               <AdminCourseDashboard />
             </ProtectedRoute>
           } />
 
           <Route path="/admin/students/:courseId" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="super-admin">
               <AdminStudentsList />
             </ProtectedRoute>
           } />
 
           <Route path="/admin/grading" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="super-admin">
               <AdminGrading />
             </ProtectedRoute>
           } />
 
           <Route path="/admin/grading/:courseId" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="super-admin">
               <AdminGrading />
             </ProtectedRoute>
           } />
 
           <Route path="/admin/questions" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="super-admin">
               <AdminQuestionBank />
             </ProtectedRoute>
           } />
 
           <Route path="/admin/questions/:courseId" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="super-admin">
               <AdminQuestionBank />
             </ProtectedRoute>
           } />
 
           <Route path="/admin/chat/:courseId" element={
-            <ProtectedRoute requiredRole="admin">
+            <ProtectedRoute requiredRole="super-admin">
               <AdminChatManager />
             </ProtectedRoute>
           } />
