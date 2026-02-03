@@ -1,24 +1,27 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
-import { getStorage } from "firebase/storage"; // 1. Mun kara wannan import din
+import { getStorage } from "firebase/storage";
+import { getAnalytics } from "firebase/analytics";
 
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "your-app.firebaseapp.com",
-  projectId: "your-app-id",
-  storageBucket: "your-app.appspot.com",
-  messagingSenderId: "123456789",
-  appId: "your-app-id"
+  apiKey: "AIzaSyBv1uD0HLzXntNV-Kp06M63TIP1GqUF3c4",
+  authDomain: "ayax-digital-solutions.firebaseapp.com",
+  projectId: "ayax-digital-solutions",
+  storageBucket: "ayax-digital-solutions.firebasestorage.app",
+  messagingSenderId: "253800759881",
+  appId: "1:253800759881:web:77bb4f78233f387f9ff598",
+  measurementId: "G-WZ23YW88SX"
 };
 
-// 2. Dole a fara initialize app kafin kowa
+// 1. Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// 3. Yanzu sai a fitar da sauran abubuwan
+// 2. Export Services (Hanya mafi sauki kuma ingantacciya)
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-export const storage = getStorage(app); 
+export const storage = getStorage(app);
+export const analytics = getAnalytics(app);
 
-// KAR KA SAKE YIN "export { db, storage }" A KASA. 
-// Tunda ka sa "export" a gaban "const", ya riga ya tafi.
+// KADA KA SAKE SA "export { db, storage }" A KASA! 
+// Tunda ka riga ka sa "export" a layin 19, 20, da 21.
