@@ -1,19 +1,29 @@
 import React, { useState } from 'react';
 import { auth } from "../firebaseConfig";
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { LogIn, ShieldAlert } from 'lucide-react';
+import { LogIn, ShieldAlert, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom'; // Mun ƙara wannan
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate(); // Initialize navigate
 
   const handleLogin = async (e) => {
     e.preventDefault();
+    setLoading(true);
     try {
+      // Shigar da user
       await signInWithEmailAndPassword(auth, email, password);
-      window.location.href = "/admin-dashboard"; // Redirect after success
+      
+      // Maimakon window.location, yi amfani da navigate
+      navigate("/admin-dashboard"); 
     } catch (error) {
       alert("Unauthorized Access: Check credentials.");
+      console.error(error.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -28,17 +38,28 @@ const Login = () => {
         <h2 className="text-2xl font-black text-center mb-8 text-gray-900">Admin Gateway</h2>
         <div className="space-y-4">
           <input 
-            type="email" placeholder="Admin Email" 
+            type="email" 
+            placeholder="Admin Email" 
+            required
             className="w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => setEmail(e.target.value.toLowerCase())} // lower case!
           />
           <input 
-            type="password" placeholder="Password" 
+            type="password" 
+            placeholder="Password" 
+            required
             className="w-full p-4 bg-gray-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-500"
             onChange={(e) => setPassword(e.target.value)}
           />
-          <button className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black">
-            Access Dashboard <LogIn size={20} />
+          <button 
+            disabled={loading}
+            className="w-full py-4 bg-gray-900 text-white rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-black disabled:opacity-50"
+          >
+            {loading ? (
+              <Loader2 className="animate-spin" size={20} />
+            ) : (
+              <>Access Dashboard <LogIn size={20} /></>
+            )}
           </button>
         </div>
       </form>
