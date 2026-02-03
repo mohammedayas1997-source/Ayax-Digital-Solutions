@@ -15,29 +15,29 @@ const AdminLogin = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // 1. Matakin Farko: Shigar da User ta amfani da Firebase Auth
+      // 1. Initial Phase: Authenticate User via Firebase Auth
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Mataki na Biyu: Duba Firestore don tabbatar da Role dinsa
+      // 2. Secondary Phase: Validate Role via Firestore
       const userDoc = await getDoc(doc(db, "users", user.uid));
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
         const role = userData.role;
 
-        // 3. Mataki na Uku: Rabon hanya gwargwadon Role (super-admin, admin, ko malami)
+        // 3. Tertiary Phase: Route distribution based on Role (super-admin, admin, or teacher)
         if (role === 'super-admin' || role === 'admin') {
           navigate("/admin-dashboard");
         } else if (role === 'malami' || role === 'teacher') {
           navigate("/teacher-portal");
         } else {
           await auth.signOut();
-          alert("ACCESS DENIED: Ba ka da izinin shiga wannan bangaren.");
+          alert("ACCESS DENIED: You do not have the required permissions to access this terminal.");
         }
       } else {
         await auth.signOut();
-        alert("ERROR: Ba a sami bayananka a database ba. Tabbatar Document ID ya yi daidai da UID.");
+        alert("DATABASE ERROR: Profile not found. Ensure Firestore Document ID matches Auth UID.");
       }
 
     } catch (error) {
@@ -75,13 +75,12 @@ const AdminLogin = () => {
 
           <div className="space-y-4">
             <div className="relative group">
-              {/* NA CIRE 'uppercase' A NAN DOMIN EMAIL DIN YA FITA NORMAL */}
               <input 
                 type="email" 
                 placeholder="IDENTIFIER (Email)" 
                 required
                 className="w-full p-6 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-red-600 focus:bg-white/10 text-white font-bold text-[11px] tracking-[0.1em] transition-all placeholder:text-gray-700"
-                onChange={(e) => setEmail(e.target.value.toLowerCase())} // Tabbatar email din lowercase ne
+                onChange={(e) => setEmail(e.target.value.toLowerCase())} 
               />
             </div>
 
