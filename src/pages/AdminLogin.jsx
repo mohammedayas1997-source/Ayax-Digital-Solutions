@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { auth, db } from "../firebaseConfig"; // Mun ƙara db (Firestore)
+import { auth, db } from "../firebaseConfig";
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore'; // Don duba role a database
+import { doc, getDoc } from 'firebase/firestore';
 import { ShieldAlert, Terminal, Loader2, Key } from 'lucide-react';
 import { useNavigate } from 'react-router-dom'; 
 
@@ -19,21 +19,29 @@ const AdminLogin = () => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
-      // 2. Mataki na Biyu: Duba Firestore don tabbatar da Role ɗinsa
+      // 2. Mataki na Biyu: Duba Firestore don tabbatar da Role dinsa
       const userDoc = await getDoc(doc(db, "users", user.uid));
 
-      if (userDoc.exists() && userDoc.data().role === 'admin') {
-        // Idan shi Admin ne, tura shi Dashboard
-        navigate("/admin-dashboard");
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const role = userData.role;
+
+        // 3. Mataki na Uku: Rabon hanya gwargwadon Role (super-admin, admin, ko malami)
+        if (role === 'super-admin' || role === 'admin') {
+          navigate("/admin-dashboard");
+        } else if (role === 'malami' || role === 'teacher') {
+          navigate("/teacher-portal");
+        } else {
+          await auth.signOut();
+          alert("ACCESS DENIED: Ba ka da izinin shiga wannan bangaren.");
+        }
       } else {
-        // Idan ba Admin ba ne, cire shi daga system ɗin
         await auth.signOut();
-        alert("ACCESS DENIED: Your account does not have Admin privileges.");
+        alert("ERROR: Ba a sami bayananka a database ba. Tabbatar Document ID ya yi daidai da UID.");
       }
 
     } catch (error) {
-      // Idan password ba daidai ba ko babu email ɗin
-      alert("CRITICAL: Unauthorized access attempt detected. Credentials rejected.");
+      alert("CRITICAL: Identity verification failed. Check credentials.");
       console.error("Login Error:", error.message);
     } finally {
       setLoading(false);
@@ -50,32 +58,30 @@ const AdminLogin = () => {
       <div className="max-w-md w-full relative z-10">
         <form onSubmit={handleLogin} className="bg-[#0a0a0a] p-12 rounded-[3.5rem] border border-white/5 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)]">
           
-          {/* Top Shield Icon */}
           <div className="flex justify-center mb-10">
             <div className="p-6 bg-red-600/10 rounded-3xl text-red-600 border border-red-600/20 shadow-[0_0_30px_-5px_rgba(220,38,38,0.3)]">
               <ShieldAlert size={44} />
             </div>
           </div>
           
-          {/* Header Texts */}
           <div className="text-center mb-12">
             <h2 className="text-3xl font-black text-white uppercase tracking-tighter leading-none">
-              Admin <br/> <span className="text-red-600">Gateway</span>
+              Security <br/> <span className="text-red-600">Gateway</span>
             </h2>
             <p className="text-red-500/40 font-black text-[9px] uppercase tracking-[0.5em] mt-4 flex items-center justify-center gap-2 italic">
               <Key size={12} /> Root Access Protocol
             </p>
           </div>
 
-          {/* Input Fields */}
           <div className="space-y-4">
             <div className="relative group">
+              {/* NA CIRE 'uppercase' A NAN DOMIN EMAIL DIN YA FITA NORMAL */}
               <input 
                 type="email" 
-                placeholder="ADMIN_IDENTIFIER" 
+                placeholder="IDENTIFIER (Email)" 
                 required
-                className="w-full p-6 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-red-600 focus:bg-white/10 text-white font-bold text-[10px] tracking-[0.2em] transition-all uppercase placeholder:text-gray-700"
-                onChange={(e) => setEmail(e.target.value)}
+                className="w-full p-6 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-red-600 focus:bg-white/10 text-white font-bold text-[11px] tracking-[0.1em] transition-all placeholder:text-gray-700"
+                onChange={(e) => setEmail(e.target.value.toLowerCase())} // Tabbatar email din lowercase ne
               />
             </div>
 
@@ -89,7 +95,6 @@ const AdminLogin = () => {
               />
             </div>
 
-            {/* Login Button */}
             <button 
               disabled={loading}
               className="w-full py-6 bg-red-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 hover:bg-red-700 transition-all shadow-2xl shadow-red-900/40 disabled:opacity-50 active:scale-95"
@@ -105,7 +110,6 @@ const AdminLogin = () => {
             </button>
           </div>
           
-          {/* System Footer Status */}
           <div className="mt-12 text-center">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full">
               <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div>
