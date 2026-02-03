@@ -1,29 +1,39 @@
 import React, { useState } from 'react';
-import { auth } from "../firebaseConfig";
+import { auth, db } from "../firebaseConfig"; // Mun ƙara db (Firestore)
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore'; // Don duba role a database
 import { ShieldAlert, Terminal, Loader2, Key } from 'lucide-react';
-// 1. Mun ƙara useNavigate don magance 404 error
 import { useNavigate } from 'react-router-dom'; 
 
 const AdminLogin = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate(); // 2. Initialize navigate
+  const navigate = useNavigate(); 
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Tabbatar da Admin ta amfani da Firebase Auth
-      await signInWithEmailAndPassword(auth, email, password);
-      
-      // 3. Mun canza window.location.href zuwa navigate()
-      // Wannan zai sa React Router ya tura ka ba tare da 404 error ba
-      navigate("/admin-dashboard"); 
+      // 1. Matakin Farko: Shigar da User ta amfani da Firebase Auth
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // 2. Mataki na Biyu: Duba Firestore don tabbatar da Role ɗinsa
+      const userDoc = await getDoc(doc(db, "users", user.uid));
+
+      if (userDoc.exists() && userDoc.data().role === 'admin') {
+        // Idan shi Admin ne, tura shi Dashboard
+        navigate("/admin-dashboard");
+      } else {
+        // Idan ba Admin ba ne, cire shi daga system ɗin
+        await auth.signOut();
+        alert("ACCESS DENIED: Your account does not have Admin privileges.");
+      }
 
     } catch (error) {
-      alert("CRITICAL: Unauthorized access attempt detected. Admin credentials rejected.");
+      // Idan password ba daidai ba ko babu email ɗin
+      alert("CRITICAL: Unauthorized access attempt detected. Credentials rejected.");
       console.error("Login Error:", error.message);
     } finally {
       setLoading(false);
