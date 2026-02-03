@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { auth } from "../firebaseConfig";
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth, db } from "../firebaseConfig"; // Tabbatar ka shigo da db
+import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, Lock, ArrowRight, Loader2, UserCheck } from 'lucide-react';
+import { BookOpen, ArrowRight, Loader2, UserCheck } from 'lucide-react';
 
 const StudentLogin = () => {
   const [email, setEmail] = useState('');
@@ -13,10 +14,33 @@ const StudentLogin = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
     try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate("/student-dashboard"); 
+      // 1. Yi Login da Firebase Auth
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+
+      // 2. Duba matsayin mai login (Role) a Firestore
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        
+        // 3. KYAUTATAWA: Idan dalibi ne kawai ya wuce
+        if (userData.role === 'student') {
+          navigate("/student-dashboard");
+        } else {
+          // Idan Admin ne ko Malami ya yi kokarin shiga ta nan, a kore shi
+          await signOut(auth);
+          alert("RESTRICTED: This portal is for students only. Use the Admin Gateway.");
+        }
+      } else {
+        await signOut(auth);
+        alert("ACCOUNT ERROR: No student profile found. Please contact administration.");
+      }
     } catch (error) {
+      console.error(error);
       alert("AUTHENTICATION ERROR: Student record not found or invalid credentials.");
     } finally {
       setLoading(false);
@@ -26,34 +50,29 @@ const StudentLogin = () => {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-6 selection:bg-blue-600 selection:text-white">
       <div className="max-w-md w-full relative">
-        {/* Academic Branding */}
         <div className="text-center mb-12">
           <div className="w-20 h-20 bg-blue-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-blue-200">
             <BookOpen className="text-white" size={32} />
           </div>
-          <h2 className="text-4xl font-black text-gray-900 tracking-tighter uppercase leading-none">Student <br/> <span className="text-blue-600">Portal</span></h2>
+          <h2 className="text-4xl font-black text-gray-900 tracking-tighter uppercase leading-none italic">Student <br/> <span className="text-blue-600 font-black">Portal</span></h2>
           <p className="text-gray-400 font-bold text-[10px] uppercase tracking-[0.3em] mt-4">Authorized Academic Access Only</p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-4">
-          <div className="group relative">
-            <input 
-              type="email" 
-              placeholder="STUDENT EMAIL ADDRESS" 
-              required
-              className="w-full p-6 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all font-bold text-xs tracking-widest uppercase placeholder:text-gray-300"
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div className="group relative">
-            <input 
-              type="password" 
-              placeholder="ACCOUNT PASSWORD" 
-              required
-              className="w-full p-6 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all font-bold text-xs tracking-widest uppercase placeholder:text-gray-300"
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
+          <input 
+            type="email" 
+            placeholder="STUDENT EMAIL ADDRESS" 
+            required
+            className="w-full p-6 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all font-bold text-xs tracking-widest uppercase placeholder:text-gray-300 shadow-sm"
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <input 
+            type="password" 
+            placeholder="ACCOUNT PASSWORD" 
+            required
+            className="w-full p-6 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all font-bold text-xs tracking-widest uppercase placeholder:text-gray-300 shadow-sm"
+            onChange={(e) => setPassword(e.target.value)}
+          />
           <button 
             disabled={loading}
             className="w-full py-6 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 active:scale-95"

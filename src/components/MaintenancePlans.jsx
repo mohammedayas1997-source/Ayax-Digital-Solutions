@@ -21,6 +21,13 @@ import {
 
 const MaintenancePlans = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
+  
+  // Sabbin states don tattara bayanai
+  const [formData, setFormData] = useState({
+    fullName: '',
+    phone: '',
+    url: ''
+  });
 
   const plans = [
     {
@@ -66,8 +73,23 @@ const MaintenancePlans = () => {
     }
   ];
 
+  // Function din tura sako zuwa WhatsApp
+  const handleWhatsAppSubmit = (e) => {
+    e.preventDefault();
+    
+    const phoneNumber = "234XXXXXXXXXX"; // Sanya lambar WhatsApp dinka a nan (misali 2348030000000)
+    const message = `*NEW MAINTENANCE REQUEST*%0A%0A` +
+                    `*Plan:* ${selectedPlan.name}%0A` +
+                    `*Price:* ${selectedPlan.price}%0A` +
+                    `*Client Name:* ${formData.fullName}%0A` +
+                    `*Phone/WA:* ${formData.phone}%0A` +
+                    `*Asset URL:* ${formData.url || 'Not Provided'}`;
+
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
   return (
-    // NAN NE: Na sanya bg-blue-50 (Lite Blue) wanda yake da dadi a kallo
     <section id="maintenance" className="bg-[#f0f9ff] py-24 px-6 relative font-sans transition-colors duration-500">
       <div className="max-w-[1700px] mx-auto">
         <div className="text-center mb-20">
@@ -92,7 +114,6 @@ const MaintenancePlans = () => {
               </div>
 
               <div className="p-8 pt-6 flex flex-col flex-grow">
-                {/* Dynamic BG color handling */}
                 <div className={`p-4 rounded-2xl w-fit mb-6 transition-transform group-hover:scale-110 duration-500 ${
                   plan.color === 'blue' ? 'bg-blue-50 text-blue-600' :
                   plan.color === 'emerald' ? 'bg-emerald-50 text-emerald-600' :
@@ -127,10 +148,9 @@ const MaintenancePlans = () => {
         </div>
       </div>
 
-      {/* --- ACTIVATION MODAL FORM --- */}
       {selectedPlan && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-blue-950/40 backdrop-blur-xl">
-          <div className="bg-white text-gray-900 w-full max-w-xl rounded-[3.5rem] p-10 md:p-14 relative shadow-2xl animate-in zoom-in duration-300 max-h-[92vh] overflow-y-auto border-[8px] border-white">
+          <div className="bg-white text-gray-900 w-full max-w-xl rounded-[3.5rem] p-10 md:p-14 relative shadow-2xl animate-in zoom-in duration-300 max-h-[92vh] overflow-y-auto border-[8px] border-white text-left">
             
             <button 
               onClick={() => setSelectedPlan(null)}
@@ -139,7 +159,7 @@ const MaintenancePlans = () => {
               <X size={24} />
             </button>
             
-            <div className="mb-10 text-left">
+            <div className="mb-10">
               <span className="text-[10px] font-black px-5 py-2 rounded-full uppercase tracking-widest bg-blue-600 text-white">
                 Maintenance Request
               </span>
@@ -147,24 +167,44 @@ const MaintenancePlans = () => {
               <p className="text-blue-600 mt-2 font-bold text-lg italic">Infrastructure Support Asset</p>
             </div>
 
-            <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={(e) => e.preventDefault()}>
+            <form className="grid grid-cols-1 md:grid-cols-2 gap-6" onSubmit={handleWhatsAppSubmit}>
               <div className="md:col-span-1">
                 <label className="flex items-center gap-2 text-[10px] font-black uppercase mb-3 text-gray-400 tracking-widest"><User size={14}/> Full Name</label>
-                <input type="text" placeholder="Johnathan Ayax" className="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold transition-all" required />
+                <input 
+                  type="text" 
+                  placeholder="Johnathan Ayax" 
+                  className="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold transition-all" 
+                  required 
+                  onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+                />
               </div>
 
               <div className="md:col-span-1">
                 <label className="flex items-center gap-2 text-[10px] font-black uppercase mb-3 text-gray-400 tracking-widest"><Phone size={14}/> Phone / WhatsApp</label>
-                <input type="tel" placeholder="+234..." className="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold transition-all" required />
+                <input 
+                  type="tel" 
+                  placeholder="+234..." 
+                  className="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold transition-all" 
+                  required 
+                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                />
               </div>
 
               <div className="md:col-span-2">
                 <label className="flex items-center gap-2 text-[10px] font-black uppercase mb-3 text-gray-400 tracking-widest"><Globe size={14}/> Asset URL (Website/App)</label>
-                <input type="text" placeholder="https://yourportal.com" className="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold transition-all" />
+                <input 
+                  type="text" 
+                  placeholder="https://yourportal.com" 
+                  className="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold transition-all" 
+                  onChange={(e) => setFormData({...formData, url: e.target.value})}
+                />
               </div>
 
               <div className="md:col-span-2">
-                <button className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 hover:bg-blue-700 shadow-2xl shadow-blue-200 transition-all active:scale-95">
+                <button 
+                  type="submit"
+                  className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black text-xl flex items-center justify-center gap-4 hover:bg-blue-700 shadow-2xl shadow-blue-200 transition-all active:scale-95"
+                >
                   Confirm Activation <Send size={24} />
                 </button>
                 <p className="text-center text-[9px] text-gray-400 mt-6 uppercase font-black tracking-[0.4em]">Secure System Provisioning</p>

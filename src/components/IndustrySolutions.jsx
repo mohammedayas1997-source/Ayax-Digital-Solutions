@@ -114,7 +114,66 @@ const IndustrySolutions = () => {
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><Mail size={16}/> Professional Email</label>
                 <input type="email" placeholder="contact@organization.com" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all" required />
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+  {/* WhatsApp/Phone Number */}
+  <div className="space-y-2 text-left">
+    <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">WhatsApp Number</label>
+    <input 
+      type="tel" 
+      placeholder="+234..."
+      className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
+      onChange={(e) => setFormData({...formData, phone: e.target.value})}
+      required
+    />
+  </div>
 
+  {/* Country */}
+  <div className="space-y-2 text-left">
+    <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Country</label>
+    <input 
+      type="text" 
+      placeholder="e.g. Nigeria"
+      className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
+      onChange={(e) => setFormData({...formData, country: e.target.value})}
+      required
+    />
+  </div>
+
+  {/* State */}
+  <div className="space-y-2 text-left">
+    <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">State</label>
+    <input 
+      type="text" 
+      placeholder="e.g. Kano, Lagos, Abuja"
+      className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
+      onChange={(e) => setFormData({...formData, state: e.target.value})}
+      required
+    />
+  </div>
+
+  {/* LGA */}
+  <div className="space-y-2 text-left">
+    <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Local Government (LGA)</label>
+    <input 
+      type="text" 
+      placeholder="Enter your LGA"
+      className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
+      onChange={(e) => setFormData({...formData, lga: e.target.value})}
+      required
+    />
+  </div>
+
+  {/* Full Residential Address */}
+  <div className="space-y-2 md:col-span-2 text-left">
+    <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Residential Address</label>
+    <textarea 
+      placeholder="House No, Street Name, City/Town..."
+      className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900 h-24"
+      onChange={(e) => setFormData({...formData, address: e.target.value})}
+      required
+    ></textarea>
+  </div>
+</div>
               {/* Additional Message */}
               <div className="md:col-span-2">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><MessageSquare size={16}/> Additional Requirements</label>

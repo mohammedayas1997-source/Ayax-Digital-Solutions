@@ -15,19 +15,21 @@ import {
   Lock
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom'; 
-
-// Tabbatar wadannan files din suna nan a folder ta components
+import { Cpu, X } from 'lucide-react';
 import Navbar from '../components/Navbar';
 import PricingCard from '../components/PricingCard';
 import MaintenancePlans from '../components/MaintenancePlans';
 import IndustrySolutions from '../components/IndustrySolutions';
-
+import CourseSection from '../components/CourseSection';
 const Home = () => {
   const navigate = useNavigate();
 
   return (
     <div className="bg-white min-h-screen selection:bg-blue-600 selection:text-white">
       <Navbar />
+
+      <div><div className="w-full h-1.5 bg-sky-400 relative z-[60]"></div>
+      </div>
 
       {/* --- PREMIUM HERO SECTION --- */}
       <section className="relative pt-0 pb-16 overflow-hidden bg-[#020617] min-h-[85vh] flex items-center">
@@ -55,23 +57,30 @@ const Home = () => {
                 At <span className="font-bold text-white">AYAX Digital Solutions</span>, we turn effort into impact. From high-end apps to global-scale websites, we build it all.
               </p>
 
-              <div className="flex flex-wrap gap-4">
-                <button 
-                  onClick={() => navigate('/enroll')}
-                  className="group px-8 py-4 bg-blue-600 text-white rounded-2xl font-bold flex items-center gap-2 hover:bg-blue-700 transition-all duration-300 shadow-xl shadow-blue-900/20"
-                >
-                  Apply for Courses 
-                  <BookOpen size={20} className="group-hover:rotate-12 transition-transform" />
-                </button>
-                
-                <button 
-                  onClick={() => navigate('/about')}
-                  className="px-8 py-4 border-2 border-white/10 text-white rounded-2xl font-bold hover:bg-white/5 transition-all"
-                >
-                  Our Work
-                </button>
-              </div>
+              <div className="flex flex-wrap items-center justify-center gap-4 mt-10">
+             
 
+                    {/* Button 2: Launch Your Project */}
+                    <Link 
+                      to="/launch-project" 
+                      className="px-8 py-4 bg-white/5 backdrop-blur-md border border-white/10 text-white rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-[0.2em] hover:bg-white/10 transition-all flex items-center gap-3 group"
+                    >
+                      Launch Your Project
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">→</span> 
+                        <X size={14} className="opacity-40 group-hover:text-red-400 transition-colors" />
+                      </div>
+                    </Link>
+
+                          {/* Button 3: Our Work */}
+                          <button 
+                            onClick={() => navigate('/about')}
+                            className="px-8 py-4 border-2 border-white/10 text-white rounded-2xl font-bold hover:bg-white/5 transition-all flex items-center gap-3 group"
+                          >
+                            Our Work
+                            <X size={16} className="text-white/30 group-hover:text-white transition-all" />
+                          </button>
+                        </div>
               <div className="mt-12 flex items-center gap-6">
                 <div className="flex -space-x-3">
                   {[1, 2, 3, 4].map((i) => (
@@ -107,6 +116,73 @@ const Home = () => {
         </div>
       </section>
 
+      {/* --- STUDENT PORTAL GATEWAY (NEW) --- */}
+<section className="py-24 bg-sky-500 relative overflow-hidden">
+  <div className="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center justify-between gap-12">
+    <div className="lg:w-1/2">
+      {/* Badge rubutun ya koma Blue */}
+      <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-900/10 border border-blue-900/20 rounded-full mb-6">
+        <Lock className="w-4 h-4 text-blue-900" />
+        <span className="text-[10px] font-black text-blue-900 uppercase tracking-widest">Secured Learning Environment</span>
+      </div>
+
+      {/* Heading duka ya koma Blue */}
+      <h2 className="text-5xl font-black text-blue-900 uppercase tracking-tighter mb-6">
+        Student <span className="text-white">Infrastructure</span> 
+      </h2>
+
+      {/* Paragraph ya koma Blue */}
+      <p className="text-blue-900/80 text-lg font-medium mb-10 max-w-md leading-relaxed">
+        Already enrolled? Access your technical dashboard to monitor curriculum progress, resources, and live project terminals.
+      </p>
+
+      {/* Buttons dake gefen hagu */}
+      <div className="flex flex-wrap items-center justify-start gap-4 mt-10 w-full mb-10">
+        <Link 
+          to="/enroll" 
+          className="px-8 py-4 bg-blue-900 text-white rounded-2xl font-black text-[10px] sm:text-xs uppercase tracking-[0.2em] hover:bg-black transition-all flex items-center gap-3 group relative overflow-hidden"
+        >
+          <div className="p-1.5 bg-blue-400/30 rounded-lg group-hover:scale-110 transition-transform">
+            <Cpu size={18} />
+          </div>
+          Apply For Courses
+          <X size={14} className="ml-2 opacity-50 group-hover:opacity-100 group-hover:rotate-90 transition-all" />
+        </Link>
+      </div>
+
+      {/* Enter Portal Button */}
+      <button 
+        onClick={() => navigate('/login')}
+        className="px-10 py-5 bg-blue-900 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center gap-4 hover:bg-black transition-all group shadow-xl"
+      >
+        Enter Portal <ArrowRight className="group-hover:translate-x-2 transition-transform" />
+      </button>
+    </div>
+    
+    <div className="lg:w-1/2 grid grid-cols-2 gap-4">
+      {/* Stat Boxes rubutu ya koma Blue */}
+      <div className="p-8 bg-white/30 border border-white/40 rounded-3xl backdrop-blur-md">
+        <p className="text-3xl font-black text-blue-900 mb-1 tracking-tighter text-left">24/7</p>
+        <p className="text-[9px] font-black text-blue-800 uppercase tracking-widest text-left">Uptime Access</p>
+      </div>
+      <div className="p-8 bg-white/30 border border-white/40 rounded-3xl backdrop-blur-md">
+        <p className="text-3xl font-black text-blue-900 mb-1 tracking-tighter text-left">100+</p>
+        <p className="text-[9px] font-black text-blue-800 uppercase tracking-widest text-left">HD Resources</p>
+      </div>
+    </div>
+  </div>
+
+  
+  {/* Ado na background circles */}
+  <div className="absolute -top-20 -right-20 w-80 h-80 bg-white/10 rounded-full blur-[80px]"></div>
+  <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-blue-400/30 rounded-full blur-[80px]"></div>
+</section>
+
+{/* --- ACADEMY COURSES SECTION (NEW ADDITION) --- */}
+      <section id="academy-courses">
+         <CourseSection />
+      </section>
+
       {/* --- SERVICES & PRICING --- */}
       <section id="services" className="py-24 bg-gray-50">
         <div className="max-w-7xl mx-auto px-6 text-center mb-16">
@@ -131,38 +207,7 @@ const Home = () => {
         <MaintenancePlans />
       </section>
 
-      {/* --- STUDENT PORTAL GATEWAY (NEW) --- */}
-      <section className="py-24 bg-[#020617] relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col lg:flex-row items-center justify-between gap-12">
-          <div className="lg:w-1/2">
-             <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-500/10 border border-blue-500/20 rounded-full mb-6">
-                <Lock className="w-4 h-4 text-blue-400" />
-                <span className="text-[10px] font-black text-white uppercase tracking-widest">Secured Learning Environment</span>
-             </div>
-             <h2 className="text-5xl font-black text-white uppercase tracking-tighter mb-6">Student <span className="text-blue-600">Infrastructure</span></h2>
-             <p className="text-gray-400 text-lg font-medium mb-10 max-w-md leading-relaxed">
-               Already enrolled? Access your technical dashboard to monitor curriculum progress, resources, and live project terminals.
-             </p>
-             <button 
-               onClick={() => navigate('/login')}
-               className="px-10 py-5 bg-white text-[#020617] rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center gap-4 hover:bg-blue-50 transition-all group"
-             >
-               Enter Portal <ArrowRight className="group-hover:translate-x-2 transition-transform" />
-             </button>
-          </div>
-          <div className="lg:w-1/2 grid grid-cols-2 gap-4">
-             <div className="p-8 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-md">
-                <p className="text-3xl font-black text-white mb-1 tracking-tighter text-left">24/7</p>
-                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest text-left">Uptime Access</p>
-             </div>
-             <div className="p-8 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-md">
-                <p className="text-3xl font-black text-white mb-1 tracking-tighter text-left">100+</p>
-                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest text-left">HD Resources</p>
-             </div>
-          </div>
-        </div>
-        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/10 rounded-full blur-[100px]"></div>
-      </section>
+     
 
       {/* --- FINAL CALL TO ACTION --- */}
       <section className="py-24 px-6 bg-white">

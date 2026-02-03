@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { db } from '../firebaseConfig'; 
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
-import { Send, CheckCircle2, User, Mail, MessageSquare, Layers, Rocket, ShieldCheck } from 'lucide-react';
+import { Send, CheckCircle2, User, Mail, MessageSquare, Layers, Rocket, ShieldCheck, Phone, Globe, MapPin } from 'lucide-react';
 
 const ProjectForm = () => {
   const [loading, setLoading] = useState(false);
@@ -10,6 +10,10 @@ const ProjectForm = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',        
+    state: '',        
+    lga: '',          
+    address: '',      
     tier: 'Starter Care (₦30k/mo)', 
     message: ''
   });
@@ -19,20 +23,33 @@ const ProjectForm = () => {
     setLoading(true);
 
     try {
-      // Shigar da bayanan a cikin 'inquiries' collection
+      // Shigar da bayanan a cikin 'inquiries' collection tare da dukkan sabbin fields
       await addDoc(collection(db, "inquiries"), {
         fullName: formData.name,
         email: formData.email,
+        phone: formData.phone,
+        state: formData.state,
+        lga: formData.lga,
+        address: formData.address,
         serviceTier: formData.tier,
         message: formData.message,
-        status: 'Unread', // Sabon inquiry kullum yana zama unread
+        status: 'Unread',
         priority: 'Medium',
         createdAt: serverTimestamp()
       });
       
       setSubmitted(true);
-      // Sake dawo da form din yadda yake (Reset)
-      setFormData({ name: '', email: '', tier: 'Starter Care (₦30k/mo)', message: '' });
+      // Reset form
+      setFormData({ 
+        name: '', 
+        email: '', 
+        phone: '', 
+        state: '', 
+        lga: '', 
+        address: '', 
+        tier: 'Starter Care (₦30k/mo)', 
+        message: '' 
+      });
     } catch (error) {
       console.error("Firebase Submission Error: ", error);
       alert("Error sending inquiry. Check your internet connection.");
@@ -110,7 +127,7 @@ const ProjectForm = () => {
             
             <div className="mt-16 bg-white/5 p-8 rounded-[2.5rem] border border-white/5 backdrop-blur-xl">
               <div className="flex gap-1 mb-4">
-                 {[1,2,3,4,5].map(i => <div key={i} className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>)}
+                  {[1,2,3,4,5].map(i => <div key={i} className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>)}
               </div>
               <p className="text-[10px] uppercase tracking-[0.2em] font-black mb-3 text-blue-400">Core Philosophy</p>
               <p className="text-xs italic text-gray-400 font-bold leading-relaxed">
@@ -151,9 +168,69 @@ const ProjectForm = () => {
                   className="w-full px-0 py-4 bg-transparent border-b-2 border-gray-100 focus:border-blue-600 outline-none transition-all font-black text-gray-800 placeholder:text-gray-200"
                 />
               </div>
+
+              {/* WhatsApp Number */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <Phone className="w-3 h-3 text-blue-600" /> WhatsApp Number
+                </label>
+                <input 
+                  required
+                  type="tel" 
+                  value={formData.phone}
+                  onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  placeholder="+234..."
+                  className="w-full px-0 py-4 bg-transparent border-b-2 border-gray-100 focus:border-blue-600 outline-none transition-all font-black text-gray-800 placeholder:text-gray-200"
+                />
+              </div>
+
+              {/* State */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <Globe className="w-3 h-3 text-blue-600" /> State
+                </label>
+                <input 
+                  required
+                  type="text" 
+                  value={formData.state}
+                  onChange={(e) => setFormData({...formData, state: e.target.value})}
+                  placeholder="e.g. Kano"
+                  className="w-full px-0 py-4 bg-transparent border-b-2 border-gray-100 focus:border-blue-600 outline-none transition-all font-black text-gray-800 placeholder:text-gray-200"
+                />
+              </div>
+
+              {/* LGA */}
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <MapPin className="w-3 h-3 text-blue-600" /> Local Government (LGA)
+                </label>
+                <input 
+                  required
+                  type="text" 
+                  value={formData.lga}
+                  onChange={(e) => setFormData({...formData, lga: e.target.value})}
+                  placeholder="Enter LGA"
+                  className="w-full px-0 py-4 bg-transparent border-b-2 border-gray-100 focus:border-blue-600 outline-none transition-all font-black text-gray-800 placeholder:text-gray-200"
+                />
+              </div>
+
+              {/* Residential Address */}
+              <div className="md:col-span-2 space-y-3">
+                <label className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <MapPin className="w-3 h-3 text-blue-600" /> Residential Address
+                </label>
+                <input 
+                  required
+                  type="text" 
+                  value={formData.address}
+                  onChange={(e) => setFormData({...formData, address: e.target.value})}
+                  placeholder="House No, Street Name, City..."
+                  className="w-full px-0 py-4 bg-transparent border-b-2 border-gray-100 focus:border-blue-600 outline-none transition-all font-black text-gray-800 placeholder:text-gray-200"
+                />
+              </div>
             </div>
 
-            {/* Service Selection Layer */}
+            {/* Service Selection */}
             <div className="space-y-3">
               <label className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] flex items-center gap-2">
                 <Layers className="w-3 h-3 text-blue-600" /> Strategic Service Tier
@@ -184,7 +261,7 @@ const ProjectForm = () => {
               </div>
             </div>
 
-            {/* Project Deep Dive */}
+            {/* Project Brief */}
             <div className="space-y-3">
               <label className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em] flex items-center gap-2">
                 <MessageSquare className="w-3 h-3 text-blue-600" /> Project Brief
@@ -210,8 +287,8 @@ const ProjectForm = () => {
             </button>
             
             <div className="flex items-center justify-center gap-2">
-               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-               <p className="text-[9px] text-gray-300 uppercase font-black tracking-widest">End-to-End Encrypted Inquiry Submission</p>
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                <p className="text-[9px] text-gray-300 uppercase font-black tracking-widest">End-to-End Encrypted Inquiry Submission</p>
             </div>
           </form>
         </div>

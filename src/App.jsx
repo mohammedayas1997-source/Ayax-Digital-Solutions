@@ -22,7 +22,7 @@ import Certificate from './components/Certificate';
 import AdminGrading from './pages/AdminGrading';
 import AcademicExam from './components/AcademicExam';
 import AdminQuestionBank from './pages/AdminQuestionBank';
-
+import SuperAdmin from './pages/SuperAdmin';
 // --- NEW TERMINALS & PAGES ---
 import StudentLogin from './pages/StudentLogin';
 import AdminLogin from './pages/AdminLogin';
@@ -31,6 +31,10 @@ import AdminChatManager from './pages/AdminChatManager';
 import AdminCourseList from './pages/AdminCourseList'; 
 import AdminCourseDashboard from './pages/AdminCourseDashboard'; 
 import AdminStudentsList from './pages/AdminStudentsList'; 
+
+// --- ADDED COURSE & PRICING COMPONENTS ---
+import CourseSection from './components/CourseSection';
+import PricingCard from './components/PricingCard';
 
 const midtermQuestions = [
   { text: "What is React?", options: [{text: "Library", isCorrect: true}, {text: "Language", isCorrect: false}] },
@@ -48,16 +52,20 @@ function App() {
           <Route path="/about" element={<AboutUs />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
-          <Route path="/inquiry" element={<ProjectForm />} />
+          <Route path="/launch-project" element={<ProjectForm />} />
           <Route path="/enroll" element={<CourseEnrollment />} />
           <Route path="/verify/:certificateId" element={<VerifyCertificate />} />
           
+          {/* --- NEW SECTION ROUTES (Optional: idan kana son direct link zuwa gare su) --- */}
+          <Route path="/courses" element={<CourseSection />} />
+          <Route path="/pricing" element={<PricingCard />} />
+
           {/* --- AUTHENTICATION TERMINALS --- */}
           <Route path="/portal" element={<AuthPortal />} />
           <Route path="/login" element={<StudentLogin />} />
           <Route path="/admin-login" element={<Login />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
-
+          <Route path="/super-admin" element={<SuperAdmin />} />
           {/* --- STUDENT SECURE INFRASTRUCTURE --- */}
           <Route path="/dashboard" element={
             <ProtectedRoute requiredRole="student">
