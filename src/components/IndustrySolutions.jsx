@@ -3,6 +3,17 @@ import { HeartPulse, Landmark, GraduationCap, X, Phone, Send, Mail, User, Buildi
 
 const IndustrySolutions = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
+  const [formData, setFormData] = useState({
+    fullName: '',
+    phone: '',
+    orgName: '',
+    email: '',
+    country: '',
+    state: '',
+    lga: '',
+    address: '',
+    requirements: ''
+  });
 
   const industries = [
     {
@@ -34,6 +45,27 @@ const IndustrySolutions = () => {
       ]
     }
   ];
+
+  const handleWhatsAppSubmit = (e) => {
+    e.preventDefault();
+    const phoneNum = "2347087244444"; 
+    const message = `*INDUSTRY SOLUTION REQUEST*%0A%0A` +
+      `*Industry:* ${selectedPlan.industry}%0A` +
+      `*Plan:* ${selectedPlan.name}%0A%0A` +
+      `*Client Details:*%0A` +
+      `Name: ${formData.fullName}%0A` +
+      `Org: ${formData.orgName}%0A` +
+      `WhatsApp: ${formData.phone}%0A` +
+      `Email: ${formData.email}%0A%0A` +
+      `*Location:*%0A` +
+      `Country: ${formData.country}%0A` +
+      `State: ${formData.state}%0A` +
+      `LGA: ${formData.lga}%0A` +
+      `Address: ${formData.address}%0A%0A` +
+      `*Brief:* ${formData.requirements}`;
+
+    window.open(`https://wa.me/${phoneNum}?text=${message}`, '_blank');
+  };
 
   return (
     <div className="bg-gray-900 py-20 text-white relative">
@@ -70,7 +102,6 @@ const IndustrySolutions = () => {
         </div>
       </div>
 
-      {/* --- ENHANCED FORM MODAL --- */}
       {selectedPlan && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
           <div className="bg-white text-gray-900 w-full max-w-xl rounded-[2.5rem] p-8 md:p-10 relative shadow-2xl animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
@@ -86,103 +117,85 @@ const IndustrySolutions = () => {
               <span className="text-xs font-black bg-blue-600 text-white px-4 py-1.5 rounded-full uppercase tracking-widest">
                 Application Form
               </span>
-              <h2 className="text-3xl font-black mt-4 text-gray-900 leading-none">Apply for {selectedPlan.name}</h2>
-              <p className="text-gray-500 mt-2 font-medium">Industry: {selectedPlan.industry}</p>
+              <h2 className="text-3xl font-black mt-4 text-gray-900 leading-none text-left">Apply for {selectedPlan.name}</h2>
+              <p className="text-gray-500 mt-2 font-medium text-left">Industry: {selectedPlan.industry}</p>
             </div>
 
-            <form className="grid grid-cols-1 md:grid-cols-2 gap-5" onSubmit={(e) => e.preventDefault()}>
-              {/* Full Name */}
-              <div className="md:col-span-1">
+            <form className="grid grid-cols-1 md:grid-cols-2 gap-5" onSubmit={handleWhatsAppSubmit}>
+              <div className="md:col-span-1 text-left">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><User size={16}/> Full Name</label>
-                <input type="text" placeholder="John Doe" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all" required />
+                <input type="text" onChange={(e) => setFormData({...formData, fullName: e.target.value})} placeholder="John Doe" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
               </div>
 
-              {/* Phone / WhatsApp */}
-              <div className="md:col-span-1">
+              <div className="md:col-span-1 text-left">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><Phone size={16}/> Phone / WhatsApp No.</label>
-                <input type="tel" placeholder="+234 800 000 0000" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all" required />
+                <input type="tel" onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+234..." className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
               </div>
 
-              {/* Organization Name */}
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 text-left">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><Building2 size={16}/> Organization Name</label>
-                <input type="text" placeholder="Your Hospital, School, or Agency Name" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all" required />
+                <input type="text" onChange={(e) => setFormData({...formData, orgName: e.target.value})} placeholder="Your Hospital, School, or Agency Name" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
               </div>
 
-              {/* Email Address */}
-              <div className="md:col-span-2">
+              <div className="md:col-span-2 text-left">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><Mail size={16}/> Professional Email</label>
-                <input type="email" placeholder="contact@organization.com" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all" required />
+                <input type="email" onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="contact@organization.com" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-  {/* WhatsApp/Phone Number */}
-  <div className="space-y-2 text-left">
-    <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">WhatsApp Number</label>
-    <input 
-      type="tel" 
-      placeholder="+234..."
-      className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
-      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-      required
-    />
-  </div>
 
-  {/* Country */}
-  <div className="space-y-2 text-left">
-    <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Country</label>
-    <input 
-      type="text" 
-      placeholder="e.g. Nigeria"
-      className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
-      onChange={(e) => setFormData({...formData, country: e.target.value})}
-      required
-    />
-  </div>
+              {/* START OF BLUE BOX FIELDS (Now correctly wired to state) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2 md:col-span-2">
+                <div className="space-y-2 text-left">
+                  <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Country</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Nigeria"
+                    className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
+                    onChange={(e) => setFormData({...formData, country: e.target.value})}
+                    required
+                  />
+                </div>
 
-  {/* State */}
-  <div className="space-y-2 text-left">
-    <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">State</label>
-    <input 
-      type="text" 
-      placeholder="e.g. Kano, Lagos, Abuja"
-      className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
-      onChange={(e) => setFormData({...formData, state: e.target.value})}
-      required
-    />
-  </div>
+                <div className="space-y-2 text-left">
+                  <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">State</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Kano, Lagos, Abuja"
+                    className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
+                    onChange={(e) => setFormData({...formData, state: e.target.value})}
+                    required
+                  />
+                </div>
 
-  {/* LGA */}
-  <div className="space-y-2 text-left">
-    <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Local Government (LGA)</label>
-    <input 
-      type="text" 
-      placeholder="Enter your LGA"
-      className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
-      onChange={(e) => setFormData({...formData, lga: e.target.value})}
-      required
-    />
-  </div>
+                <div className="space-y-2 text-left">
+                  <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Local Government (LGA)</label>
+                  <input 
+                    type="text" 
+                    placeholder="Enter your LGA"
+                    className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
+                    onChange={(e) => setFormData({...formData, lga: e.target.value})}
+                    required
+                  />
+                </div>
 
-  {/* Full Residential Address */}
-  <div className="space-y-2 md:col-span-2 text-left">
-    <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Residential Address</label>
-    <textarea 
-      placeholder="House No, Street Name, City/Town..."
-      className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900 h-24"
-      onChange={(e) => setFormData({...formData, address: e.target.value})}
-      required
-    ></textarea>
-  </div>
-</div>
-              {/* Additional Message */}
-              <div className="md:col-span-2">
+                <div className="space-y-2 md:col-span-2 text-left">
+                  <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Residential Address</label>
+                  <textarea 
+                    placeholder="House No, Street Name, City/Town..."
+                    className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900 h-24 resize-none"
+                    onChange={(e) => setFormData({...formData, address: e.target.value})}
+                    required
+                  ></textarea>
+                </div>
+              </div>
+              {/* END OF BLUE BOX FIELDS */}
+
+              <div className="md:col-span-2 text-left">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><MessageSquare size={16}/> Additional Requirements</label>
-                <textarea rows="3" placeholder="Tell us more about your specific needs..." className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition-all resize-none"></textarea>
+                <textarea rows="3" onChange={(e) => setFormData({...formData, requirements: e.target.value})} placeholder="Tell us more about your specific needs..." className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"></textarea>
               </div>
 
-              {/* Submit Button */}
               <div className="md:col-span-2 pt-2">
-                <button className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl flex items-center justify-center gap-3 hover:bg-blue-700 shadow-2xl shadow-blue-200 transition-all active:scale-95">
+                <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl flex items-center justify-center gap-3 hover:bg-blue-700 shadow-2xl transition-all active:scale-95">
                   Submit Application <Send size={22} />
                 </button>
                 <p className="text-center text-xs text-gray-400 mt-4 uppercase font-bold tracking-widest">Secure 256-bit Encrypted Transmission</p>
