@@ -102,7 +102,8 @@ const PricingCard = () => {
 
   const handleWhatsAppAction = (e) => {
     e.preventDefault();
-    const phoneNum = "2348000000000"; // CANZA WANNAN ZUWA LAMBARKA
+    // Lambar ka ta WhatsApp: 07087244444
+    const phoneNum = "2347087244444"; 
     const message = `*PROJECT INITIALIZATION REQUEST*%0A%0A` +
       `*Service:* ${selectedTier.serviceTitle}%0A` +
       `*Tier:* ${selectedTier.name} (${selectedTier.price})%0A%0A` +
@@ -200,7 +201,6 @@ const PricingCard = () => {
             </div>
             
             <form className="grid grid-cols-1 md:grid-cols-2 gap-10" onSubmit={handleWhatsAppAction}>
-              {/* Basic Details */}
               <div className="md:col-span-1">
                 <label className="block text-[11px] font-black uppercase mb-4 text-gray-400 tracking-[0.3em] flex items-center gap-3"><User size={16}/> Authorized Client Name</label>
                 <input type="text" onChange={(e) => setFormData({...formData, clientName: e.target.value})} placeholder="Full Legal Name" className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold text-lg transition-all" required />
@@ -210,7 +210,6 @@ const PricingCard = () => {
                 <input type="tel" onChange={(e) => setFormData({...formData, whatsapp: e.target.value})} placeholder="+234..." className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold text-lg transition-all" required />
               </div>
 
-              {/* Org & Country */}
               <div className="md:col-span-1">
                 <label className="block text-[11px] font-black uppercase mb-4 text-gray-400 tracking-[0.3em] flex items-center gap-3"><Building2 size={16}/> Organization Identity</label>
                 <input type="text" onChange={(e) => setFormData({...formData, organization: e.target.value})} placeholder="Company or NGO Name" className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold text-lg transition-all" required />
@@ -220,7 +219,6 @@ const PricingCard = () => {
                 <input type="text" onChange={(e) => setFormData({...formData, country: e.target.value})} placeholder="e.g. Nigeria" className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold text-lg transition-all" required />
               </div>
 
-              {/* State & LGA */}
               <div className="md:col-span-1">
                 <label className="block text-[11px] font-black uppercase mb-4 text-gray-400 tracking-[0.3em] flex items-center gap-3"><MapPin size={16}/> State</label>
                 <input type="text" onChange={(e) => setFormData({...formData, state: e.target.value})} placeholder="e.g. Kano" className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold text-lg transition-all" required />
@@ -230,19 +228,16 @@ const PricingCard = () => {
                 <input type="text" onChange={(e) => setFormData({...formData, lga: e.target.value})} placeholder="Local Govt Area" className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold text-lg transition-all" required />
               </div>
 
-              {/* Address */}
               <div className="md:col-span-2">
                 <label className="block text-[11px] font-black uppercase mb-4 text-gray-400 tracking-[0.3em] flex items-center gap-3"><MapPin size={16}/> Full Residential / Office Address</label>
                 <input type="text" onChange={(e) => setFormData({...formData, address: e.target.value})} placeholder="House No, Street Name, City" className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-blue-600 outline-none font-bold text-lg transition-all" required />
               </div>
 
-              {/* Message */}
               <div className="md:col-span-2">
                 <label className="block text-[11px] font-black uppercase mb-4 text-gray-400 tracking-[0.3em] flex items-center gap-3"><MessageSquare size={16}/> Project Brief</label>
                 <textarea rows="4" onChange={(e) => setFormData({...formData, requirements: e.target.value})} placeholder="Specify any custom features..." className="w-full p-6 bg-gray-50 border-2 border-gray-100 rounded-[2rem] focus:border-blue-600 outline-none font-bold text-lg transition-all resize-none"></textarea>
               </div>
 
-              {/* Submit */}
               <div className="md:col-span-2">
                 <button type="submit" className="w-full py-8 bg-blue-600 text-white rounded-[3rem] font-black text-2xl hover:bg-blue-700 shadow-2xl transition-all active:scale-95 flex items-center justify-center gap-6">
                   Initialize Request <Send size={28} />

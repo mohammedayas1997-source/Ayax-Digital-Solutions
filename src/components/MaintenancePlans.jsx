@@ -73,11 +73,12 @@ const MaintenancePlans = () => {
     }
   ];
 
-  // Function din tura sako zuwa WhatsApp
+  // Function din tura sako zuwa WhatsApp da sabuwar lambar ka
   const handleWhatsAppSubmit = (e) => {
     e.preventDefault();
     
-    const phoneNumber = "234XXXXXXXXXX"; // Sanya lambar WhatsApp dinka a nan (misali 2348030000000)
+    // Lambar ka da ka bayar: 07087244444 (an maida ta international format)
+    const phoneNumber = "2347087244444"; 
     const message = `*NEW MAINTENANCE REQUEST*%0A%0A` +
                     `*Plan:* ${selectedPlan.name}%0A` +
                     `*Price:* ${selectedPlan.price}%0A` +
