@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebaseConfig';
-import { signOut, createUserWithEmailAndPassword } from 'firebase/auth'; // Added missing import
+import { signOut, createUserWithEmailAndPassword } from 'firebase/auth'; 
 import { 
   collection, onSnapshot, updateDoc, doc, 
   addDoc, serverTimestamp, deleteDoc, query, orderBy, where, setDoc, getDoc 
-} from 'firebase/firestore'; // Added setDoc and getDoc
+} from 'firebase/firestore'; 
 import { 
   Users, BookOpen, CreditCard, LayoutDashboard, 
   CheckCircle, Trash2, Award, Globe, UserPlus, Eye, 
@@ -24,20 +24,18 @@ const SuperAdmin = () => {
   const [adminReply, setAdminReply] = useState('');
   const [loading, setLoading] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState(1);
-  // New States for requested features
   const [darkMode, setDarkMode] = useState(false);
   const [historyLogs, setHistoryLogs] = useState([]);
   const [newSubmissionsCount, setNewSubmissionsCount] = useState(0);
 
-  // New Academic State for Super Admin
   const [lessons, setLessons] = useState([]);
   const [academicData, setAcademicData] = useState({
-    type: 'video', // video, assignment, or exam
+    type: 'video', 
     title: '',
     content: '', 
     week: '1',
     course: 'Web Development',
-    dueDate: '' // Added for assignments
+    dueDate: '' 
   });
 
   const [weekSchedule, setWeekSchedule] = useState({
@@ -46,7 +44,6 @@ const SuperAdmin = () => {
     endDate: ''
   });
 
-  // Forum Creation State
   const [forumData, setForumData] = useState({
     title: '',
     content: '',
@@ -59,7 +56,6 @@ const SuperAdmin = () => {
     name: '', email: '', phone: '', password: '', role: 'student', comment: ''
   });
 
-  // REAL-TIME DATA ENGINE
   useEffect(() => {
     const unsubStudents = onSnapshot(collection(db, "course_applications"), (snap) => {
       setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -93,89 +89,78 @@ const SuperAdmin = () => {
     };
   }, []);
 
-  // 1. Approve Certificate & Show on Student Dashboard
-const approveCertificate = async (studentId) => {
-  try {
-    await updateDoc(doc(db, "users", studentId), {
-      certificateApproved: true,
-      graduationDate: serverTimestamp(),
-      status: "Graduated"
-    });
-    alert("Certificate approved and visible to student!");
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-// 2. Deactivate User (After Download)
-const deactivateStudent = async (studentId) => {
-  try {
-    await updateDoc(doc(db, "users", studentId), {
-      accountStatus: "Deactivated",
-      accessRevoked: true
-    });
-    alert("Student account deactivated successfully.");
-  } catch (err) {
-    console.error(err);
-  }
-};
-
-
-// 3. Email Certificate (Simulated using a Cloud Function or API)
-const handleStudentGraduation = async (student) => {
-  const PUBLIC_KEY = "Zq65aNb8G1g9F7XkY";
-  const SERVICE_ID = "YOUR_SERVICE_ID"; 
-  const TEMPLATE_ID = "YOUR_TEMPLATE_ID";
-
-  const emailParams = {
-    to_name: student.fullName,
-    to_email: student.email,
-    course_name: student.course || "Full Stack Web Development",
-    certificate_link: `https://ayax-university.com/verify/${student.id}`,
-    admin_contact: "ayaxdigitalsolutions@gmail.com"
+  const approveCertificate = async (studentId) => {
+    try {
+      await updateDoc(doc(db, "users", studentId), {
+        certificateApproved: true,
+        graduationDate: serverTimestamp(),
+        status: "Graduated"
+      });
+      alert("Certificate approved and visible to student!");
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  try {
-    // 1. Send Email via EmailJS
-    const emailRes = await emailjs.send(SERVICE_ID, TEMPLATE_ID, emailParams, PUBLIC_KEY);
-    
-    if (emailRes.status === 200) {
-      // 2. Update Firebase Status and Deactivate
-      const studentRef = doc(db, "users", student.id);
-      await updateDoc(studentRef, {
-        certificateApproved: true,
-        accountStatus: "Deactivated", // Revokes portal access
-        graduationDate: serverTimestamp(),
-        accessLevel: "Graduated"
+  const deactivateStudent = async (studentId) => {
+    try {
+      await updateDoc(doc(db, "users", studentId), {
+        accountStatus: "Deactivated",
+        accessRevoked: true
       });
-
-      alert(`Success: Certificate sent to ${student.email} and account deactivated.`);
+      alert("Student account deactivated successfully.");
+    } catch (err) {
+      console.error(err);
     }
-  } catch (error) {
-    console.error("Workflow Error:", error);
-    alert("Critical Error: Process interrupted. Check console for details.");
-  }
-};
+  };
+
+  const handleStudentGraduation = async (student) => {
+    const PUBLIC_KEY = "Zq65aNb8G1g9F7XkY";
+    const SERVICE_ID = "YOUR_SERVICE_ID"; 
+    const TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+
+    const emailParams = {
+      to_name: student.fullName,
+      to_email: student.email,
+      course_name: student.course || "Full Stack Web Development",
+      certificate_link: `https://ayax-university.com/verify/${student.id}`,
+      admin_contact: "ayaxdigitalsolutions@gmail.com"
+    };
+
+    try {
+      const emailRes = await emailjs.send(SERVICE_ID, TEMPLATE_ID, emailParams, PUBLIC_KEY);
+      if (emailRes.status === 200) {
+        const studentRef = doc(db, "users", student.id);
+        await updateDoc(studentRef, {
+          certificateApproved: true,
+          accountStatus: "Deactivated", 
+          graduationDate: serverTimestamp(),
+          accessLevel: "Graduated"
+        });
+        alert(`Success: Certificate sent to ${student.email} and account deactivated.`);
+      }
+    } catch (error) {
+      console.error("Workflow Error:", error);
+      alert("Critical Error: Process interrupted. Check console for details.");
+    }
+  };
+
   const handleSetSchedule = async (e) => {
-  e.preventDefault();
-  try {
-    // Za mu yi amfani da "week_1", "week_2" a matsayin ID don ya sauya na dā
-    await updateDoc(doc(db, "schedules", `week_${weekSchedule.week}`), {
-      ...weekSchedule,
-      updatedAt: serverTimestamp()
-    });
-    alert(`An saita lokacin Week ${weekSchedule.week} cikin nasara!`);
-  } catch (err) {
-    // Idan babu shi, sai mu ƙara sabo
-    await addDoc(collection(db, "schedules"), {
-      ...weekSchedule,
-      id: `week_${weekSchedule.week}`,
-      updatedAt: serverTimestamp()
-    });
-  }
-};
-
-
+    e.preventDefault();
+    try {
+      await updateDoc(doc(db, "schedules", `week_${weekSchedule.week}`), {
+        ...weekSchedule,
+        updatedAt: serverTimestamp()
+      });
+      alert(`An saita lokacin Week ${weekSchedule.week} cikin nasara!`);
+    } catch (err) {
+      await addDoc(collection(db, "schedules"), {
+        ...weekSchedule,
+        id: `week_${weekSchedule.week}`,
+        updatedAt: serverTimestamp()
+      });
+    }
+  };
 
   const handleLogout = async () => {
     if(window.confirm("Are you sure you want to logout?")) {
@@ -186,36 +171,9 @@ const handleStudentGraduation = async (student) => {
     }
   };
 
-  const VerifyCertificate = () => {
-  const { id } = useParams();
-  const [data, setData] = useState(null);
-
-  useEffect(() => {
-    const checkValidity = async () => {
-      const docRef = doc(db, "users", id);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists() && docSnap.data().certificateApproved) {
-        setData(docSnap.data());
-      }
-    };
-    checkValidity();
-  }, [id]);
-
-  if (!data) return <div className="p-20 text-center font-black">INVALID CREDENTIAL</div>;
-
-  return (
-    <div className="p-20 text-center">
-      <ShieldCheck className="mx-auto text-emerald-500 mb-4" size={64} />
-      <h1 className="text-3xl font-black uppercase italic">Verified Academic Record</h1>
-      <p className="mt-4 font-bold text-slate-500 uppercase">This certifies that {data.fullName} is a verified graduate of AYAX Academy.</p>
-    </div>
-  );
-};
-
   const updateStudentStatus = async (id, field, value) => {
     const studentRef = doc(db, "course_applications", id);
     await updateDoc(studentRef, { [field]: value });
-    await logActivity("UPDATE", `Updated ${field} to ${value} for ${id}`);
     alert(`ADMIN PROTOCOL: ${field} verified as ${value}`);
   };
 
@@ -223,7 +181,6 @@ const handleStudentGraduation = async (student) => {
     if(window.confirm("CRITICAL: Permanent revocation of system access. Proceed?")) {
       try {
         await deleteDoc(doc(db, "users", id));
-        await logActivity("DELETE", `Deleted user ID: ${id}`);
       } catch (err) { alert("ERROR: System could not delete record."); }
     }
   };
@@ -238,13 +195,11 @@ const handleStudentGraduation = async (student) => {
         createdAt: serverTimestamp(),
         isGradable: academicData.type === 'exam' || academicData.type === 'assignment'
       });
-      await logActivity("ACADEMIC", `Deployed ${academicData.type}: ${academicData.title}`);
       alert(`SUCCESS: ${academicData.type.toUpperCase()} deployed to ${academicData.course}`);
       setAcademicData({ ...academicData, title: '', content: '', dueDate: '' });
     } catch (err) { alert(err.message); } finally { setLoading(false); }
   };
 
-  // NEW: Forum Creation Function
   const handleCreateForum = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -255,44 +210,36 @@ const handleStudentGraduation = async (student) => {
         role: 'authority',
         createdAt: serverTimestamp()
       });
-      await logActivity("FORUM", `Started discussion: ${forumData.title}`);
       alert("OFFICIAL: Discussion thread launched.");
       setForumData({ title: '', content: '', course: 'Web Development' });
     } catch (err) { alert(err.message); } finally { setLoading(false); }
   };
 
- const createNewUser = async (email, password, fullName, role) => {
-  try {
-    // 1. Create the user in Firebase Authentication
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+  const createNewUser = async (email, password, fullName, role) => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      const profileData = {
+        uid: user.uid,
+        fullName: fullName,
+        email: email,
+        role: role,
+        createdAt: serverTimestamp(),
+        accountStatus: "Active",
+      };
 
-    // 2. Define the profile data based on Role
-    const userData = {
-      uid: user.uid,
-      fullName: fullName,
-      email: email,
-      role: role, // 'student' or 'teacher'
-      createdAt: serverTimestamp(),
-      accountStatus: "Active",
-    };
+      if (role === 'student') {
+        profileData.currentWeek = 1;
+        profileData.averageScore = 0;
+        profileData.certificateApproved = false;
+      }
 
-    // Add specific fields for Students
-    if (role === 'student') {
-      userData.currentWeek = 1;
-      userData.averageScore = 0;
-      userData.certificateApproved = false;
+      await setDoc(doc(db, "users", user.uid), profileData);
+      alert(`${role.toUpperCase()} created successfully!`);
+    } catch (error) {
+      alert("Error: " + error.message);
     }
-
-    // 3. Save to Firestore 'users' collection
-    await setDoc(doc(db, "users", user.uid), userData);
-
-    alert(`${role.toUpperCase()} created successfully!`);
-  } catch (error) {
-    console.error("Error creating user:", error.message);
-    alert("Real-life Error: " + error.message);
-  }
-};
+  };
 
   const handleAdminReply = async (e) => {
     e.preventDefault();
@@ -306,331 +253,68 @@ const handleStudentGraduation = async (student) => {
     setAdminReply('');
     alert("AUTHORITY_RESPONSE: Message injected into forum.");
   };
+
+  // Helper Component for Activity
   const AdminStudentActivity = ({ courseId, selectedWeek }) => {
-   const [submissions, setSubmissions] = useState([]);
+    const [submissions, setSubmissions] = useState([]);
 
-  useEffect(() => {
-    const q = query(
-      collection(db, "submissions"),
-      where("course", "==", courseId),
-      where("week", "==", parseInt(selectedWeek))
+    useEffect(() => {
+      const q = query(
+        collection(db, "submissions"),
+        where("course", "==", courseId),
+        where("week", "==", parseInt(selectedWeek))
+      );
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      });
+      return () => unsubscribe();
+    }, [courseId, selectedWeek]);
+
+    useEffect(() => {
+      const yau = new Date();
+      yau.setHours(0, 0, 0, 0);
+      const q = query(collection(db, "submissions"), where("createdAt", ">=", yau));
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        setNewSubmissionsCount(snapshot.size);
+      });
+      return () => unsubscribe();
+    }, []);
+
+    return (
+      <div className="bg-white rounded-[2rem] border shadow-xl overflow-hidden mt-6">
+        <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
+          <h3 className="font-black text-xs uppercase italic">Activity Tracker: Week {selectedWeek}</h3>
+          <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black">{submissions.length} SUBMISSIONS</span>
+        </div>
+        <table className="w-full text-left">
+          <thead className="text-[10px] font-black text-gray-400 uppercase bg-gray-50/50">
+            <tr>
+              <th className="p-6">Student</th>
+              <th className="p-6">Type</th>
+              <th className="p-6">Status</th>
+              <th className="p-6 text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {submissions.map((sub) => (
+              <tr key={sub.id} className="hover:bg-blue-50/30">
+                <td className="p-6 font-bold text-sm">{sub.studentName}</td>
+                <td className="p-6"><span className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-[9px] font-black">{sub.type}</span></td>
+                <td className="p-6 text-[10px] font-bold">{sub.status || 'Pending'}</td>
+                <td className="p-6 flex justify-center gap-2">
+                  <button onClick={() => updateDoc(doc(db, "submissions", sub.id), { status: 'Graded' })} className="p-2 bg-green-500 text-white rounded-lg"><CheckCircle size={14}/></button>
+                  <button onClick={() => deleteDoc(doc(db, "submissions", sub.id))} className="p-2 bg-red-500 text-white rounded-lg"><Trash2 size={14}/></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     );
-  
- useEffect(() => {
-  const yau = new Date();
-  yau.setHours(0, 0, 0, 0); // Saita lokaci zuwa farkon yau
-
-  const q = query(
-    collection(db, "submissions"),
-    where("createdAt", ">=", yau)
-  );
-
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    setNewSubmissionsCount(snapshot.size); // Zai kirga adadin saƙonni nawa ne
-  });
-
-  return () => unsubscribe();
-}, []);
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    return () => unsubscribe();
-  }, [courseId, selectedWeek]);
-
-  return (
-    <div className="bg-white rounded-[2rem] border shadow-xl overflow-hidden mt-6">
-      <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
-        <h3 className="font-black text-xs uppercase italic">Activity Tracker: Week {selectedWeek}</h3>
-        <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black">{submissions.length} SUBMISSIONS</span>
-      </div>
-      <table className="w-full text-left">
-        <thead className="text-[10px] font-black text-gray-400 uppercase bg-gray-50/50">
-          <tr>
-            <th className="p-6">Student</th>
-            <th className="p-6">Type</th>
-            <th className="p-6">Status</th>
-            <th className="p-6 text-center">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {submissions.map((sub) => (
-            <tr key={sub.id} className="hover:bg-blue-50/30">
-              <td className="p-6 font-bold text-sm">{sub.studentName}</td>
-              <td className="p-6"><span className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-[9px] font-black">{sub.type}</span></td>
-              <td className="p-6 text-[10px] font-bold">{sub.status || 'Pending'}</td>
-              <td className="p-6 flex justify-center gap-2">
-                <button onClick={() => updateDoc(doc(db, "submissions", sub.id), { status: 'Graded' })} className="p-2 bg-green-500 text-white rounded-lg"><CheckCircle size={14}/></button>
-                <button onClick={() => deleteDoc(doc(db, "submissions", sub.id))} className="p-2 bg-red-500 text-white rounded-lg"><Trash2 size={14}/></button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
-
-const SuperAdmin = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [students, setStudents] = useState([]);
-  const [systemUsers, setSystemUsers] = useState([]);
-  const [serviceRequests, setServiceRequests] = useState([]);
-  const [allThreads, setAllThreads] = useState([]);
-  const [activeThread, setActiveThread] = useState(null);
-  const [adminReply, setAdminReply] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [selectedWeek, setSelectedWeek] = useState(1);
-  const [darkMode, setDarkMode] = useState(false);
-  const [historyLogs, setHistoryLogs] = useState([]);
-  const [newSubmissionsCount, setNewSubmissionsCount] = useState(0);
-  const [lessons, setLessons] = useState([]);
-
-  const [academicData, setAcademicData] = useState({
-    type: 'video', title: '', content: '', week: '1', course: 'Web Development', dueDate: ''
-  });
-
-  const [weekSchedule, setWeekSchedule] = useState({ week: '1', startDate: '', endDate: '' });
-  const [forumData, setForumData] = useState({ title: '', content: '', course: 'Web Development' });
-  const [userData, setUserData] = useState({ name: '', email: '', phone: '', password: '', role: 'student' });
-
-  const availableCourses = ["Web Development", "Graphic Design", "Digital Marketing", "Cyber Security"];
-
-  // LOG ACTIVITY FUNCTION
-  const logActivity = async (action, details) => {
-    try {
-      await addDoc(collection(db, "system_logs"), { action, details, timestamp: serverTimestamp() });
-    } catch (e) { console.error(e); }
   };
 
-  // REAL-TIME DATA ENGINE
-  useEffect(() => {
-    const unsubStudents = onSnapshot(collection(db, "course_applications"), (snap) => {
-      setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
-      setSystemUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    const unsubServices = onSnapshot(collection(db, "service_requests"), (snap) => {
-      setServiceRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    const unsubForum = onSnapshot(query(collection(db, "forum_threads"), orderBy("createdAt", "desc")), (snap) => {
-      setAllThreads(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    const unsubLessons = onSnapshot(query(collection(db, "lessons"), orderBy("createdAt", "desc")), (snap) => {
-      setLessons(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-    const unsubLogs = onSnapshot(query(collection(db, "system_logs"), orderBy("timestamp", "desc")), (snap) => {
-      setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
-
-    const yau = new Date(); yau.setHours(0,0,0,0);
-    const unsubNewSub = onSnapshot(query(collection(db, "submissions"), where("createdAt", ">=", yau)), (snap) => {
-      setNewSubmissionsCount(snap.size);
-    });
-
-    return () => { 
-      unsubStudents(); unsubUsers(); unsubServices(); 
-      unsubForum(); unsubLessons(); unsubLogs(); unsubNewSub();
-    };
-  }, []);
-
-  const handleLogout = async () => {
-    if(window.confirm("Logout?")) {
-      try { await signOut(auth); window.location.href = "/login"; } catch (err) { alert("Error logging out"); }
-    }
-  };
-
-  const createNewUser = async (email, password, fullName, role) => {
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await setDoc(doc(db, "users", userCredential.user.uid), {
-        uid: userCredential.user.uid, fullName, email, role, createdAt: serverTimestamp(), accountStatus: "Active"
-      });
-      alert("User Created!");
-    } catch (error) { alert(error.message); }
-  };
-
-  const handleAcademicUpload = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await addDoc(collection(db, "lessons"), {
-        ...academicData, instructor: "SUPER_ADMIN", createdAt: serverTimestamp()
-      });
-      alert("Deployed!");
-      setAcademicData({ ...academicData, title: '', content: '' });
-    } catch (err) { alert(err.message); } finally { setLoading(false); }
-  };
-
-  // --- RENDER PORTION ---
-  return (
-    <div className={`flex min-h-screen ${darkMode ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'}`}>
-      {/* SIDEBAR */}
-      <div className="w-72 p-8 bg-slate-950 text-white space-y-8">
-        <h2 className="text-2xl font-black italic text-blue-500">AYAX ADMIN</h2>
-        <nav className="space-y-2">
-          <button onClick={() => setActiveTab('overview')} className={`w-full text-left p-4 rounded-xl flex gap-3 ${activeTab === 'overview' ? 'bg-blue-600' : ''}`}><LayoutDashboard size={18}/> Overview</button>
-          <button onClick={() => setActiveTab('engagement')} className={`w-full text-left p-4 rounded-xl flex gap-3 relative ${activeTab === 'engagement' ? 'bg-blue-600' : ''}`}><BarChart3 size={18}/> Tracker {newSubmissionsCount > 0 && <span className="absolute right-2 top-2 bg-red-500 text-[8px] w-4 h-4 rounded-full flex items-center justify-center">{newSubmissionsCount}</span>}</button>
-          <button onClick={() => setActiveTab('academic')} className={`w-full text-left p-4 rounded-xl flex gap-3 ${activeTab === 'academic' ? 'bg-blue-600' : ''}`}><BookOpen size={18}/> Curriculum</button>
-          <button onClick={() => setActiveTab('users')} className={`w-full text-left p-4 rounded-xl flex gap-3 ${activeTab === 'users' ? 'bg-blue-600' : ''}`}><ShieldCheck size={18}/> Access</button>
-          <button onClick={handleLogout} className="w-full text-left p-4 text-red-400 mt-10 flex gap-3"><LogOut size={18}/> Logout</button>
-        </nav>
-      </div>
-
-      {/* MAIN */}
-      <div className="flex-1 p-10 overflow-y-auto">
-        {activeTab === 'overview' && (
-          <div className="grid grid-cols-4 gap-6">
-            <div className="bg-white p-6 rounded-3xl shadow-sm">
-              <p className="text-[10px] font-black uppercase text-gray-400">Total Revenue</p>
-              <h3 className="text-2xl font-black">₦{(students.length * 35000).toLocaleString()}</h3>
-            </div>
-            {/* Add other cards here */}
-          </div>
-        )}
-
-        {activeTab === 'engagement' && (
-          <div>
-            <div className="flex gap-2 mb-6">
-              {[1, 2, 3, 4].map(w => (
-                <button key={w} onClick={() => setSelectedWeek(w)} className={`px-4 py-2 rounded-lg font-black ${selectedWeek === w ? 'bg-black text-white' : 'bg-white'}`}>Week {w}</button>
-              ))}
-            </div>
-            <StudentActivityTable courseId="Web Development" selectedWeek={selectedWeek} />
-          </div>
-        )}
-
-        {activeTab === 'academic' && (
-          <div className="grid grid-cols-3 gap-8">
-            <form onSubmit={handleAcademicUpload} className="bg-white p-8 rounded-[2rem] shadow-lg space-y-4">
-              <input className="w-full p-4 bg-slate-100 rounded-xl" placeholder="Title" value={academicData.title} onChange={e => setAcademicData({...academicData, title: e.target.value})} />
-              <input className="w-full p-4 bg-slate-100 rounded-xl" placeholder="Content/Link" value={academicData.content} onChange={e => setAcademicData({...academicData, content: e.target.value})} />
-              <button className="w-full py-4 bg-blue-600 text-white rounded-xl font-black uppercase">Deploy</button>
-            </form>
-            <div className="col-span-2 space-y-3">
-              {lessons.map(lesson => (
-                <div key={lesson.id} className="bg-white p-4 rounded-xl flex justify-between">
-                  <span className="font-bold">{lesson.title}</span>
-                  <button onClick={() => deleteDoc(doc(db, "lessons", lesson.id))}><Trash2 size={16} className="text-red-500"/></button>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-
-
-  const AdminUserManagement = () => {
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    fullName: '',
-    role: 'student' // Default role
-  });
-
-  return (
-    <div className="max-w-4xl mx-auto p-10 bg-white rounded-[3rem] shadow-2xl border border-gray-100">
-      <div className="mb-10 text-center">
-        <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tight">User Provisioning Portal</h2>
-        <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mt-2">Authorized Super Admin Access Only</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Full Name */}
-        <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase text-slate-400 ml-4">Full Legal Name</label>
-          <input 
-            type="text" 
-            className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
-            placeholder="John Doe"
-            onChange={(e) => setFormData({...formData, fullName: e.target.value})}
-          />
-        </div>
-
-        {/* Role Selection */}
-        <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase text-slate-400 ml-4">Assign Role</label>
-          <select 
-            className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-black uppercase text-xs"
-            onChange={(e) => setFormData({...formData, role: e.target.value})}
-          >
-            <option value="student">Student</option>
-            <option value="teacher">Instructor / Teacher</option>
-          </select>
-        </div>
-
-        {/* Email */}
-        <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase text-slate-400 ml-4">Official Email</label>
-          <input 
-            type="email" 
-            className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
-            placeholder="email@ayax.com"
-            onChange={(e) => setFormData({...formData, email: e.target.value})}
-          />
-        </div>
-
-        {/* Password */}
-        <div className="space-y-2">
-          <label className="text-[10px] font-black uppercase text-slate-400 ml-4">Temporary Password</label>
-          <input 
-            type="password" 
-            className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
-            placeholder="••••••••"
-            onChange={(e) => setFormData({...formData, password: e.target.value})}
-          />
-        </div>
-      </div>
-
-      <button 
-        onClick={() => createNewUser(formData.email, formData.password, formData.fullName, formData.role)}
-        className="w-full mt-12 py-6 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-4"
-      >
-        <UserPlus size={20}/> Initialize User Credentials
-      </button>
-    </div>
-  );
-};
-
-  return (
-    <div className="bg-white rounded-[2rem] border shadow-xl overflow-hidden mt-6">
-      <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
-        <h3 className="font-black text-xs uppercase italic">Activity Tracker: Week {selectedWeek}</h3>
-        <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black">{submissions.length} SUBMISSIONS</span>
-      </div>
-      <table className="w-full text-left">
-        <thead className="text-[10px] font-black text-gray-400 uppercase bg-gray-50/50">
-          <tr>
-            <th className="p-6">Student</th>
-            <th className="p-6">Type</th>
-            <th className="p-6">Status</th>
-            <th className="p-6 text-center">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100">
-          {submissions.map((sub) => (
-            <tr key={sub.id} className="hover:bg-blue-50/30">
-              <td className="p-6 font-bold text-sm">{sub.studentName}</td>
-              <td className="p-6"><span className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-[9px] font-black">{sub.type}</span></td>
-              <td className="p-6 text-[10px] font-bold">{sub.status || 'Pending'}</td>
-              <td className="p-6 flex justify-center gap-2">
-                 <button onClick={() => updateDoc(doc(db, "submissions", sub.id), { status: 'Graded' })} className="p-2 bg-green-500 text-white rounded-lg"><CheckCircle size={14}/></button>
-                 <button onClick={() => deleteDoc(doc(db, "submissions", sub.id))} className="p-2 bg-red-500 text-white rounded-lg"><Trash2 size={14}/></button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-};
   return (
     <div className={`flex min-h-screen font-sans transition-colors duration-300 ${darkMode ? 'bg-[#0f172a] text-white' : 'bg-[#f1f5f9] text-slate-900'}`}>
-      
-      {/* SIDEBAR NAVIGATION */}
       <div className={`w-72 p-8 space-y-10 shrink-0 border-r shadow-2xl transition-colors duration-300 ${darkMode ? 'bg-[#1e293b] border-white/5' : 'bg-[#0f172a] text-white border-transparent'}`}>
         <div className="flex justify-between items-center">
           <div>
@@ -642,32 +326,32 @@ const SuperAdmin = () => {
           </button>
         </div>
         <nav className="space-y-2">
-          <button onClick={() => setActiveTab('overview')} className={`nav-link ${activeTab === 'overview' ? 'active-nav' : ''}`}><LayoutDashboard size={18}/> Overview</button>
-          <button onClick={() => setActiveTab('students')} className={`nav-link ${activeTab === 'students' ? 'active-nav' : ''}`}><Users size={18}/> Admissions</button>
-          <button onClick={() => setActiveTab('academic')} className={`nav-link ${activeTab === 'academic' ? 'active-nav' : ''}`}><BookOpen size={18}/> Curriculum</button>
-          <button onClick={() => setActiveTab('global_forum')} className={`nav-link ${activeTab === 'global_forum' ? 'active-nav' : ''}`}><MessageSquare size={18}/> Global Forum</button>
-          <button onClick={() => setActiveTab('services')} className={`nav-link ${activeTab === 'services' ? 'active-nav' : ''}`}><Globe size={18}/> Services</button>
-          <button onClick={() => setActiveTab('users')} className={`nav-link ${activeTab === 'users' ? 'active-nav' : ''}`}><ShieldCheck size={18}/> Access Control</button>
-          <button onClick={() => setActiveTab('history')} className={`nav-link ${activeTab === 'history' ? 'active-nav' : ''}`}><History size={18}/> History Logs</button>
-         <button 
-            onClick={() => setActiveTab('engagement')} 
-            className={`w-full text-left p-4 rounded-2xl flex items-center gap-3 font-bold text-xs uppercase tracking-widest relative ${activeTab === 'engagement' ? 'bg-blue-600 text-white' : ''}`}
-          >
+          <button onClick={() => setActiveTab('overview')} className={`w-full text-left p-4 rounded-2xl flex items-center gap-3 font-bold text-xs uppercase tracking-widest ${activeTab === 'overview' ? 'bg-blue-600 text-white' : ''}`}><LayoutDashboard size={18}/> Overview</button>
+          <button onClick={() => setActiveTab('students')} className={`w-full text-left p-4 rounded-2xl flex items-center gap-3 font-bold text-xs uppercase tracking-widest ${activeTab === 'students' ? 'bg-blue-600 text-white' : ''}`}><Users size={18}/> Admissions</button>
+          <button onClick={() => setActiveTab('academic')} className={`w-full text-left p-4 rounded-2xl flex items-center gap-3 font-bold text-xs uppercase tracking-widest ${activeTab === 'academic' ? 'bg-blue-600 text-white' : ''}`}><BookOpen size={18}/> Curriculum</button>
+          <button onClick={() => setActiveTab('engagement')} className={`w-full text-left p-4 rounded-2xl flex items-center gap-3 font-bold text-xs uppercase tracking-widest relative ${activeTab === 'engagement' ? 'bg-blue-600 text-white' : ''}`}>
             <BarChart3 size={18}/> 
             Engagement Tracker
-
-            {/* Wannan shi ne Badge din */}
             {newSubmissionsCount > 0 && (
               <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[9px] w-5 h-5 flex items-center justify-center rounded-full animate-bounce shadow-lg border-2 border-white">
                 {newSubmissionsCount}
               </span>
             )}
           </button>
+          <button onClick={() => setActiveTab('users')} className={`w-full text-left p-4 rounded-2xl flex items-center gap-3 font-bold text-xs uppercase tracking-widest ${activeTab === 'users' ? 'bg-blue-600 text-white' : ''}`}><ShieldCheck size={18}/> Access Control</button>
           <div className="pt-10">
-            <button onClick={handleLogout} className="nav-link text-red-400 hover:bg-red-500/10"><LogOut size={18}/> Logout</button>
+            <button onClick={handleLogout} className="w-full text-left p-4 rounded-2xl flex items-center gap-3 font-bold text-xs uppercase tracking-widest text-red-400 hover:bg-red-500/10"><LogOut size={18}/> Logout</button>
           </div>
         </nav>
       </div>
+
+      <div className="flex-1 p-10 overflow-y-auto">
+        {activeTab === 'engagement' && (
+          <AdminStudentActivity courseId="Web Development" selectedWeek={selectedWeek} />
+        )}
+        {/* Ragowar Tabs dinka zasu zo anan kamar yadda kake dasu */}
+      </div>
+    
 
       {/* MAIN DASHBOARD INTERFACE */}
       <div className="flex-1 p-10 overflow-y-auto max-h-screen">
