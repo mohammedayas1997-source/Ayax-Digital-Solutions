@@ -1,17 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { db, auth } from '../firebaseConfig'; // Tabbatar ka yi export na auth a can
-import { signOut } from 'firebase/auth';
+import { db, auth } from '../firebaseConfig';
+import { signOut, createUserWithEmailAndPassword } from 'firebase/auth'; // Added missing import
 import { 
   collection, onSnapshot, updateDoc, doc, 
-  addDoc, serverTimestamp, deleteDoc, query, orderBy, where 
-} from 'firebase/firestore';
-import AdminStudentActivity from '../components/AdminStudentActivity';
+  addDoc, serverTimestamp, deleteDoc, query, orderBy, where, setDoc, getDoc 
+} from 'firebase/firestore'; // Added setDoc and getDoc
 import { 
   Users, BookOpen, CreditCard, LayoutDashboard, 
   CheckCircle, Trash2, Award, Globe, UserPlus, Eye, 
   Phone, MessageSquare, Send, Loader2, ShieldCheck, 
   XCircle, Activity, ShieldAlert, Search, Video, FileText, 
-  ClipboardList, PlusCircle, Moon, Sun, LogOut, History
+  ClipboardList, PlusCircle, Moon, Sun, LogOut, History, BarChart3 
 } from 'lucide-react';
 import emailjs from '@emailjs/browser';
 
@@ -307,8 +306,8 @@ const handleStudentGraduation = async (student) => {
     setAdminReply('');
     alert("AUTHORITY_RESPONSE: Message injected into forum.");
   };
-const AdminStudentActivity = ({ courseId, selectedWeek }) => {
-  const [submissions, setSubmissions] = useState([]);
+  const AdminStudentActivity = ({ courseId, selectedWeek }) => {
+   const [submissions, setSubmissions] = useState([]);
 
   useEffect(() => {
     const q = query(
@@ -338,6 +337,191 @@ const AdminStudentActivity = ({ courseId, selectedWeek }) => {
     });
     return () => unsubscribe();
   }, [courseId, selectedWeek]);
+
+  return (
+    <div className="bg-white rounded-[2rem] border shadow-xl overflow-hidden mt-6">
+      <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
+        <h3 className="font-black text-xs uppercase italic">Activity Tracker: Week {selectedWeek}</h3>
+        <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black">{submissions.length} SUBMISSIONS</span>
+      </div>
+      <table className="w-full text-left">
+        <thead className="text-[10px] font-black text-gray-400 uppercase bg-gray-50/50">
+          <tr>
+            <th className="p-6">Student</th>
+            <th className="p-6">Type</th>
+            <th className="p-6">Status</th>
+            <th className="p-6 text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {submissions.map((sub) => (
+            <tr key={sub.id} className="hover:bg-blue-50/30">
+              <td className="p-6 font-bold text-sm">{sub.studentName}</td>
+              <td className="p-6"><span className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-[9px] font-black">{sub.type}</span></td>
+              <td className="p-6 text-[10px] font-bold">{sub.status || 'Pending'}</td>
+              <td className="p-6 flex justify-center gap-2">
+                <button onClick={() => updateDoc(doc(db, "submissions", sub.id), { status: 'Graded' })} className="p-2 bg-green-500 text-white rounded-lg"><CheckCircle size={14}/></button>
+                <button onClick={() => deleteDoc(doc(db, "submissions", sub.id))} className="p-2 bg-red-500 text-white rounded-lg"><Trash2 size={14}/></button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+const SuperAdmin = () => {
+  const [activeTab, setActiveTab] = useState('overview');
+  const [students, setStudents] = useState([]);
+  const [systemUsers, setSystemUsers] = useState([]);
+  const [serviceRequests, setServiceRequests] = useState([]);
+  const [allThreads, setAllThreads] = useState([]);
+  const [activeThread, setActiveThread] = useState(null);
+  const [adminReply, setAdminReply] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [darkMode, setDarkMode] = useState(false);
+  const [historyLogs, setHistoryLogs] = useState([]);
+  const [newSubmissionsCount, setNewSubmissionsCount] = useState(0);
+  const [lessons, setLessons] = useState([]);
+
+  const [academicData, setAcademicData] = useState({
+    type: 'video', title: '', content: '', week: '1', course: 'Web Development', dueDate: ''
+  });
+
+  const [weekSchedule, setWeekSchedule] = useState({ week: '1', startDate: '', endDate: '' });
+  const [forumData, setForumData] = useState({ title: '', content: '', course: 'Web Development' });
+  const [userData, setUserData] = useState({ name: '', email: '', phone: '', password: '', role: 'student' });
+
+  const availableCourses = ["Web Development", "Graphic Design", "Digital Marketing", "Cyber Security"];
+
+  // LOG ACTIVITY FUNCTION
+  const logActivity = async (action, details) => {
+    try {
+      await addDoc(collection(db, "system_logs"), { action, details, timestamp: serverTimestamp() });
+    } catch (e) { console.error(e); }
+  };
+
+  // REAL-TIME DATA ENGINE
+  useEffect(() => {
+    const unsubStudents = onSnapshot(collection(db, "course_applications"), (snap) => {
+      setStudents(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
+      setSystemUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubServices = onSnapshot(collection(db, "service_requests"), (snap) => {
+      setServiceRequests(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubForum = onSnapshot(query(collection(db, "forum_threads"), orderBy("createdAt", "desc")), (snap) => {
+      setAllThreads(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubLessons = onSnapshot(query(collection(db, "lessons"), orderBy("createdAt", "desc")), (snap) => {
+      setLessons(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    const unsubLogs = onSnapshot(query(collection(db, "system_logs"), orderBy("timestamp", "desc")), (snap) => {
+      setHistoryLogs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
+    const yau = new Date(); yau.setHours(0,0,0,0);
+    const unsubNewSub = onSnapshot(query(collection(db, "submissions"), where("createdAt", ">=", yau)), (snap) => {
+      setNewSubmissionsCount(snap.size);
+    });
+
+    return () => { 
+      unsubStudents(); unsubUsers(); unsubServices(); 
+      unsubForum(); unsubLessons(); unsubLogs(); unsubNewSub();
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    if(window.confirm("Logout?")) {
+      try { await signOut(auth); window.location.href = "/login"; } catch (err) { alert("Error logging out"); }
+    }
+  };
+
+  const createNewUser = async (email, password, fullName, role) => {
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      await setDoc(doc(db, "users", userCredential.user.uid), {
+        uid: userCredential.user.uid, fullName, email, role, createdAt: serverTimestamp(), accountStatus: "Active"
+      });
+      alert("User Created!");
+    } catch (error) { alert(error.message); }
+  };
+
+  const handleAcademicUpload = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "lessons"), {
+        ...academicData, instructor: "SUPER_ADMIN", createdAt: serverTimestamp()
+      });
+      alert("Deployed!");
+      setAcademicData({ ...academicData, title: '', content: '' });
+    } catch (err) { alert(err.message); } finally { setLoading(false); }
+  };
+
+  // --- RENDER PORTION ---
+  return (
+    <div className={`flex min-h-screen ${darkMode ? 'bg-slate-900 text-white' : 'bg-slate-50 text-slate-900'}`}>
+      {/* SIDEBAR */}
+      <div className="w-72 p-8 bg-slate-950 text-white space-y-8">
+        <h2 className="text-2xl font-black italic text-blue-500">AYAX ADMIN</h2>
+        <nav className="space-y-2">
+          <button onClick={() => setActiveTab('overview')} className={`w-full text-left p-4 rounded-xl flex gap-3 ${activeTab === 'overview' ? 'bg-blue-600' : ''}`}><LayoutDashboard size={18}/> Overview</button>
+          <button onClick={() => setActiveTab('engagement')} className={`w-full text-left p-4 rounded-xl flex gap-3 relative ${activeTab === 'engagement' ? 'bg-blue-600' : ''}`}><BarChart3 size={18}/> Tracker {newSubmissionsCount > 0 && <span className="absolute right-2 top-2 bg-red-500 text-[8px] w-4 h-4 rounded-full flex items-center justify-center">{newSubmissionsCount}</span>}</button>
+          <button onClick={() => setActiveTab('academic')} className={`w-full text-left p-4 rounded-xl flex gap-3 ${activeTab === 'academic' ? 'bg-blue-600' : ''}`}><BookOpen size={18}/> Curriculum</button>
+          <button onClick={() => setActiveTab('users')} className={`w-full text-left p-4 rounded-xl flex gap-3 ${activeTab === 'users' ? 'bg-blue-600' : ''}`}><ShieldCheck size={18}/> Access</button>
+          <button onClick={handleLogout} className="w-full text-left p-4 text-red-400 mt-10 flex gap-3"><LogOut size={18}/> Logout</button>
+        </nav>
+      </div>
+
+      {/* MAIN */}
+      <div className="flex-1 p-10 overflow-y-auto">
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-3xl shadow-sm">
+              <p className="text-[10px] font-black uppercase text-gray-400">Total Revenue</p>
+              <h3 className="text-2xl font-black">₦{(students.length * 35000).toLocaleString()}</h3>
+            </div>
+            {/* Add other cards here */}
+          </div>
+        )}
+
+        {activeTab === 'engagement' && (
+          <div>
+            <div className="flex gap-2 mb-6">
+              {[1, 2, 3, 4].map(w => (
+                <button key={w} onClick={() => setSelectedWeek(w)} className={`px-4 py-2 rounded-lg font-black ${selectedWeek === w ? 'bg-black text-white' : 'bg-white'}`}>Week {w}</button>
+              ))}
+            </div>
+            <StudentActivityTable courseId="Web Development" selectedWeek={selectedWeek} />
+          </div>
+        )}
+
+        {activeTab === 'academic' && (
+          <div className="grid grid-cols-3 gap-8">
+            <form onSubmit={handleAcademicUpload} className="bg-white p-8 rounded-[2rem] shadow-lg space-y-4">
+              <input className="w-full p-4 bg-slate-100 rounded-xl" placeholder="Title" value={academicData.title} onChange={e => setAcademicData({...academicData, title: e.target.value})} />
+              <input className="w-full p-4 bg-slate-100 rounded-xl" placeholder="Content/Link" value={academicData.content} onChange={e => setAcademicData({...academicData, content: e.target.value})} />
+              <button className="w-full py-4 bg-blue-600 text-white rounded-xl font-black uppercase">Deploy</button>
+            </form>
+            <div className="col-span-2 space-y-3">
+              {lessons.map(lesson => (
+                <div key={lesson.id} className="bg-white p-4 rounded-xl flex justify-between">
+                  <span className="font-bold">{lesson.title}</span>
+                  <button onClick={() => deleteDoc(doc(db, "lessons", lesson.id))}><Trash2 size={16} className="text-red-500"/></button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
 
   const AdminUserManagement = () => {
   const [formData, setFormData] = useState({
