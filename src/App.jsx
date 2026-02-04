@@ -10,7 +10,6 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home'; 
 import ProjectForm from './components/ProjectForm';
 import CourseEnrollment from './pages/CourseEnrollment'; 
-import AdminDashboard from './pages/AdminDashboard2';
 import Login from './pages/Login'; 
 import AdminStudentActivity from './components/AdminStudentActivity';
 import AuthPortal from './components/AuthPortal';
@@ -33,21 +32,19 @@ import AdminChatManager from './pages/AdminChatManager';
 import AdminCourseList from './pages/AdminCourseList'; 
 import AdminCourseDashboard from './pages/AdminCourseDashboard'; 
 import AdminStudentsList from './pages/AdminStudentsList'; 
-import AdminDashboard from './pages/AdminDashboard';
+import AdminDashboard from './pages/AdminDashboard'; // Kept only one AdminDashboard
+
 // --- ADDED COURSE & PRICING COMPONENTS ---
-import CourseSection from './components/CourseSection';
+import CourseSection from './components/CourseSection'; // Kept only one
 import PricingCard from './components/PricingCard';
 
 // --- SABBIN COMPONENTS DIN DA MUKA GINA ---
 import IndustrySolutions from './components/IndustrySolutions';
 import MaintenancePlans from './components/MaintenancePlans';
-import CourseSection from './components/CourseSection';
 
 const midtermQuestions = [
   { text: "What is React?", options: [{text: "Library", isCorrect: true}, {text: "Language", isCorrect: false}] },
 ];
-
-{userRole === 'teacher' ? <TeacherDashboard /> : <Redirect to="/portal" />}
 
 function App() {
   return (
@@ -56,10 +53,10 @@ function App() {
         <Navbar /> 
         
         <Routes>
-          <Route path="/" element={<Login />} />
-          <Route path="/login" element={<Login />} />
-          {/* --- PUBLIC ACCESS PROTOCOLS --- */}
           <Route path="/" element={<Home />} />
+          <Route path="/login" element={<Login />} />
+
+          {/* --- PUBLIC ACCESS PROTOCOLS --- */}
           <Route path="/about" element={<AboutUs />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
@@ -78,7 +75,7 @@ function App() {
 
           {/* --- AUTHENTICATION TERMINALS --- */}
           <Route path="/portal" element={<AuthPortal />} />
-          <Route path="/login" element={<StudentLogin />} />
+          <Route path="/student-login" element={<StudentLogin />} />
           
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
