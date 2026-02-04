@@ -41,6 +41,7 @@ import PricingCard from './components/PricingCard';
 // --- SABBIN COMPONENTS DIN DA MUKA GINA ---
 import IndustrySolutions from './components/IndustrySolutions';
 import MaintenancePlans from './components/MaintenancePlans';
+import CourseSection from './components/CourseSection';
 
 const midtermQuestions = [
   { text: "What is React?", options: [{text: "Library", isCorrect: true}, {text: "Language", isCorrect: false}] },
