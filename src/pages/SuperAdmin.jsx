@@ -5,7 +5,7 @@ import {
   collection, onSnapshot, updateDoc, doc, 
   addDoc, serverTimestamp, deleteDoc, query, orderBy, where 
 } from 'firebase/firestore';
-
+import AdminStudentActivity from '../components/AdminStudentActivity';
 import { 
   Users, BookOpen, CreditCard, LayoutDashboard, 
   CheckCircle, Trash2, Award, Globe, UserPlus, Eye, 
@@ -13,6 +13,7 @@ import {
   XCircle, Activity, ShieldAlert, Search, Video, FileText, 
   ClipboardList, PlusCircle, Moon, Sun, LogOut, History
 } from 'lucide-react';
+import emailjs from '@emailjs/browser';
 
 const SuperAdmin = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -23,10 +24,11 @@ const SuperAdmin = () => {
   const [activeThread, setActiveThread] = useState(null);
   const [adminReply, setAdminReply] = useState('');
   const [loading, setLoading] = useState(false);
-  
+  const [selectedWeek, setSelectedWeek] = useState(1);
   // New States for requested features
   const [darkMode, setDarkMode] = useState(false);
   const [historyLogs, setHistoryLogs] = useState([]);
+  const [newSubmissionsCount, setNewSubmissionsCount] = useState(0);
 
   // New Academic State for Super Admin
   const [lessons, setLessons] = useState([]);
@@ -37,6 +39,12 @@ const SuperAdmin = () => {
     week: '1',
     course: 'Web Development',
     dueDate: '' // Added for assignments
+  });
+
+  const [weekSchedule, setWeekSchedule] = useState({
+    week: '1',
+    startDate: '',
+    endDate: ''
   });
 
   // Forum Creation State
@@ -86,15 +94,89 @@ const SuperAdmin = () => {
     };
   }, []);
 
-  // ADMINISTRATIVE ACTIONS
-  const logActivity = async (action, details) => {
-    await addDoc(collection(db, "system_logs"), {
-      action,
-      details,
-      admin: "SUPER_ADMIN",
-      timestamp: serverTimestamp()
+  // 1. Approve Certificate & Show on Student Dashboard
+const approveCertificate = async (studentId) => {
+  try {
+    await updateDoc(doc(db, "users", studentId), {
+      certificateApproved: true,
+      graduationDate: serverTimestamp(),
+      status: "Graduated"
     });
+    alert("Certificate approved and visible to student!");
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+// 2. Deactivate User (After Download)
+const deactivateStudent = async (studentId) => {
+  try {
+    await updateDoc(doc(db, "users", studentId), {
+      accountStatus: "Deactivated",
+      accessRevoked: true
+    });
+    alert("Student account deactivated successfully.");
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+
+// 3. Email Certificate (Simulated using a Cloud Function or API)
+const handleStudentGraduation = async (student) => {
+  const PUBLIC_KEY = "Zq65aNb8G1g9F7XkY";
+  const SERVICE_ID = "YOUR_SERVICE_ID"; 
+  const TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+
+  const emailParams = {
+    to_name: student.fullName,
+    to_email: student.email,
+    course_name: student.course || "Full Stack Web Development",
+    certificate_link: `https://ayax-university.com/verify/${student.id}`,
+    admin_contact: "ayaxdigitalsolutions@gmail.com"
   };
+
+  try {
+    // 1. Send Email via EmailJS
+    const emailRes = await emailjs.send(SERVICE_ID, TEMPLATE_ID, emailParams, PUBLIC_KEY);
+    
+    if (emailRes.status === 200) {
+      // 2. Update Firebase Status and Deactivate
+      const studentRef = doc(db, "users", student.id);
+      await updateDoc(studentRef, {
+        certificateApproved: true,
+        accountStatus: "Deactivated", // Revokes portal access
+        graduationDate: serverTimestamp(),
+        accessLevel: "Graduated"
+      });
+
+      alert(`Success: Certificate sent to ${student.email} and account deactivated.`);
+    }
+  } catch (error) {
+    console.error("Workflow Error:", error);
+    alert("Critical Error: Process interrupted. Check console for details.");
+  }
+};
+  const handleSetSchedule = async (e) => {
+  e.preventDefault();
+  try {
+    // Za mu yi amfani da "week_1", "week_2" a matsayin ID don ya sauya na dā
+    await updateDoc(doc(db, "schedules", `week_${weekSchedule.week}`), {
+      ...weekSchedule,
+      updatedAt: serverTimestamp()
+    });
+    alert(`An saita lokacin Week ${weekSchedule.week} cikin nasara!`);
+  } catch (err) {
+    // Idan babu shi, sai mu ƙara sabo
+    await addDoc(collection(db, "schedules"), {
+      ...weekSchedule,
+      id: `week_${weekSchedule.week}`,
+      updatedAt: serverTimestamp()
+    });
+  }
+};
+
+
 
   const handleLogout = async () => {
     if(window.confirm("Are you sure you want to logout?")) {
@@ -104,6 +186,32 @@ const SuperAdmin = () => {
       } catch (err) { alert("Logout failed"); }
     }
   };
+
+  const VerifyCertificate = () => {
+  const { id } = useParams();
+  const [data, setData] = useState(null);
+
+  useEffect(() => {
+    const checkValidity = async () => {
+      const docRef = doc(db, "users", id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists() && docSnap.data().certificateApproved) {
+        setData(docSnap.data());
+      }
+    };
+    checkValidity();
+  }, [id]);
+
+  if (!data) return <div className="p-20 text-center font-black">INVALID CREDENTIAL</div>;
+
+  return (
+    <div className="p-20 text-center">
+      <ShieldCheck className="mx-auto text-emerald-500 mb-4" size={64} />
+      <h1 className="text-3xl font-black uppercase italic">Verified Academic Record</h1>
+      <p className="mt-4 font-bold text-slate-500 uppercase">This certifies that {data.fullName} is a verified graduate of AYAX Academy.</p>
+    </div>
+  );
+};
 
   const updateStudentStatus = async (id, field, value) => {
     const studentRef = doc(db, "course_applications", id);
@@ -154,31 +262,38 @@ const SuperAdmin = () => {
     } catch (err) { alert(err.message); } finally { setLoading(false); }
   };
 
-  const handleCreateUser = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await addDoc(collection(db, "users"), {
-        fullName: userData.name,
-        email: userData.email,
-        phone: userData.phone,
-        role: userData.role,
-        comment: userData.comment,
-        createdAt: serverTimestamp(),
-        status: 'active',
-        currentActivity: 'Just Joined'
-      });
+ const createNewUser = async (email, password, fullName, role) => {
+  try {
+    // 1. Create the user in Firebase Authentication
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const user = userCredential.user;
 
-      await logActivity("USER_CREATION", `Created new ${userData.role}: ${userData.email}`);
+    // 2. Define the profile data based on Role
+    const userData = {
+      uid: user.uid,
+      fullName: fullName,
+      email: email,
+      role: role, // 'student' or 'teacher'
+      createdAt: serverTimestamp(),
+      accountStatus: "Active",
+    };
 
-      const message = `*OFFICIAL ADMISSION NOTICE - AYAX ACADEMY*\n\n` +
-                      `Hello *${userData.name}*,\nYour official account has been provisioned.\n\n` +
-                      `*ACCESS CREDENTIALS:*\nIdentifier: ${userData.email}\nSecurity Key: ${userData.password}\nRole: ${userData.role.toUpperCase()}`;
-      
-      window.open(`https://wa.me/${userData.phone.replace('+', '')}?text=${encodeURIComponent(message)}`, '_blank');
-      setUserData({ name: '', email: '', phone: '', password: '', role: 'student', comment: '' });
-    } catch (err) { alert(err.message); } finally { setLoading(false); }
-  };
+    // Add specific fields for Students
+    if (role === 'student') {
+      userData.currentWeek = 1;
+      userData.averageScore = 0;
+      userData.certificateApproved = false;
+    }
+
+    // 3. Save to Firestore 'users' collection
+    await setDoc(doc(db, "users", user.uid), userData);
+
+    alert(`${role.toUpperCase()} created successfully!`);
+  } catch (error) {
+    console.error("Error creating user:", error.message);
+    alert("Real-life Error: " + error.message);
+  }
+};
 
   const handleAdminReply = async (e) => {
     e.preventDefault();
@@ -192,7 +307,142 @@ const SuperAdmin = () => {
     setAdminReply('');
     alert("AUTHORITY_RESPONSE: Message injected into forum.");
   };
+const AdminStudentActivity = ({ courseId, selectedWeek }) => {
+  const [submissions, setSubmissions] = useState([]);
 
+  useEffect(() => {
+    const q = query(
+      collection(db, "submissions"),
+      where("course", "==", courseId),
+      where("week", "==", parseInt(selectedWeek))
+    );
+  
+ useEffect(() => {
+  const yau = new Date();
+  yau.setHours(0, 0, 0, 0); // Saita lokaci zuwa farkon yau
+
+  const q = query(
+    collection(db, "submissions"),
+    where("createdAt", ">=", yau)
+  );
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    setNewSubmissionsCount(snapshot.size); // Zai kirga adadin saƙonni nawa ne
+  });
+
+  return () => unsubscribe();
+}, []);
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setSubmissions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+    return () => unsubscribe();
+  }, [courseId, selectedWeek]);
+
+  const AdminUserManagement = () => {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    fullName: '',
+    role: 'student' // Default role
+  });
+
+  return (
+    <div className="max-w-4xl mx-auto p-10 bg-white rounded-[3rem] shadow-2xl border border-gray-100">
+      <div className="mb-10 text-center">
+        <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tight">User Provisioning Portal</h2>
+        <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mt-2">Authorized Super Admin Access Only</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Full Name */}
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase text-slate-400 ml-4">Full Legal Name</label>
+          <input 
+            type="text" 
+            className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
+            placeholder="John Doe"
+            onChange={(e) => setFormData({...formData, fullName: e.target.value})}
+          />
+        </div>
+
+        {/* Role Selection */}
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase text-slate-400 ml-4">Assign Role</label>
+          <select 
+            className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-black uppercase text-xs"
+            onChange={(e) => setFormData({...formData, role: e.target.value})}
+          >
+            <option value="student">Student</option>
+            <option value="teacher">Instructor / Teacher</option>
+          </select>
+        </div>
+
+        {/* Email */}
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase text-slate-400 ml-4">Official Email</label>
+          <input 
+            type="email" 
+            className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
+            placeholder="email@ayax.com"
+            onChange={(e) => setFormData({...formData, email: e.target.value})}
+          />
+        </div>
+
+        {/* Password */}
+        <div className="space-y-2">
+          <label className="text-[10px] font-black uppercase text-slate-400 ml-4">Temporary Password</label>
+          <input 
+            type="password" 
+            className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
+            placeholder="••••••••"
+            onChange={(e) => setFormData({...formData, password: e.target.value})}
+          />
+        </div>
+      </div>
+
+      <button 
+        onClick={() => createNewUser(formData.email, formData.password, formData.fullName, formData.role)}
+        className="w-full mt-12 py-6 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-4"
+      >
+        <UserPlus size={20}/> Initialize User Credentials
+      </button>
+    </div>
+  );
+};
+
+  return (
+    <div className="bg-white rounded-[2rem] border shadow-xl overflow-hidden mt-6">
+      <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
+        <h3 className="font-black text-xs uppercase italic">Activity Tracker: Week {selectedWeek}</h3>
+        <span className="bg-blue-600 text-white px-4 py-1 rounded-full text-[10px] font-black">{submissions.length} SUBMISSIONS</span>
+      </div>
+      <table className="w-full text-left">
+        <thead className="text-[10px] font-black text-gray-400 uppercase bg-gray-50/50">
+          <tr>
+            <th className="p-6">Student</th>
+            <th className="p-6">Type</th>
+            <th className="p-6">Status</th>
+            <th className="p-6 text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100">
+          {submissions.map((sub) => (
+            <tr key={sub.id} className="hover:bg-blue-50/30">
+              <td className="p-6 font-bold text-sm">{sub.studentName}</td>
+              <td className="p-6"><span className="px-2 py-1 bg-purple-100 text-purple-600 rounded text-[9px] font-black">{sub.type}</span></td>
+              <td className="p-6 text-[10px] font-bold">{sub.status || 'Pending'}</td>
+              <td className="p-6 flex justify-center gap-2">
+                 <button onClick={() => updateDoc(doc(db, "submissions", sub.id), { status: 'Graded' })} className="p-2 bg-green-500 text-white rounded-lg"><CheckCircle size={14}/></button>
+                 <button onClick={() => deleteDoc(doc(db, "submissions", sub.id))} className="p-2 bg-red-500 text-white rounded-lg"><Trash2 size={14}/></button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
   return (
     <div className={`flex min-h-screen font-sans transition-colors duration-300 ${darkMode ? 'bg-[#0f172a] text-white' : 'bg-[#f1f5f9] text-slate-900'}`}>
       
@@ -215,7 +465,20 @@ const SuperAdmin = () => {
           <button onClick={() => setActiveTab('services')} className={`nav-link ${activeTab === 'services' ? 'active-nav' : ''}`}><Globe size={18}/> Services</button>
           <button onClick={() => setActiveTab('users')} className={`nav-link ${activeTab === 'users' ? 'active-nav' : ''}`}><ShieldCheck size={18}/> Access Control</button>
           <button onClick={() => setActiveTab('history')} className={`nav-link ${activeTab === 'history' ? 'active-nav' : ''}`}><History size={18}/> History Logs</button>
-          
+         <button 
+            onClick={() => setActiveTab('engagement')} 
+            className={`w-full text-left p-4 rounded-2xl flex items-center gap-3 font-bold text-xs uppercase tracking-widest relative ${activeTab === 'engagement' ? 'bg-blue-600 text-white' : ''}`}
+          >
+            <BarChart3 size={18}/> 
+            Engagement Tracker
+
+            {/* Wannan shi ne Badge din */}
+            {newSubmissionsCount > 0 && (
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 bg-red-500 text-white text-[9px] w-5 h-5 flex items-center justify-center rounded-full animate-bounce shadow-lg border-2 border-white">
+                {newSubmissionsCount}
+              </span>
+            )}
+          </button>
           <div className="pt-10">
             <button onClick={handleLogout} className="nav-link text-red-400 hover:bg-red-500/10"><LogOut size={18}/> Logout</button>
           </div>
@@ -273,6 +536,65 @@ const SuperAdmin = () => {
             </table>
           </div>
         )}
+         return (
+    <div className="flex min-h-screen bg-gray-100">
+      {/* --- SIDEBAR --- */}
+      <div className="w-64 bg-gray-900 text-white p-6">
+        <h2 className="text-xl font-black mb-10 tracking-tighter text-blue-400">SUPER ADMIN</h2>
+        <nav className="space-y-2">
+          <button 
+            onClick={() => setActiveTab('overview')}
+            className={`w-full text-left p-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${activeTab === 'overview' ? 'bg-blue-600' : 'hover:bg-white/5'}`}
+          >
+            System Overview
+          </button>
+          
+          <button 
+            onClick={() => setActiveTab('engagement')}
+            className={`w-full text-left p-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all ${activeTab === 'engagement' ? 'bg-blue-600' : 'hover:bg-white/5'}`}
+          >
+            Engagement Tracker
+          </button>
+          
+          {/* Sauran buttons na Admin dinka na nan... */}
+        </nav>
+      </div>
+
+      {/* --- MAIN CONTENT --- */}
+      <div className="flex-1 overflow-y-auto">
+        {activeTab === 'overview' && (
+          <div className="p-10">
+            <h1 className="text-3xl font-black">Welcome, Chief.</h1>
+            {/* Abinda ke cikin overview dinka na asali */}
+          </div>
+        )}
+
+        {activeTab === 'engagement' && (
+          <div className="p-4 md:p-8">
+            {/* Control Bar na canza Week */}
+            <div className="bg-white p-4 rounded-2xl mb-6 shadow-sm flex items-center gap-4">
+              <span className="font-black text-[10px] uppercase text-gray-400">Select Week:</span>
+              {[1, 2, 3, 4].map(w => (
+                <button 
+                  key={w}
+                  onClick={() => setSelectedWeek(w)}
+                  className={`px-4 py-2 rounded-lg font-black text-xs ${selectedWeek === w ? 'bg-black text-white' : 'bg-gray-100 text-gray-600'}`}
+                >
+                  Week {w}
+                </button>
+              ))}
+            </div>
+
+            {/* Kiran Tracker Component din da muka gina */}
+            <AdminStudentActivity 
+              courseId="full-stack-web" // Ka sa courseId din da kake amfani da shi
+              selectedWeek={selectedWeek} 
+            />
+          </div>
+       )}
+      </div>
+    </div>
+  );
 
         {/* ACADEMIC MANAGEMENT */}
         {activeTab === 'academic' && (
@@ -298,6 +620,42 @@ const SuperAdmin = () => {
                   <button disabled={loading} className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg flex items-center justify-center gap-3">
                     {loading ? <Loader2 className="animate-spin"/> : <><PlusCircle size={18}/> Deploy to Curriculum</>}
                   </button>
+                  <div className="p-8 bg-blue-50 rounded-[2.5rem] border-2 border-dashed border-blue-200 mb-8">
+  <h3 className="font-black text-xs uppercase mb-4 flex items-center gap-2 text-blue-700">
+    <ClipboardList size={16}/> Set Weekly Academic Duration (7 Days)
+  </h3>
+  <form onSubmit={handleSetSchedule} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+    <select 
+      className="p-3 rounded-xl border font-bold text-xs"
+      value={weekSchedule.week}
+      onChange={(e) => setWeekSchedule({...weekSchedule, week: e.target.value})}
+    >
+      {[1, 2, 3, 4, 5, 6, 7, 8].map(w => <option key={w} value={w}>Week {w}</option>)}
+    </select>
+    
+    <div className="flex flex-col">
+      <label className="text-[9px] font-black ml-2 mb-1">START DATE</label>
+      <input 
+        type="date" 
+        className="p-3 rounded-xl border text-xs font-bold"
+        onChange={(e) => setWeekSchedule({...weekSchedule, startDate: e.target.value})}
+      />
+    </div>
+    
+    <div className="flex flex-col">
+      <label className="text-[9px] font-black ml-2 mb-1">END DATE</label>
+      <input 
+        type="date" 
+        className="p-3 rounded-xl border text-xs font-bold"
+        onChange={(e) => setWeekSchedule({...weekSchedule, endDate: e.target.value})}
+      />
+    </div>
+    
+    <button className="bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase shadow-md hover:bg-blue-700 mt-auto py-4">
+      Save Schedule
+    </button>
+  </form>
+</div>
                 </form>
               </div>
             </div>
@@ -494,6 +852,101 @@ const SuperAdmin = () => {
           </div>
         )}
 
+        {activeTab === 'engagement' && (
+  <div className="animate-in fade-in duration-500">
+     <div className="flex justify-between items-center mb-6 bg-white p-6 rounded-[2rem] shadow-sm border">
+        <h2 className="text-xl font-black uppercase italic">Student Engagement</h2>
+        <div className="flex gap-2">
+           {[1, 2, 3, 4].map(w => (
+             <button 
+               key={w} 
+               onClick={() => setSelectedWeek(w)} 
+               className={`px-5 py-2 rounded-xl font-black text-[10px] ${selectedWeek === w ? 'bg-black text-white' : 'bg-gray-100 text-gray-400'}`}
+             >
+               WEEK {w}
+             </button>
+           ))}
+        </div>
+     </div>
+     {/* Kiran Tracker Component anan */}
+     <AdminStudentActivity courseId="Web Development" selectedWeek={selectedWeek} />
+  </div>
+)}
+<div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm mb-6">
+  <div className="flex flex-col lg:flex-row justify-between items-center gap-6">
+    <div className="flex items-center gap-5">
+      <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg">
+        {student.fullName.charAt(0)}
+      </div>
+      <div>
+        <h4 className="text-lg font-black text-slate-900 uppercase italic tracking-tight">{student.fullName}</h4>
+        <div className="flex gap-3 mt-1">
+          <span className="text-[9px] font-black text-emerald-500 uppercase bg-emerald-50 px-2 py-0.5 rounded-md">Grade: {student.averageScore}%</span>
+          <span className="text-[9px] font-black text-blue-500 uppercase bg-blue-50 px-2 py-0.5 rounded-md">{student.course}</span>
+        </div>
+      </div>
+    </div>
+
+    <div className="flex flex-wrap justify-center gap-3">
+      {/* STEP 1: APPROVE */}
+      <button 
+        onClick={() => approveCertificate(student.id)}
+        disabled={student.certificateApproved}
+        className={`px-6 py-4 rounded-2xl text-[10px] font-black uppercase tracking-[0.1em] transition-all flex items-center gap-2 ${
+          student.certificateApproved ? 'bg-gray-100 text-gray-400' : 'bg-emerald-500 text-white hover:bg-emerald-600 shadow-lg shadow-emerald-100'
+        }`}
+      >
+        <CheckCircle size={16}/> {student.certificateApproved ? "Approved" : "Approve Certificate"}
+      </button>
+
+      {/* STEP 2: EMAIL */}
+      <button 
+        onClick={() => sendCertificateEmail(student)}
+        className="px-6 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.1em] hover:bg-slate-900 transition-all flex items-center gap-2 shadow-lg shadow-blue-100"
+      >
+        <Mail size={16}/> Send via Email
+      </button>
+
+      {/* STEP 3: DEACTIVATE */}
+      <button 
+        onClick={() => {
+          if(window.confirm("CAUTION: Deactivating will lock the student out forever. Proceed?")) {
+            deactivateStudent(student.id);
+          }
+        }}
+        className="px-6 py-4 bg-red-50 text-red-600 border border-red-100 rounded-2xl text-[10px] font-black uppercase tracking-[0.1em] hover:bg-red-600 hover:text-white transition-all flex items-center gap-2"
+      >
+        <UserX size={16}/> Terminate Access
+      </button>
+    </div>
+  </div>
+</div>
+
+<div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
+  <div className="flex items-center gap-5">
+    <div className="w-16 h-16 bg-blue-900 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg">
+      {student.fullName.charAt(0)}
+    </div>
+    <div>
+      <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">{student.fullName}</h4>
+      <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{student.email}</p>
+    </div>
+  </div>
+
+  <div className="flex items-center gap-4">
+    <div className="text-right mr-4 border-r pr-4 border-slate-100">
+      <p className="text-[10px] font-black text-slate-400 uppercase">Average Grade</p>
+      <p className="text-xl font-black text-slate-900">{student.averageScore}%</p>
+    </div>
+
+    <button 
+      onClick={() => handleStudentGraduation(student)}
+      className="px-8 py-4 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-900 transition-all shadow-lg flex items-center gap-3"
+    >
+      <Award size={16}/> Approve & Graduate
+    </button>
+  </div>
+</div>
         {/* SERVICE REQUESTS */}
         {activeTab === 'services' && (
           <div className="grid md:grid-cols-2 gap-6 animate-in fade-in duration-500">

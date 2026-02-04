@@ -18,12 +18,37 @@ const ProjectForm = () => {
     message: ''
   });
 
+  const sendToWhatsAppBackground = async (data) => {
+    // Lambar WhatsApp din Company
+    const companyPhone = "2347087244444";
+    
+    // Tsarin sakon da za a tura
+    const textMessage = `*NEW PROJECT INQUIRY*%0A` +
+      `*Name:* ${data.name}%0A` +
+      `*Phone:* ${data.phone}%0A` +
+      `*Plan:* ${data.tier}%0A` +
+      `*Location:* ${data.lga}, ${data.state}%0A` +
+      `*Message:* ${data.message}`;
+
+    try {
+      // Wannan zai yi kokarin kiran WhatsApp API a boye
+      // Lura: Domin wannan ya tafi 100% ba tare da window pop-up ba, 
+      // yawanci ana amfani da WhatsApp Business API/Cloud API.
+      // Amma wannan fetch din zai yi kokarin aika request din.
+      fetch(`https://api.whatsapp.com/send?phone=${companyPhone}&text=${textMessage}`, {
+        mode: 'no-cors'
+      });
+    } catch (err) {
+      console.log("WhatsApp background trigger failed, but Firebase is saved.");
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Shigar da bayanan a cikin 'inquiries' collection tare da dukkan sabbin fields
+      // 1. Aika sako zuwa Firebase (Super Admin Dashboard)
       await addDoc(collection(db, "inquiries"), {
         fullName: formData.name,
         email: formData.email,
@@ -37,6 +62,9 @@ const ProjectForm = () => {
         priority: 'Medium',
         createdAt: serverTimestamp()
       });
+      
+      // 2. Aika sako zuwa WhatsApp dinka a boye
+      await sendToWhatsAppBackground(formData);
       
       setSubmitted(true);
       // Reset form

@@ -22,7 +22,6 @@ import {
 const MaintenancePlans = () => {
   const [selectedPlan, setSelectedPlan] = useState(null);
   
-  // Sabbin states don tattara bayanai
   const [formData, setFormData] = useState({
     fullName: '',
     phone: '',
@@ -73,11 +72,9 @@ const MaintenancePlans = () => {
     }
   ];
 
-  // Function din tura sako zuwa WhatsApp da sabuwar lambar ka
   const handleWhatsAppSubmit = (e) => {
     e.preventDefault();
     
-    // Lambar ka da ka bayar: 07087244444 (an maida ta international format)
     const phoneNumber = "2347087244444"; 
     const message = `*NEW MAINTENANCE REQUEST*%0A%0A` +
                     `*Plan:* ${selectedPlan.name}%0A` +
@@ -94,12 +91,12 @@ const MaintenancePlans = () => {
     <section id="maintenance" className="bg-[#f0f9ff] py-24 px-6 relative font-sans transition-colors duration-500">
       <div className="max-w-[1700px] mx-auto">
         <div className="text-center mb-20">
-          <h2 className="text-5xl font-black text-gray-900 mb-6 uppercase tracking-tight italic">Maintenance & Support Ecosystem</h2>
-          <p className="text-xl text-gray-700 max-w-3xl mx-auto font-medium">Ensuring 99.9% uptime and peak performance for your digital infrastructure.</p>
+          <h2 className="text-5xl font-black text-gray-900 mb-6 uppercase tracking-tight italic text-left md:text-center">Maintenance & Support Ecosystem</h2>
+          <p className="text-xl text-gray-700 max-w-3xl mx-auto font-medium text-left md:text-center">Ensuring 99.9% uptime and peak performance for your digital infrastructure.</p>
           <div className="w-24 h-2 bg-blue-600 mx-auto mt-8 rounded-full"></div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 text-left">
           {plans.map((plan, index) => (
             <div 
               key={index} 

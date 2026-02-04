@@ -1,51 +1,77 @@
 import React, { useState, useEffect } from 'react';
 import { db, auth } from '../firebaseConfig';
-import { collection, addDoc, getDocs, query, where, doc, updateDoc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { MessageSquare, CheckCircle, Users } from 'lucide-react';
+import { collection, addDoc, getDocs, query, where, doc, updateDoc, getDoc, setDoc, serverTimestamp, orderBy } from 'firebase/firestore';
+import { MessageSquare, CheckCircle, Users, Pin, Send, Reply } from 'lucide-react';
 
 const WeeklyForum = ({ weekId, courseId }) => {
   const [mySubmission, setMySubmission] = useState("");
   const [othersSubmissions, setOthersSubmissions] = useState([]);
-  const [commentCount, setCommentCount] = useState(0);
+  const [repliesCount, setRepliesCount] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [adminAssignment, setAdminAssignment] = useState(null);
+  const [replyText, setReplyText] = useState({}); // Tracking reply input for each peer
+  
   const user = auth.currentUser;
-
-  // Path na progress domin rage maimaita code
   const progressPath = `students/${user?.uid}/progress/${courseId}_week_${weekId}`;
 
   useEffect(() => {
     if (!user) return;
 
-    const checkStatus = async () => {
+    const fetchData = async () => {
+      // 1. Check Completion Status
       const progRef = doc(db, progressPath);
       const progSnap = await getDoc(progRef);
       if (progSnap.exists() && progSnap.data().status === 'completed') {
         setIsCompleted(true);
       }
+
+      // 2. Fetch Super Admin Sticky Assignment
+      const adminQ = query(
+        collection(db, "forum_assignments"), 
+        where("weekId", "==", weekId),
+        where("courseId", "==", courseId)
+      );
+      const adminSnap = await getDocs(adminQ);
+      if (!adminSnap.empty) {
+        setAdminAssignment(adminSnap.docs[0].data());
+      }
+
+      // 3. Fetch Peer Submissions
+      fetchPeerWork();
+
+      // 4. Count my actual replies for this week
+      const repliesQ = query(
+        collection(db, "forum_replies"),
+        where("userId", "==", user.uid),
+        where("weekId", "==", weekId)
+      );
+      const repliesSnap = await getDocs(repliesQ);
+      setRepliesCount(repliesSnap.size);
+      if (repliesSnap.size >= 3 && hasSubmitted) markAsComplete();
     };
 
-    checkStatus();
-    fetchPeerWork();
-  }, [weekId, courseId, user]);
+    fetchData();
+  }, [weekId, courseId, user, hasSubmitted]);
 
   const fetchPeerWork = async () => {
     try {
-      const q = query(collection(db, "submissions"), where("weekId", "==", weekId));
+      const q = query(
+        collection(db, "submissions"), 
+        where("weekId", "==", weekId),
+        orderBy("createdAt", "desc")
+      );
       const snap = await getDocs(q);
       const filtered = snap.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .filter(item => item.userId !== user?.uid);
-      
-      // Dauko guda 3 kawai don yin review
-      setOthersSubmissions(filtered.slice(0, 3));
+      setOthersSubmissions(filtered);
     } catch (error) {
       console.error("Error fetching peers:", error);
     }
   };
 
   const handleSubmit = async () => {
-    // Tabbatar da tsawon sako (Academic Standard)
     if (mySubmission.trim().length < 100) {
       return alert("Your response is too short. Please provide at least 100 characters.");
     }
@@ -53,135 +79,151 @@ const WeeklyForum = ({ weekId, courseId }) => {
     try {
       await addDoc(collection(db, "submissions"), {
         userId: user.uid,
-        userName: user.email,
+        userName: user.displayName || user.email,
         content: mySubmission,
+        weekId,
+        courseId,
+        type: "main_assignment",
+        createdAt: serverTimestamp()
+      });
+      setHasSubmitted(true);
+      alert("Assignment posted! Now you MUST reply to at least 3 peers to finish.");
+    } catch (error) {
+      alert("Submission failed.");
+    }
+  };
+
+  const handleReplySubmit = async (peer) => {
+    const text = replyText[peer.id];
+    if (!text || text.trim().length < 10) {
+      return alert("Reply too short! Write a meaningful feedback.");
+    }
+
+    try {
+      await addDoc(collection(db, "forum_replies"), {
+        userId: user.uid,
+        userName: user.displayName || user.email,
+        replyContent: text,
+        parentPostId: peer.id,
+        parentPostContent: peer.content, // Domin admin ya gani ba tare da yayi search ba
+        replyToName: peer.userName,
         weekId,
         courseId,
         createdAt: serverTimestamp()
       });
-      setHasSubmitted(true);
-      alert("Assignment posted! Now review 3 peers to complete this week.");
-    } catch (error) {
-      alert("Submission failed. Please try again.");
-    }
-  };
 
-  const handleReview = () => {
-    setCommentCount(prev => {
-      const updated = prev + 1;
-      if (updated >= 3) markAsComplete();
-      return updated;
-    });
+      setReplyText(prev => ({ ...prev, [peer.id]: "" }));
+      const newCount = repliesCount + 1;
+      setRepliesCount(newCount);
+      
+      alert("Reply sent!");
+      if (newCount >= 3 && hasSubmitted) markAsComplete();
+    } catch (error) {
+      alert("Reply failed.");
+    }
   };
 
   const markAsComplete = async () => {
     const progRef = doc(db, progressPath);
-    try {
-      // Amfani da setDoc tare da {merge: true} ya fi tsaro idan document din bai riga ya wanzu ba
-      await setDoc(progRef, {
-        status: 'completed',
-        completedAt: serverTimestamp(),
-        courseId,
-        weekId
-      }, { merge: true });
-      
-      setIsCompleted(true);
-    } catch (error) {
-      console.error("Error marking complete:", error);
-    }
+    await setDoc(progRef, {
+      status: 'completed',
+      completedAt: serverTimestamp(),
+      courseId,
+      weekId
+    }, { merge: true });
+    setIsCompleted(true);
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-4 md:p-8 space-y-8">
-      {/* Header Section */}
-      <div className="bg-white p-8 md:p-10 rounded-[2.5rem] md:rounded-[3rem] shadow-sm border border-gray-100">
-        <h2 className="text-2xl md:text-3xl font-black text-gray-900 flex items-center gap-4">
-          <div className="p-3 bg-blue-50 rounded-2xl">
-            <MessageSquare className="text-blue-600" size={28} />
-          </div> 
-          Week {weekId} Academic Forum
-        </h2>
-        <p className="text-gray-500 mt-3 font-medium text-sm md:text-base leading-relaxed">
-          Share your research findings and engage in peer-to-peer scholarly review to unlock your weekly completion badge.
-        </p>
-      </div>
+    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
+      
+      {/* --- STICKY ADMIN ASSIGNMENT --- */}
+      {adminAssignment && (
+        <div className="sticky top-4 z-40 bg-blue-700 text-white p-6 md:p-8 rounded-[2.5rem] shadow-2xl border-b-8 border-yellow-400 mb-10">
+          <div className="flex items-center gap-3 mb-3">
+            <Pin className="rotate-45 text-yellow-300" size={24} />
+            <span className="font-black uppercase tracking-[0.3em] text-[10px] text-blue-100">Super Admin Instruction</span>
+          </div>
+          <h3 className="text-xl md:text-2xl font-black leading-tight italic">
+            "{adminAssignment.instruction}"
+          </h3>
+          <div className="mt-4 flex items-center gap-4">
+             <div className="bg-white/10 px-4 py-2 rounded-full flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${repliesCount >= 3 ? 'bg-green-400' : 'bg-red-400 animate-pulse'}`}></div>
+                <span className="text-[10px] font-black uppercase">Replies: {repliesCount} / 3</span>
+             </div>
+          </div>
+        </div>
+      )}
 
       {isCompleted ? (
-        <div className="bg-blue-600 p-10 md:p-16 rounded-[3rem] text-center text-white shadow-2xl shadow-blue-200 animate-in fade-in zoom-in duration-500">
-          <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-8">
-            <CheckCircle size={48} className="text-white" />
-          </div>
-          <h3 className="text-3xl md:text-4xl font-black tracking-tighter">Module Completed!</h3>
-          <p className="mt-4 font-bold text-blue-100 max-w-md mx-auto opacity-90">
-            Great job! You have fulfilled the discussion requirements for this week.
-          </p>
+        <div className="bg-emerald-500 p-12 rounded-[3.5rem] text-center text-white shadow-2xl">
+          <CheckCircle size={80} className="mx-auto mb-6" />
+          <h3 className="text-4xl font-black">Module Unlocked!</h3>
+          <p className="mt-4 font-bold opacity-90">You have successfully engaged with the community.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Submission Area */}
-          <div className="lg:col-span-2 space-y-6">
-            <div className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-100 relative overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          
+          {/* Main Submission Area */}
+          <div className="lg:col-span-7 space-y-6">
+            <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100">
               <div className="flex justify-between items-center mb-6">
-                <h4 className="font-black text-gray-900 uppercase text-[10px] tracking-[0.2em] bg-gray-50 px-4 py-2 rounded-full">Your Submission</h4>
-                {hasSubmitted && <span className="text-green-500 font-black text-[10px] uppercase">✓ Posted</span>}
+                <h4 className="font-black text-gray-900 uppercase text-xs tracking-widest">Submit Your Research</h4>
+                {hasSubmitted && <span className="bg-green-100 text-green-600 px-4 py-1 rounded-full text-[10px] font-black italic">✓ PUBLISHED</span>}
               </div>
-              
               <textarea 
-                className={`w-full p-6 bg-gray-50 rounded-3xl border-2 border-transparent focus:border-blue-100 focus:bg-white focus:ring-0 font-bold text-gray-700 h-80 transition-all resize-none ${hasSubmitted ? 'opacity-50' : ''}`}
-                placeholder="Structure your findings here (Minimum 100 characters)..."
+                className="w-full p-6 bg-gray-50 rounded-3xl border-2 border-transparent focus:border-blue-500 focus:bg-white transition-all h-64 font-bold text-gray-700 resize-none"
+                placeholder="Write your weekly assignment findings here..."
                 value={mySubmission}
                 onChange={(e) => setMySubmission(e.target.value)}
                 disabled={hasSubmitted}
               />
-              
               {!hasSubmitted && (
-                <button 
-                  onClick={handleSubmit} 
-                  className="mt-6 w-full py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-[1.5rem] font-black text-sm uppercase tracking-widest transition-all shadow-lg shadow-blue-100 active:scale-[0.98]"
-                >
+                <button onClick={handleSubmit} className="mt-6 w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-blue-700 shadow-xl active:scale-95 transition-all">
                   Publish to Forum
                 </button>
               )}
             </div>
           </div>
 
-          {/* Peer Review Sidebar */}
-          <div className="space-y-6">
-            <div className="bg-gray-900 p-8 rounded-[2.5rem] text-white shadow-xl">
-              <div className="flex justify-between items-center mb-8">
-                <h4 className="font-black text-[10px] uppercase tracking-widest flex items-center gap-2">
-                  <Users size={16} className="text-blue-400"/> Peer Review
-                </h4>
-                <span className="bg-blue-600 px-3 py-1 rounded-full text-[10px] font-black">{commentCount}/3</span>
-              </div>
+          {/* Peer Feed - Admin Tracking Friendly */}
+          <div className="lg:col-span-5 space-y-6 overflow-y-auto max-h-[800px] pr-2">
+            <h4 className="font-black text-gray-400 uppercase text-[10px] tracking-widest px-4">Student Discussion Feed</h4>
+            
+            {othersSubmissions.map(peer => (
+              <div key={peer.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:border-blue-300 transition-all">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-black text-xs">
+                    {peer.userName.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-black text-gray-900">{peer.userName}</p>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase">Peer Submission</p>
+                  </div>
+                </div>
+                
+                <p className="text-sm text-gray-600 font-medium leading-relaxed mb-6 italic">"{peer.content}"</p>
 
-              <div className="space-y-4">
-                {othersSubmissions.length > 0 ? othersSubmissions.map(peer => (
-                  <div key={peer.id} className="bg-white/5 p-5 rounded-2xl border border-white/10 group hover:bg-white/10 transition-all">
-                    <p className="text-[10px] font-black text-blue-400 mb-2 uppercase tracking-tighter italic">Anonymous Scholar:</p>
-                    <p className="text-xs line-clamp-3 text-gray-400 mb-4 leading-relaxed">"{peer.content}"</p>
+                {/* Reply System */}
+                <div className="space-y-3">
+                  <div className="relative">
+                    <textarea 
+                      className="w-full p-4 bg-gray-100 rounded-2xl text-xs font-bold focus:bg-white border-2 border-transparent focus:border-blue-200 outline-none transition-all resize-none"
+                      placeholder="Add scholarly feedback..."
+                      value={replyText[peer.id] || ""}
+                      onChange={(e) => setReplyText(prev => ({ ...prev, [peer.id]: e.target.value }))}
+                    />
                     <button 
-                      onClick={handleReview} 
-                      className="w-full py-3 bg-white/10 hover:bg-white text-white hover:text-gray-900 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      onClick={() => handleReplySubmit(peer)}
+                      className="absolute bottom-3 right-3 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
                     >
-                      Review & Approve
+                      <Send size={14} />
                     </button>
                   </div>
-                )) : (
-                  <div className="py-10 text-center opacity-30">
-                    <Users size={32} className="mx-auto mb-2" />
-                    <p className="text-[10px] font-bold uppercase">Waiting for peers...</p>
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
-
-            {/* Locked Status info */}
-            <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100">
-               <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest leading-tight">
-                 Requirement: Submit your work and review 3 peers to unlock the next module.
-               </p>
-            </div>
+            ))}
           </div>
         </div>
       )}

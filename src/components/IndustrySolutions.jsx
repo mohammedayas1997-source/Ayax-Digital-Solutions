@@ -57,7 +57,7 @@ const IndustrySolutions = () => {
       `Org: ${formData.orgName}%0A` +
       `WhatsApp: ${formData.phone}%0A` +
       `Email: ${formData.email}%0A%0A` +
-      `*Location:*%0A` +
+      `*Location Details:*%0A` +
       `Country: ${formData.country}%0A` +
       `State: ${formData.state}%0A` +
       `LGA: ${formData.lga}%0A` +
@@ -70,7 +70,7 @@ const IndustrySolutions = () => {
   return (
     <div className="bg-gray-900 py-20 text-white relative">
       <div className="max-w-7xl mx-auto px-6">
-        <h2 className="text-3xl font-bold mb-12 text-center underline decoration-emerald-500 tracking-tight">
+        <h2 className="text-3xl font-bold mb-12 text-center underline decoration-emerald-500 tracking-tight text-left md:text-center">
           Enterprise Industry Solutions
         </h2>
         
@@ -87,7 +87,7 @@ const IndustrySolutions = () => {
                     onClick={() => setSelectedPlan({ ...tier, industry: industry.title })}
                     className="flex justify-between items-center border-b border-gray-700 pb-4 cursor-pointer group hover:bg-gray-700/50 p-3 rounded-xl transition-all"
                   >
-                    <div>
+                    <div className="text-left">
                       <p className="font-bold text-xl group-hover:text-blue-400 transition-colors">{tier.name}</p>
                       <p className="text-gray-400 text-sm">{tier.feature}</p>
                     </div>
@@ -124,81 +124,81 @@ const IndustrySolutions = () => {
             <form className="grid grid-cols-1 md:grid-cols-2 gap-5" onSubmit={handleWhatsAppSubmit}>
               <div className="md:col-span-1 text-left">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><User size={16}/> Full Name</label>
-                <input type="text" onChange={(e) => setFormData({...formData, fullName: e.target.value})} placeholder="John Doe" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+                <input type="text" onChange={(e) => setFormData({...formData, fullName: e.target.value})} placeholder="John Doe" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold" required />
               </div>
 
               <div className="md:col-span-1 text-left">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><Phone size={16}/> Phone / WhatsApp No.</label>
-                <input type="tel" onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+234..." className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+                <input type="tel" onChange={(e) => setFormData({...formData, phone: e.target.value})} placeholder="+234..." className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold" required />
               </div>
 
               <div className="md:col-span-2 text-left">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><Building2 size={16}/> Organization Name</label>
-                <input type="text" onChange={(e) => setFormData({...formData, orgName: e.target.value})} placeholder="Your Hospital, School, or Agency Name" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+                <input type="text" onChange={(e) => setFormData({...formData, orgName: e.target.value})} placeholder="Your Hospital, School, or Agency Name" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold" required />
               </div>
 
               <div className="md:col-span-2 text-left">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><Mail size={16}/> Professional Email</label>
-                <input type="email" onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="contact@organization.com" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all" required />
+                <input type="email" onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="contact@organization.com" className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all font-bold" required />
               </div>
 
-              {/* START OF BLUE BOX FIELDS (Now correctly wired to state) */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-2 md:col-span-2">
+              {/* BLUE BOX FIELDS - FULLY RESTORED */}
+              <div className="md:col-span-2 bg-blue-50 p-6 rounded-[2rem] border-2 border-blue-100 grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2 text-left">
-                  <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Country</label>
+                  <label className="text-blue-900 font-black text-[10px] uppercase tracking-[0.2em] block px-1">Country</label>
                   <input 
                     type="text" 
                     placeholder="e.g. Nigeria"
-                    className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
+                    className="w-full p-4 bg-white border-2 border-blue-100 rounded-xl focus:border-blue-500 outline-none text-blue-900 font-bold placeholder:text-blue-200"
                     onChange={(e) => setFormData({...formData, country: e.target.value})}
                     required
                   />
                 </div>
 
                 <div className="space-y-2 text-left">
-                  <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">State</label>
+                  <label className="text-blue-900 font-black text-[10px] uppercase tracking-[0.2em] block px-1">State</label>
                   <input 
                     type="text" 
-                    placeholder="e.g. Kano, Lagos, Abuja"
-                    className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
+                    placeholder="e.g. Kano, Lagos"
+                    className="w-full p-4 bg-white border-2 border-blue-100 rounded-xl focus:border-blue-500 outline-none text-blue-900 font-bold placeholder:text-blue-200"
                     onChange={(e) => setFormData({...formData, state: e.target.value})}
                     required
                   />
                 </div>
 
                 <div className="space-y-2 text-left">
-                  <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Local Government (LGA)</label>
+                  <label className="text-blue-900 font-black text-[10px] uppercase tracking-[0.2em] block px-1">LGA</label>
                   <input 
                     type="text" 
-                    placeholder="Enter your LGA"
-                    className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900"
+                    placeholder="Enter Local Govt"
+                    className="w-full p-4 bg-white border-2 border-blue-100 rounded-xl focus:border-blue-500 outline-none text-blue-900 font-bold placeholder:text-blue-200"
                     onChange={(e) => setFormData({...formData, lga: e.target.value})}
                     required
                   />
                 </div>
 
-                <div className="space-y-2 md:col-span-2 text-left">
-                  <label className="text-blue-900 font-bold text-xs uppercase tracking-widest block">Residential Address</label>
-                  <textarea 
-                    placeholder="House No, Street Name, City/Town..."
-                    className="w-full p-4 bg-white/50 border border-blue-200 rounded-xl focus:border-blue-500 outline-none text-blue-900 h-24 resize-none"
+                <div className="space-y-2 text-left">
+                  <label className="text-blue-900 font-black text-[10px] uppercase tracking-[0.2em] block px-1">Residential Address</label>
+                  <input 
+                    type="text" 
+                    placeholder="House No, Street..."
+                    className="w-full p-4 bg-white border-2 border-blue-100 rounded-xl focus:border-blue-500 outline-none text-blue-900 font-bold placeholder:text-blue-200"
                     onChange={(e) => setFormData({...formData, address: e.target.value})}
                     required
-                  ></textarea>
+                  />
                 </div>
               </div>
-              {/* END OF BLUE BOX FIELDS */}
 
               <div className="md:col-span-2 text-left">
                 <label className="flex items-center gap-2 text-sm font-bold mb-2 text-gray-700"><MessageSquare size={16}/> Additional Requirements</label>
-                <textarea rows="3" onChange={(e) => setFormData({...formData, requirements: e.target.value})} placeholder="Tell us more about your specific needs..." className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none"></textarea>
+                <textarea rows="3" onChange={(e) => setFormData({...formData, requirements: e.target.value})} placeholder="Tell us more..." className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none font-medium"></textarea>
               </div>
 
               <div className="md:col-span-2 pt-2">
                 <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black text-xl flex items-center justify-center gap-3 hover:bg-blue-700 shadow-2xl transition-all active:scale-95">
                   Submit Application <Send size={22} />
                 </button>
-                <p className="text-center text-xs text-gray-400 mt-4 uppercase font-bold tracking-widest">Secure 256-bit Encrypted Transmission</p>
+                <p className="text-center text-[10px] text-gray-400 mt-4 uppercase font-black tracking-widest">Secure 256-bit Encrypted Transmission</p>
               </div>
             </form>
           </div>

@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { db } from '../firebaseConfig';
 import { 
   collection, onSnapshot, addDoc, serverTimestamp, 
-  query, where, deleteDoc, doc, orderBy 
+  query, where, deleteDoc, doc, orderBy, getDocs
 } from 'firebase/firestore';
 import { 
   BookOpen, Video, Users, PlusCircle, Trash2, Clock, 
   Send, CheckCircle, LayoutDashboard, LogOut, MessageSquare, 
-  ChevronRight, Search, Filter, User, Loader2
+  ChevronRight, Search, Filter, User, Loader2, BarChart3, AlertTriangle
 } from 'lucide-react';
 
 const TeacherDashboard = ({ teacherName = "Instructor" }) => {
@@ -19,6 +19,11 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
   const [activeThread, setActiveThread] = useState(null);
   const [reply, setReply] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // NEW STATES FOR ENGAGEMENT TRACKER
+  const [studentStats, setStudentStats] = useState([]);
+  const [selectedWeek, setSelectedWeek] = useState(1);
+  const [isStatsLoading, setIsStatsLoading] = useState(false);
 
   const availableCourses = ["Web Development", "Graphic Design", "Digital Marketing", "Cyber Security"];
 
@@ -27,7 +32,7 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
 
   useEffect(() => {
     if (!selectedCourse) return;
-
+  
     // 1. Sync Filtered Lessons
     const qLessons = query(
       collection(db, "lessons"), 
@@ -37,6 +42,32 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
     const unsubLessons = onSnapshot(qLessons, (snap) => {
       setLessons(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
+
+    const submitGrade = async (submissionId, studentId, gradeData) => {
+  try {
+    const submissionRef = doc(db, "submissions", submissionId);
+    
+    // 1. Update the specific assignment
+    await updateDoc(submissionRef, {
+      status: gradeData.score >= 50 ? "Graded" : "Needs Revision",
+      score: Number(gradeData.score),
+      feedback: gradeData.feedback,
+      gradedAt: new Date().toISOString()
+    });
+
+    // 2. Optionally update the student's overall average in their profile
+    const studentRef = doc(db, "users", studentId);
+    await updateDoc(studentRef, {
+      totalPoints: increment(Number(gradeData.score)),
+      gradedAssignmentsCount: increment(1)
+    });
+
+    alert("Evaluation submitted successfully!");
+  } catch (error) {
+    console.error("Grading Error:", error);
+    alert("Failed to submit grade.");
+  }
+};
 
     // 2. Sync Filtered Students
     const qStudents = query(collection(db, "course_applications"), 
@@ -56,8 +87,49 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
       setForumThreads(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
+    // 4. Fetch Engagement Stats for Tracker
+    fetchEngagementStats();
+
     return () => { unsubLessons(); unsubStudents(); unsubForum(); };
-  }, [selectedCourse]);
+  }, [selectedCourse, selectedWeek]);
+
+  // NEW FUNCTION: Tattara bayanan mu'amalar dalibai
+  const fetchEngagementStats = async () => {
+    if (!selectedCourse) return;
+    setIsStatsLoading(true);
+    try {
+      const subQ = query(
+        collection(db, "submissions"),
+        where("courseId", "==", selectedCourse),
+        where("weekId", "==", selectedWeek)
+      );
+      const subSnap = await getDocs(subQ);
+      const submissions = subSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      const repQ = query(
+        collection(db, "forum_replies"),
+        where("courseId", "==", selectedCourse),
+        where("weekId", "==", selectedWeek)
+      );
+      const repSnap = await getDocs(repQ);
+      const allReplies = repSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+      const stats = submissions.map(sub => {
+        const studentReplies = allReplies.filter(r => r.userId === sub.userId);
+        return {
+          ...sub,
+          replies: studentReplies,
+          replyCount: studentReplies.length,
+          isEligible: studentReplies.length >= 3
+        };
+      });
+      setStudentStats(stats);
+    } catch (err) {
+      console.error("Tracker Error:", err);
+    } finally {
+      setIsStatsLoading(false);
+    }
+  };
 
   const handleReply = async (e) => {
     e.preventDefault();
@@ -80,7 +152,6 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Wannan bangaren yana tura darasin zuwa Firebase
       await addDoc(collection(db, "lessons"), {
         title: newLesson.title,
         videoLink: newLesson.videoLink,
@@ -91,7 +162,7 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
       });
       
       setNewLesson({ title: '', videoLink: '', description: '' });
-      setActiveTab('classroom'); // Maida malami gurin kallon darussan bayan ya yi upload
+      setActiveTab('classroom');
       alert("CONTENT_LIVE: Curriculum updated successfully.");
     } catch (err) { 
       alert("UPLOAD_FAILED: " + err.message); 
@@ -99,6 +170,83 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
       setLoading(false); 
     }
   };
+  
+const TeacherDashboard = ({ pendingSubmissions }) => {
+  return (
+    <div className="space-y-8 p-10 bg-slate-50 min-h-screen">
+      <header className="flex justify-between items-center mb-10">
+        <div>
+          <h2 className="text-3xl font-black text-slate-900 uppercase italic">Evaluation Portal</h2>
+          <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em]">Review student project submissions</p>
+        </div>
+        <div className="bg-white px-6 py-3 rounded-2xl shadow-sm border border-slate-100">
+          <span className="text-xs font-black text-slate-400 uppercase">Queue: </span>
+          <span className="text-xs font-black text-blue-600">{pendingSubmissions.length} Pending</span>
+        </div>
+      </header>
+
+      <div className="grid grid-cols-1 gap-6">
+        {pendingSubmissions.map((sub) => (
+          <div key={sub.id} className="bg-white p-8 rounded-[3rem] shadow-xl border border-slate-50 flex flex-col lg:flex-row gap-8 items-center">
+            {/* Student Info */}
+            <div className="flex-1">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center text-white font-black text-xl">
+                  {sub.studentName.charAt(0)}
+                </div>
+                <div>
+                  <h4 className="font-black text-slate-900 uppercase italic tracking-tight">{sub.studentName}</h4>
+                  <p className="text-[10px] font-bold text-blue-600 uppercase">Week {sub.week} Project</p>
+                </div>
+              </div>
+              <a 
+                href={sub.workLink} 
+                target="_blank" 
+                className="inline-flex items-center gap-2 text-xs font-black text-slate-400 hover:text-blue-600 underline transition-all"
+              >
+                <ExternalLink size={14} /> Open Student Repository
+              </a>
+            </div>
+
+            {/* Grading Form */}
+            <div className="flex-[2] grid grid-cols-1 md:grid-cols-3 gap-4 w-full">
+              <div className="flex flex-col gap-2">
+                <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Score (0-100)</label>
+                <input 
+                  type="number" 
+                  placeholder="85"
+                  className="p-4 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-black"
+                  id={`score-${sub.id}`}
+                />
+              </div>
+              <div className="flex flex-col gap-2 md:col-span-2">
+                <label className="text-[9px] font-black uppercase text-slate-400 ml-2">Feedback Notes</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    placeholder="Great work on the responsive design..."
+                    className="flex-1 p-4 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-medium text-sm"
+                    id={`feedback-${sub.id}`}
+                  />
+                  <button 
+                    onClick={() => {
+                      const score = document.getElementById(`score-${sub.id}`).value;
+                      const feedback = document.getElementById(`feedback-${sub.id}`).value;
+                      submitGrade(sub.id, sub.studentId, { score, feedback });
+                    }}
+                    className="px-6 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase hover:bg-slate-900 transition-all"
+                  >
+                    Submit
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
   const deleteLesson = async (lessonId) => {
     if (window.confirm("Are you sure you want to remove this lesson from the curriculum?")) {
@@ -111,7 +259,6 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
     }
   };
 
-  // COURSE SELECTION OVERLAY
   if (!selectedCourse) {
     return (
       <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-6">
@@ -144,6 +291,7 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
         <nav className="space-y-2">
           <button onClick={() => setActiveTab('classroom')} className={`t-nav ${activeTab === 'classroom' ? 't-active' : ''}`}><LayoutDashboard size={18}/> Classroom</button>
           <button onClick={() => setActiveTab('forum')} className={`t-nav ${activeTab === 'forum' ? 't-active' : ''}`}><MessageSquare size={18}/> Discussions</button>
+          <button onClick={() => setActiveTab('tracker')} className={`t-nav ${activeTab === 'tracker' ? 't-active' : ''}`}><BarChart3 size={18}/> Engagement Tracker</button>
           <button onClick={() => setActiveTab('upload')} className={`t-nav ${activeTab === 'upload' ? 't-active' : ''}`}><PlusCircle size={18}/> New Lesson</button>
           <button onClick={() => setActiveTab('students')} className={`t-nav ${activeTab === 'students' ? 't-active' : ''}`}><Users size={18}/> Student Roster</button>
         </nav>
@@ -158,6 +306,62 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
           </div>
           <button onClick={() => setSelectedCourse(null)} className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest">Switch Course</button>
         </div>
+
+        {/* --- TRACKER TAB (NEW) --- */}
+        {activeTab === 'tracker' && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Week Selection */}
+            <div className="flex items-center gap-4 bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm">
+               <span className="text-[10px] font-black uppercase text-slate-400">Review Week:</span>
+               {[1, 2, 3, 4].map(w => (
+                 <button key={w} onClick={() => setSelectedWeek(w)} className={`px-5 py-2 rounded-xl font-black text-xs transition-all ${selectedWeek === w ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>
+                   Week {w}
+                 </button>
+               ))}
+               {isStatsLoading && <Loader2 size={16} className="animate-spin text-blue-600 ml-auto"/>}
+            </div>
+
+            <div className="grid grid-cols-1 gap-6">
+              {studentStats.length > 0 ? studentStats.map(stat => (
+                <div key={stat.id} className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col md:flex-row gap-8">
+                   <div className="md:w-1/4">
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-xs">{stat.userName.charAt(0)}</div>
+                        <div>
+                          <p className="font-black text-slate-900 text-sm">{stat.userName}</p>
+                          <p className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full mt-1 inline-block ${stat.isEligible ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
+                            {stat.isEligible ? 'Completed' : 'Incomplete'}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-2xl font-black text-slate-900">{stat.replyCount} <span className="text-[10px] text-slate-400 uppercase tracking-widest">/ 3 Replies</span></div>
+                   </div>
+
+                   <div className="md:w-1/2 bg-slate-50 p-6 rounded-[2rem] border border-dashed border-slate-200">
+                      <h4 className="text-[9px] font-black uppercase text-slate-400 mb-2">Original Submission:</h4>
+                      <p className="text-xs text-slate-600 font-medium italic leading-relaxed">"{stat.content}"</p>
+                   </div>
+
+                   <div className="md:w-1/4 space-y-2">
+                      <h4 className="text-[9px] font-black uppercase text-slate-400">Interaction Log:</h4>
+                      {stat.replies.map((r, i) => (
+                        <div key={i} className="p-3 bg-blue-50 rounded-xl text-[10px] border border-blue-100">
+                          <p className="font-black text-blue-600">Reply to: {r.replyToName}</p>
+                          <p className="text-slate-500 line-clamp-1 italic">"{r.replyContent}"</p>
+                        </div>
+                      ))}
+                      {stat.replies.length === 0 && <div className="text-[10px] font-bold text-slate-300 italic">No activity yet.</div>}
+                   </div>
+                </div>
+              )) : (
+                <div className="py-20 text-center bg-white rounded-[3rem] border border-dashed">
+                   <AlertTriangle size={32} className="mx-auto mb-4 text-slate-200"/>
+                   <p className="font-black uppercase text-xs text-slate-300">No data found for Week {selectedWeek}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* FORUM INTERFACE */}
         {activeTab === 'forum' && (
@@ -202,7 +406,7 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
           </div>
         )}
 
-        {/* UPLOAD TAB - INDA MALAMI ZAI YI UPLOADING VIDEO */}
+        {/* UPLOAD TAB */}
         {activeTab === 'upload' && (
           <div className="max-w-2xl bg-white p-12 rounded-[3.5rem] shadow-2xl border border-slate-50 animate-in slide-in-from-bottom-8 duration-700">
             <h2 className="text-2xl font-black italic uppercase mb-8 flex items-center gap-3">
@@ -231,13 +435,12 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
           </div>
         )}
 
-        {/* CLASSROOM TAB - INDA AKA JERI VIDEOS DIN DA AKA YI UPLOAD */}
+        {/* CLASSROOM TAB */}
         {activeTab === 'classroom' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
             {lessons.length > 0 ? lessons.map(lesson => (
               <div key={lesson.id} className="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm group relative hover:shadow-md transition-all">
                 <div className="h-40 bg-slate-900 rounded-[2rem] mb-4 flex flex-col items-center justify-center text-blue-500 font-black italic overflow-hidden">
-                   {/* Misali: Idan kana so ka nuna preview na YouTube image */}
                    <Video size={32} className="mb-2 opacity-50"/>
                    <span className="text-[10px] uppercase tracking-widest">Video Active</span>
                 </div>
