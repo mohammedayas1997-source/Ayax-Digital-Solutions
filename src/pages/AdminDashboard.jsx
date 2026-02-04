@@ -6,6 +6,7 @@ import {
   LayoutGrid, CheckCircle, BarChart3, AlertTriangle, User, Clock 
 } from 'lucide-react';
 import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, Users, BookOpen } from 'lucide-react';
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('inquiries');
