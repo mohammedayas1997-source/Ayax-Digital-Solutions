@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebaseConfig"; // Tabbatar ka yi export na auth a can
 import { signOut } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import {
   collection,
   onSnapshot,
@@ -157,6 +159,48 @@ const SuperAdmin = () => {
     });
   };
 
+  const handleStudentGraduation = async (student) => {
+    const PUBLIC_KEY = "Zq65aNb8G1g9F7XkY";
+    const SERVICE_ID = "YOUR_SERVICE_ID";
+    const TEMPLATE_ID = "YOUR_TEMPLATE_ID";
+
+    const emailParams = {
+      to_name: student.fullName,
+      to_email: student.email,
+      course_name: student.course || "Full Stack Web Development",
+      certificate_link: `https://ayax-university.com/verify/${student.id}`,
+      admin_contact: "ayaxdigitalsolutions@gmail.com",
+    };
+
+    try {
+      // 1. Send Email via EmailJS
+      const emailRes = await emailjs.send(
+        SERVICE_ID,
+        TEMPLATE_ID,
+        emailParams,
+        PUBLIC_KEY,
+      );
+
+      if (emailRes.status === 200) {
+        // 2. Update Firebase Status and Deactivate
+        const studentRef = doc(db, "users", student.id);
+        await updateDoc(studentRef, {
+          certificateApproved: true,
+          accountStatus: "Deactivated", // Revokes portal access
+          graduationDate: serverTimestamp(),
+          accessLevel: "Graduated",
+        });
+
+        alert(
+          `Success: Certificate sent to ${student.email} and account deactivated.`,
+        );
+      }
+    } catch (error) {
+      console.error("Workflow Error:", error);
+      alert("Critical Error: Process interrupted. Check console for details.");
+    }
+  };
+
   const handleLogout = async () => {
     if (window.confirm("Are you sure you want to logout?")) {
       try {
@@ -214,6 +258,39 @@ const SuperAdmin = () => {
     } finally {
       setLoading(false);
     }
+  };
+  const VerifyCertificate = () => {
+    const { id } = useParams();
+    const [data, setData] = useState(null);
+
+    useEffect(() => {
+      const checkValidity = async () => {
+        const docRef = doc(db, "users", id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists() && docSnap.data().certificateApproved) {
+          setData(docSnap.data());
+        }
+      };
+      checkValidity();
+    }, [id]);
+
+    if (!data)
+      return (
+        <div className="p-20 text-center font-black">INVALID CREDENTIAL</div>
+      );
+
+    return (
+      <div className="p-20 text-center">
+        <ShieldCheck className="mx-auto text-emerald-500 mb-4" size={64} />
+        <h1 className="text-3xl font-black uppercase italic">
+          Verified Academic Record
+        </h1>
+        <p className="mt-4 font-bold text-slate-500 uppercase">
+          This certifies that {data.fullName} is a verified graduate of AYAX
+          Academy.
+        </p>
+      </div>
+    );
   };
 
   // NEW: Forum Creation Function
@@ -278,6 +355,42 @@ const SuperAdmin = () => {
       alert(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+  const createNewUser = async (email, password, fullName, role) => {
+    try {
+      // 1. Create the user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password,
+      );
+      const user = userCredential.user;
+
+      // 2. Define the profile data based on Role
+      const userData = {
+        uid: user.uid,
+        fullName: fullName,
+        email: email,
+        role: role, // 'student' or 'teacher'
+        createdAt: serverTimestamp(),
+        accountStatus: "Active",
+      };
+
+      // Add specific fields for Students
+      if (role === "student") {
+        userData.currentWeek = 1;
+        userData.averageScore = 0;
+        userData.certificateApproved = false;
+      }
+
+      // 3. Save to Firestore 'users' collection
+      await setDoc(doc(db, "users", user.uid), userData);
+
+      alert(`${role.toUpperCase()} created successfully!`);
+    } catch (error) {
+      console.error("Error creating user:", error.message);
+      alert("Real-life Error: " + error.message);
     }
   };
 
@@ -900,6 +1013,181 @@ const SuperAdmin = () => {
           </div>
         )}
 
+        <div className="max-w-4xl mx-auto p-10 bg-white rounded-[3rem] shadow-2xl border border-gray-100">
+          <div className="mb-10 text-center">
+            <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tight">
+              User Provisioning Portal
+            </h2>
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mt-2">
+              Authorized Super Admin Access Only
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Full Name */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-4">
+                Full Legal Name
+              </label>
+              <input
+                type="text"
+                className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
+                placeholder="John Doe"
+                onChange={(e) =>
+                  setFormData({ ...formData, fullName: e.target.value })
+                }
+              />
+            </div>
+
+            {/* Role Selection */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-4">
+                Assign Role
+              </label>
+              <select
+                className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-black uppercase text-xs"
+                onChange={(e) =>
+                  setFormData({ ...formData, role: e.target.value })
+                }
+              >
+                <option value="student">Student</option>
+                <option value="teacher">Instructor / Teacher</option>
+              </select>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-4">
+                Official Email
+              </label>
+              <input
+                type="email"
+                className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
+                placeholder="email@ayax.com"
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+              />
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-4">
+                Temporary Password
+              </label>
+              <input
+                type="password"
+                className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
+                placeholder="••••••••"
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={() =>
+              createNewUser(
+                formData.email,
+                formData.password,
+                formData.fullName,
+                formData.role,
+              )
+            }
+            className="w-full mt-12 py-6 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-4"
+          >
+            <UserPlus size={20} /> Initialize User Credentials
+          </button>
+        </div>
+        <div className="max-w-4xl mx-auto p-10 bg-white rounded-[3rem] shadow-2xl border border-gray-100">
+          <div className="mb-10 text-center">
+            <h2 className="text-3xl font-black text-slate-900 uppercase italic tracking-tight">
+              User Provisioning Portal
+            </h2>
+            <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.3em] mt-2">
+              Authorized Super Admin Access Only
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Full Name */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-4">
+                Full Legal Name
+              </label>
+              <input
+                type="text"
+                className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
+                placeholder="John Doe"
+                onChange={(e) =>
+                  setFormData({ ...formData, fullName: e.target.value })
+                }
+              />
+            </div>
+
+            {/* Role Selection */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-4">
+                Assign Role
+              </label>
+              <select
+                className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-black uppercase text-xs"
+                onChange={(e) =>
+                  setFormData({ ...formData, role: e.target.value })
+                }
+              >
+                <option value="student">Student</option>
+                <option value="teacher">Instructor / Teacher</option>
+              </select>
+            </div>
+
+            {/* Email */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-4">
+                Official Email
+              </label>
+              <input
+                type="email"
+                className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
+                placeholder="email@ayax.com"
+                onChange={(e) =>
+                  setFormData({ ...formData, email: e.target.value })
+                }
+              />
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-slate-400 ml-4">
+                Temporary Password
+              </label>
+              <input
+                type="password"
+                className="w-full p-5 bg-slate-50 rounded-2xl border-none focus:ring-2 focus:ring-blue-600 font-bold"
+                placeholder="••••••••"
+                onChange={(e) =>
+                  setFormData({ ...formData, password: e.target.value })
+                }
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={() =>
+              createNewUser(
+                formData.email,
+                formData.password,
+                formData.fullName,
+                formData.role,
+              )
+            }
+            className="w-full mt-12 py-6 bg-slate-900 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] hover:bg-blue-600 transition-all shadow-xl flex items-center justify-center gap-4"
+          >
+            <UserPlus size={20} /> Initialize User Credentials
+          </button>
+        </div>
+
         {/* ACCESS CONTROL */}
         {activeTab === "users" && (
           <div className="space-y-8">
@@ -1015,6 +1303,40 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
+
+        <div className="bg-white p-8 rounded-[2rem] border border-gray-100 shadow-xl flex flex-col md:flex-row justify-between items-center gap-6">
+          <div className="flex items-center gap-5">
+            <div className="w-16 h-16 bg-blue-900 rounded-2xl flex items-center justify-center text-white text-2xl font-black shadow-lg">
+              {student.fullName.charAt(0)}
+            </div>
+            <div>
+              <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">
+                {student.fullName}
+              </h4>
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                {student.email}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="text-right mr-4 border-r pr-4 border-slate-100">
+              <p className="text-[10px] font-black text-slate-400 uppercase">
+                Average Grade
+              </p>
+              <p className="text-xl font-black text-slate-900">
+                {student.averageScore}%
+              </p>
+            </div>
+
+            <button
+              onClick={() => handleStudentGraduation(student)}
+              className="px-8 py-4 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-[0.2em] hover:bg-slate-900 transition-all shadow-lg flex items-center gap-3"
+            >
+              <Award size={16} /> Approve & Graduate
+            </button>
+          </div>
+        </div>
 
         {/* SERVICE REQUESTS */}
         {activeTab === "services" && (
