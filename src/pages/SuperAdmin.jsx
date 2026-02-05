@@ -45,6 +45,7 @@ import {
   LogOut,
   History,
 } from "lucide-react";
+import emailjs from "@emailjs/browser";
 
 const SuperAdmin = () => {
   const [activeTab, setActiveTab] = useState("overview");
