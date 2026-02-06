@@ -6,7 +6,6 @@ import {
   Navigate,
 } from "react-router-dom";
 import { auth } from "./firebaseConfig";
-import AdminEmailPortal from "./components/AdminEmailPortal";
 
 // --- EXISTING IMPORTS ---
 import AboutUs from "./pages/AboutUs";
@@ -16,8 +15,8 @@ import Navbar from "./components/Navbar";
 import Home from "./pages/Home";
 import ProjectForm from "./components/ProjectForm";
 import CourseEnrollment from "./pages/CourseEnrollment";
+import AdminDashboard from "./pages/AdminDashboard2";
 import Login from "./pages/Login";
-import AdminStudentActivity from "./components/AdminStudentActivity";
 import AuthPortal from "./components/AuthPortal";
 import StudentPortal from "./components/StudentPortal";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -38,15 +37,10 @@ import AdminChatManager from "./pages/AdminChatManager";
 import AdminCourseList from "./pages/AdminCourseList";
 import AdminCourseDashboard from "./pages/AdminCourseDashboard";
 import AdminStudentsList from "./pages/AdminStudentsList";
-import AdminDashboard from "./pages/AdminDashboard";
 
 // --- ADDED COURSE & PRICING COMPONENTS ---
 import CourseSection from "./components/CourseSection";
 import PricingCard from "./components/PricingCard";
-
-// --- SABBIN COMPONENTS DIN DA MUKA GINA ---
-import IndustrySolutions from "./components/IndustrySolutions";
-import MaintenancePlans from "./components/MaintenancePlans";
 
 const midtermQuestions = [
   {
@@ -65,10 +59,8 @@ function App() {
         <Navbar />
 
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-
           {/* --- PUBLIC ACCESS PROTOCOLS --- */}
+          <Route path="/" element={<Home />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
@@ -78,35 +70,18 @@ function App() {
             path="/verify/:certificateId"
             element={<VerifyCertificate />}
           />
-          <Route
-            path="/admin/activity"
-            element={<AdminStudentActivity courseId="full-stack-web" />}
-          />
-
-          {/* Admin Dashboard - Keeping it consistent with admin role */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
 
           <Route path="/courses" element={<CourseSection />} />
           <Route path="/pricing" element={<PricingCard />} />
 
-          {/* --- SABBIN ROUTES DIN DA AKA KARA --- */}
-          <Route path="/industry-solutions" element={<IndustrySolutions />} />
-          <Route path="/maintenance" element={<MaintenancePlans />} />
-
           {/* --- AUTHENTICATION TERMINALS --- */}
           <Route path="/portal" element={<AuthPortal />} />
-          <Route path="/student-login" element={<StudentLogin />} />
+          <Route path="/login" element={<StudentLogin />} />
+
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
 
-          {/* Super Admin Route - Synchronized to 'super-admin' */}
+          {/* Super Admin Route - Na gyara requiredRole don ya yarda da super-admin */}
           <Route
             path="/super-admin"
             element={
@@ -181,7 +156,8 @@ function App() {
           />
 
           {/* --- ADMIN SECURE INFRASTRUCTURE --- */}
-          {/* Synchronized all to 'super-admin' to match your SuperAdmin component */}
+
+          {/* SHI MA NAN NA GYARA ZUWA super-admin TUNDA SHI NE A DB DIN KA */}
           <Route
             path="/admin-dashboard"
             element={
@@ -259,24 +235,6 @@ function App() {
             element={
               <ProtectedRoute requiredRole="super-admin">
                 <AdminChatManager />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/admin/mailer"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminEmailPortal />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/super-admin/mailer"
-            element={
-              <ProtectedRoute requiredRole="super-admin">
-                <AdminEmailPortal />
               </ProtectedRoute>
             }
           />

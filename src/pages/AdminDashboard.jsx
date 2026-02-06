@@ -23,7 +23,7 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("inquiries");
   const [inquiries, setInquiries] = useState([]);
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+
   // State for Course Upload
   const [courseData, setCourseData] = useState({
     title: "",
@@ -108,14 +108,6 @@ const AdminDashboard = () => {
             Status: <span className="text-green-500">Live</span>
           </div>
         </header>
-
-        <button
-          onClick={() => navigate("/admin/mailer")}
-          className="flex items-center gap-3 p-4 bg-blue-600 text-white rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg"
-        >
-          <Mail size={20} />
-          <span>Open Email Portal</span>
-        </button>
 
         {activeTab === "inquiries" ? (
           /* SECTION 1: INQUIRIES LIST */
