@@ -38,10 +38,10 @@ import AdminChatManager from "./pages/AdminChatManager";
 import AdminCourseList from "./pages/AdminCourseList";
 import AdminCourseDashboard from "./pages/AdminCourseDashboard";
 import AdminStudentsList from "./pages/AdminStudentsList";
-import AdminDashboard from "./pages/AdminDashboard"; // Kept only one AdminDashboard
+import AdminDashboard from "./pages/AdminDashboard";
 
 // --- ADDED COURSE & PRICING COMPONENTS ---
-import CourseSection from "./components/CourseSection"; // Kept only one
+import CourseSection from "./components/CourseSection";
 import PricingCard from "./components/PricingCard";
 
 // --- SABBIN COMPONENTS DIN DA MUKA GINA ---
@@ -82,7 +82,16 @@ function App() {
             path="/admin/activity"
             element={<AdminStudentActivity courseId="full-stack-web" />}
           />
-          <Route path="/admin" element={<AdminDashboard />} />
+
+          {/* Admin Dashboard - Keeping it consistent with admin role */}
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="/courses" element={<CourseSection />} />
           <Route path="/pricing" element={<PricingCard />} />
@@ -94,11 +103,10 @@ function App() {
           {/* --- AUTHENTICATION TERMINALS --- */}
           <Route path="/portal" element={<AuthPortal />} />
           <Route path="/student-login" element={<StudentLogin />} />
-
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
 
-          {/* Super Admin Route */}
+          {/* Super Admin Route - Synchronized to 'super-admin' */}
           <Route
             path="/super-admin"
             element={
@@ -173,6 +181,7 @@ function App() {
           />
 
           {/* --- ADMIN SECURE INFRASTRUCTURE --- */}
+          {/* Synchronized all to 'super-admin' to match your SuperAdmin component */}
           <Route
             path="/admin-dashboard"
             element={
@@ -262,10 +271,11 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route
             path="/super-admin/mailer"
             element={
-              <ProtectedRoute requiredRole="superadmin">
+              <ProtectedRoute requiredRole="super-admin">
                 <AdminEmailPortal />
               </ProtectedRoute>
             }
