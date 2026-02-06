@@ -3,7 +3,7 @@ import { db, auth } from "../firebaseConfig";
 import { signOut, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
 import { UserX, UserCheck, Trash2, ShieldAlert, Users } from "lucide-react";
-import { Send, Mail, Users, Loader2 } from "lucide-react";
+import { Send, Users, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { Mail, ShieldAlert } from "lucide-react";
 import {
@@ -33,12 +33,9 @@ import {
   Eye,
   Phone,
   MessageSquare,
-  Send,
   Loader2,
-  ShieldCheck,
   XCircle,
   Activity,
-  ShieldAlert,
   Search,
   Video,
   FileText,
