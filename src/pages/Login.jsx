@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { auth, db } from "../firebaseConfig"; // Ka tabbata 'db' yana nan
+import { auth, db } from "../firebaseConfig";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { LogIn, UserCircle, Loader2, ShieldAlert } from "lucide-react";
@@ -26,37 +26,40 @@ const StudentLogin = () => {
       );
       const user = userCredential.user;
 
-      // 2. Fetch User Data from Firestore
-      const userDoc = await getDoc(doc(db, "users", user.uid));
+      // 2. Fetch User Data from Firestore (Collection must be named "users")
+      const userRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userRef);
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
 
-        // 3. Role Validation (Student Only)
+        // 3. Role Validation
         if (userData.role !== "student") {
-          await signOut(auth); // Kore shi idan ba student ba ne
-          setError("Unauthorized: Wannan kofar ta dalibai ce kadai.");
+          await signOut(auth);
+          setError("Access Denied: This portal is for students only.");
           setLoading(false);
           return;
         }
 
-        // 4. Status Validation (Active Check)
+        // 4. Status Validation
         if (userData.status === "suspended" || userData.status === "inactive") {
-          await signOut(auth); // Kore shi idan an dakatar da shi
-          setError("Account dinka ba ya aiki. Tuntubi babban admin.");
+          await signOut(auth);
+          setError("Account Inactive: Please contact the administrator.");
           setLoading(false);
           return;
         }
 
-        // 5. Success - Navigate to Student Portal
+        // 5. Success
         navigate("/student-portal");
       } else {
+        // Log the UID to help you debug in the browser console
+        console.error("No Firestore document found for UID:", user.uid);
         await signOut(auth);
-        setError("Babu bayananka a tsarinmu.");
+        setError("Account Error: No student profile found in the database.");
       }
     } catch (err) {
-      console.error(err.message);
-      setError("Email ko Password ba su daidai ba.");
+      console.error("Login Error:", err.code);
+      setError("Invalid credentials. Please check your email and password.");
     } finally {
       setLoading(false);
     }
@@ -78,7 +81,7 @@ const StudentLogin = () => {
           Student Portal
         </h2>
         <p className="text-center text-gray-400 text-sm mb-8 font-medium">
-          Shiga dandalin koyo na dalibai
+          Authorized Academic Access Only
         </p>
 
         {error && (
@@ -94,9 +97,9 @@ const StudentLogin = () => {
             </label>
             <input
               type="email"
-              placeholder="sunana@misali.com"
+              placeholder="student@example.com"
               required
-              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900"
               onChange={(e) => setEmail(e.target.value.toLowerCase())}
             />
           </div>
@@ -109,7 +112,7 @@ const StudentLogin = () => {
               type="password"
               placeholder="••••••••"
               required
-              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900"
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
@@ -128,7 +131,7 @@ const StudentLogin = () => {
           </button>
         </div>
 
-        <div className="mt-8 text-center">
+        <div className="mt-8 text-center border-t pt-6">
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
             &copy; 2026 Academy Management System
           </p>
