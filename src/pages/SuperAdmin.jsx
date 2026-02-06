@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import emailjs from "@emailjs/browser";
+
+// Firebase Imports
 import { db, auth } from "../firebaseConfig";
 import { signOut, createUserWithEmailAndPassword } from "firebase/auth";
-import { doc, updateDoc } from "firebase/firestore";
-import { UserX, UserCheck, Trash2, ShieldAlert, Users } from "lucide-react";
-import { Send, Users, Loader2 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { Mail, ShieldAlert } from "lucide-react";
 import {
   collection,
   onSnapshot,
@@ -20,20 +19,26 @@ import {
   where,
 } from "firebase/firestore";
 
+// Lucide Icons (Merged and duplicates removed)
 import {
   Users,
+  UserX,
+  UserCheck,
+  Trash2,
+  ShieldAlert,
+  Send,
+  Loader2,
+  Mail,
   BookOpen,
   CreditCard,
   LayoutDashboard,
   CheckCircle,
-  Trash2,
   Award,
   Globe,
   UserPlus,
   Eye,
   Phone,
   MessageSquare,
-  Loader2,
   XCircle,
   Activity,
   Search,
@@ -46,7 +51,6 @@ import {
   LogOut,
   History,
 } from "lucide-react";
-import emailjs from "@emailjs/browser";
 
 const SuperAdmin = () => {
   const [activeTab, setActiveTab] = useState("overview");
