@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { db, auth } from "../firebaseConfig"; // Tabbatar ka yi export na auth a can
-import { signOut } from "firebase/auth";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { query, deleteDoc } from "firebase/firestore";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "../firebaseConfig";
+import { signOut, createUserWithEmailAndPassword } from "firebase/auth";
 import {
   collection,
   onSnapshot,
   updateDoc,
   doc,
+  setDoc,
   addDoc,
   serverTimestamp,
   deleteDoc,
