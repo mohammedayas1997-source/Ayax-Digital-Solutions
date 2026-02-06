@@ -111,6 +111,15 @@ function App() {
           />
 
           <Route
+            path="/student-portal"
+            element={
+              <ProtectedRoute requiredRole="student">
+                <StudentPortal />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/lesson/:lessonId"
             element={
               <ProtectedRoute requiredRole="student">
