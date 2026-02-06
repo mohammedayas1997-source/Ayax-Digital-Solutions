@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebaseConfig";
 import { signOut, createUserWithEmailAndPassword } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
+import { UserX, UserCheck, Trash2, ShieldAlert, Users } from "lucide-react";
+import { Send, Mail, Users, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { Mail, ShieldAlert } from "lucide-react";
 import {
   collection,
   onSnapshot,
@@ -55,7 +60,7 @@ const SuperAdmin = () => {
   const [activeThread, setActiveThread] = useState(null);
   const [adminReply, setAdminReply] = useState("");
   const [loading, setLoading] = useState(false);
-
+  const navigate = useNavigate();
   // New States for requested features
   const [darkMode, setDarkMode] = useState(false);
   const [historyLogs, setHistoryLogs] = useState([]);
@@ -201,6 +206,27 @@ const SuperAdmin = () => {
     }
   };
 
+  const [teachers, setTeachers] = useState([]);
+
+  useEffect(() => {
+    // Wannan layin zai kwaso dukkan users masu role din instructor
+    const q = query(collection(db, "users"), where("role", "==", "instructor"));
+    const unsub = onSnapshot(q, (snap) => {
+      setTeachers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
+    return unsub;
+  }, []);
+
+  const toggleStatus = async (id, status) => {
+    const newStatus = status === "suspended" ? "active" : "suspended";
+    await updateDoc(doc(db, "users", id), { status: newStatus });
+  };
+
+  const deleteTeacher = async (id) => {
+    if (window.confirm("Delete this instructor permanently?")) {
+      await deleteDoc(doc(db, "users", id));
+    }
+  };
   const handleLogout = async () => {
     if (window.confirm("Are you sure you want to logout?")) {
       try {
@@ -486,6 +512,13 @@ const SuperAdmin = () => {
             >
               <LogOut size={18} /> Logout
             </button>
+            <button
+              onClick={() => navigate("/super-admin/mailer")}
+              className="flex items-center gap-3 px-6 py-3 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 transition-all shadow-xl"
+            >
+              <Mail size={18} />
+              Send Official Email
+            </button>
           </div>
         </nav>
       </div>
@@ -745,6 +778,55 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
+        {/* --- MANAGEMENT SECTION --- */}
+        <div className="mt-12">
+          <h2 className="text-xl font-black mb-6 flex items-center gap-2">
+            <Users className="text-blue-600" /> INSTRUCTOR DIRECTORY
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {teachers.map((teacher) => (
+              <div
+                key={teacher.id}
+                className="bg-white p-5 rounded-[2rem] shadow-sm border border-slate-100 flex justify-between items-center"
+              >
+                <div>
+                  <h4 className="font-black text-slate-900">
+                    {teacher.fullName}
+                  </h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase">
+                    {teacher.email}
+                  </p>
+                  <div
+                    className={`mt-2 text-[9px] font-black uppercase px-2 py-0.5 rounded-full inline-block ${teacher.status === "suspended" ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"}`}
+                  >
+                    {teacher.status || "active"}
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => toggleStatus(teacher.id, teacher.status)}
+                    className={`p-3 rounded-2xl transition-all ${teacher.status === "suspended" ? "bg-green-600 text-white" : "bg-slate-100 text-slate-600 hover:bg-red-50 hover:text-red-600"}`}
+                  >
+                    {teacher.status === "suspended" ? (
+                      <UserCheck size={18} />
+                    ) : (
+                      <UserX size={18} />
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => deleteTeacher(teacher.id)}
+                    className="p-3 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* OVERVIEW: LIVE TRACKING */}
         {activeTab === "overview" && (
