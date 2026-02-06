@@ -18,7 +18,7 @@ import {
   Loader2,
   Star,
 } from "lucide-react";
-import { db } from "../firebase";
+import { db } from "../../firebase";
 import {
   collection,
   onSnapshot,
