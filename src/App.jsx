@@ -81,7 +81,7 @@ function App() {
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
 
-          {/* Super Admin Route - Na gyara requiredRole don ya yarda da super-admin */}
+          {/* Super Admin Route */}
           <Route
             path="/super-admin"
             element={
@@ -92,13 +92,21 @@ function App() {
           />
 
           {/* --- STUDENT SECURE INFRASTRUCTURE --- */}
+
+          {/* FIXED: Muna amfani da /student-portal a matsayin main dashboard din dalibi */}
           <Route
-            path="/dashboard"
+            path="/student-portal"
             element={
               <ProtectedRoute requiredRole="student">
                 <StudentPortal />
               </ProtectedRoute>
             }
+          />
+
+          {/* ADDED: Wannan redirect ne idan wani ya tafi /dashboard direct */}
+          <Route
+            path="/dashboard"
+            element={<Navigate to="/student-portal" replace />}
           />
 
           <Route
@@ -106,15 +114,6 @@ function App() {
             element={
               <ProtectedRoute requiredRole="student">
                 <StudentGrades />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/student-portal"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <StudentPortal />
               </ProtectedRoute>
             }
           />
@@ -165,8 +164,6 @@ function App() {
           />
 
           {/* --- ADMIN SECURE INFRASTRUCTURE --- */}
-
-          {/* SHI MA NAN NA GYARA ZUWA super-admin TUNDA SHI NE A DB DIN KA */}
           <Route
             path="/admin-dashboard"
             element={
