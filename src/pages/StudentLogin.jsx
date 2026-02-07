@@ -16,10 +16,9 @@ const StudentLogin = () => {
     setLoading(true);
 
     try {
-      // 1. Tabbatar email din yana kananan haruffa (lowercase) kuma babu sarari (trim)
       const cleanEmail = email.trim().toLowerCase();
 
-      // 2. Yi Login da Firebase Auth
+      // 1. Firebase Auth
       const userCredential = await signInWithEmailAndPassword(
         auth,
         cleanEmail,
@@ -27,14 +26,14 @@ const StudentLogin = () => {
       );
       const user = userCredential.user;
 
-      // 3. Duba matsayin mai login a Firestore
+      // 2. Firestore Check
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
 
       if (userSnap.exists()) {
         const userData = userSnap.data();
 
-        // 4. Duba Role (Dole ya zama student)
+        // 3. Role Validation
         if (userData.role !== "student") {
           await signOut(auth);
           alert("RESTRICTED: This portal is for students only.");
@@ -42,24 +41,24 @@ const StudentLogin = () => {
           return;
         }
 
-        // 5. Duba Status (Dole ya zama active)
+        // 4. Status Validation
         if (userData.status === "suspended" || userData.status === "inactive") {
           await signOut(auth);
-          alert(
-            "ACCOUNT INACTIVE: Your account has been suspended or is inactive.",
-          );
+          alert("ACCOUNT INACTIVE: Your account has been suspended.");
           setLoading(false);
           return;
         }
 
-        // Idan komai yayi daidai
-        navigate("/student-dashboard");
+        // 5. SUCCESSFUL REDIRECT
+        // We use /student-portal because that's what is in your App.jsx
+        console.log("Access Granted. Redirecting to Student Portal...");
+        navigate("/student-portal");
       } else {
         await signOut(auth);
-        alert("ACCOUNT ERROR: No student profile found.");
+        alert("ACCOUNT ERROR: No student profile found in database.");
       }
     } catch (error) {
-      console.error(error);
+      console.error("Login Error:", error.code);
       alert("AUTHENTICATION ERROR: Invalid email or password.");
     } finally {
       setLoading(false);
@@ -91,7 +90,6 @@ const StudentLogin = () => {
               type="email"
               placeholder="e.g. abubakar@ayax.com"
               required
-              // AN GYARA: Na cire 'uppercase' a nan don rubutun ya fito normal
               className="w-full p-6 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all font-medium text-sm shadow-sm lowercase"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
