@@ -18,15 +18,15 @@ const StudentLogin = () => {
     setError("");
 
     try {
-      // 1. Authentication
+      // 1. Authentication - Ensure email is lowercase and trimmed
       const userCredential = await signInWithEmailAndPassword(
         auth,
-        email.trim(),
+        email.trim().toLowerCase(),
         password,
       );
       const user = userCredential.user;
 
-      // 2. Fetch User Data from Firestore (Collection must be named "users")
+      // 2. Fetch User Data from Firestore
       const userRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userRef);
 
@@ -52,7 +52,6 @@ const StudentLogin = () => {
         // 5. Success
         navigate("/student-portal");
       } else {
-        // Log the UID to help you debug in the browser console
         console.error("No Firestore document found for UID:", user.uid);
         await signOut(auth);
         setError("Account Error: No student profile found in the database.");
@@ -99,7 +98,9 @@ const StudentLogin = () => {
               type="email"
               placeholder="student@example.com"
               required
-              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900"
+              // "lowercase" class forces the text to look lowercase while typing
+              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 lowercase"
+              value={email}
               onChange={(e) => setEmail(e.target.value.toLowerCase())}
             />
           </div>
@@ -113,6 +114,7 @@ const StudentLogin = () => {
               placeholder="••••••••"
               required
               className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900"
+              value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
