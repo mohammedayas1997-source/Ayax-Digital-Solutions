@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import { auth, db } from "../firebaseConfig";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { LogIn, UserCircle, Loader2, ShieldAlert } from "lucide-react";
+import { LogIn, ShieldCheck, Loader2, ShieldAlert } from "lucide-react"; // Changed UserCircle to ShieldCheck
 import { useNavigate } from "react-router-dom";
 
-const StudentLogin = () => {
+const StaffLogin = () => {
+  // Renamed for clarity
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -18,7 +19,6 @@ const StudentLogin = () => {
     setError("");
 
     try {
-      // Final lowercase check before sending to Firebase
       const cleanEmail = email.trim().toLowerCase();
 
       const userCredential = await signInWithEmailAndPassword(
@@ -33,28 +33,43 @@ const StudentLogin = () => {
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        const userRole = userData.role;
 
-        if (userData.role !== "student") {
+        // AUTH CHECK: Only Super Admin, Admin, and Malami allowed
+        const isAuthorized =
+          userRole === "super-admin" ||
+          userRole === "admin" ||
+          userRole === "malami" ||
+          userRole === "instructor";
+
+        if (!isAuthorized) {
           await signOut(auth);
-          setError("Access Denied: Student portal only.");
+          setError(
+            "Access Denied: Administrative and Faculty credentials required.",
+          );
           setLoading(false);
           return;
         }
 
         if (userData.status === "suspended" || userData.status === "inactive") {
           await signOut(auth);
-          setError("Account Inactive: Contact administrator.");
+          setError("Account Revoked: Contact Super Admin.");
           setLoading(false);
           return;
         }
 
-        navigate("/student-portal");
+        // Redirect based on specific administrative levels
+        if (userRole === "super-admin") {
+          navigate("/super-dashboard");
+        } else {
+          navigate("/admin-dashboard");
+        }
       } else {
         await signOut(auth);
-        setError("Account Error: Profile not found.");
+        setError("Account Error: Profile not found in authority database.");
       }
     } catch (err) {
-      setError("Invalid credentials. Check email and password.");
+      setError("Invalid administrative credentials.");
     } finally {
       setLoading(false);
     }
@@ -67,16 +82,16 @@ const StudentLogin = () => {
         className="bg-white p-10 rounded-[2.5rem] shadow-2xl max-w-md w-full border border-gray-100"
       >
         <div className="flex justify-center mb-6">
-          <div className="p-4 bg-blue-50 rounded-3xl text-blue-600">
-            <UserCircle size={40} />
+          <div className="p-4 bg-red-50 text-red-600 rounded-3xl">
+            <ShieldCheck size={40} />
           </div>
         </div>
 
         <h2 className="text-2xl font-black text-center mb-2 text-gray-900 uppercase tracking-tight">
-          Student Portal
+          Admin Command
         </h2>
-        <p className="text-center text-gray-400 text-sm mb-8 font-medium">
-          Authorized Academic Access Only
+        <p className="text-center text-gray-400 text-sm mb-8 font-medium italic">
+          Super Admin, Admin & Faculty Only
         </p>
 
         {error && (
@@ -88,31 +103,29 @@ const StudentLogin = () => {
         <div className="space-y-4">
           <div>
             <label className="block text-[10px] font-black uppercase text-gray-400 mb-1 ml-2">
-              Email Address
+              Official Email
             </label>
             <input
               type="email"
-              placeholder="student@example.com"
+              placeholder="admin@ayax.com"
               required
               autoComplete="email"
-              // ADDED: "normal-case" to stop visual capitalization
-              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 normal-case"
+              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 transition-all text-gray-900 normal-case font-bold"
               value={email}
-              // FORCED: Convert to lowercase on every keystroke
               onChange={(e) => setEmail(e.target.value.toLowerCase())}
             />
           </div>
 
           <div>
             <label className="block text-[10px] font-black uppercase text-gray-400 mb-1 ml-2">
-              Password
+              Security Key
             </label>
             <input
               type="password"
               placeholder="••••••••"
               required
               autoComplete="current-password"
-              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900"
+              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-red-500 transition-all text-gray-900"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -120,13 +133,13 @@ const StudentLogin = () => {
 
           <button
             disabled={loading}
-            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-blue-700 shadow-lg shadow-blue-200 disabled:opacity-50 transition-all mt-4"
+            className="w-full py-4 bg-gray-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-black shadow-lg disabled:opacity-50 transition-all mt-4"
           >
             {loading ? (
               <Loader2 className="animate-spin" size={20} />
             ) : (
               <>
-                Sign In <LogIn size={18} />
+                Authorize Access <LogIn size={18} />
               </>
             )}
           </button>
@@ -134,7 +147,7 @@ const StudentLogin = () => {
 
         <div className="mt-8 text-center border-t pt-6">
           <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-            &copy; 2026 Academy Management System
+            &copy; 2026 AYAX Digital Security Protocol
           </p>
         </div>
       </form>
@@ -142,4 +155,4 @@ const StudentLogin = () => {
   );
 };
 
-export default StudentLogin;
+export default StaffLogin;
