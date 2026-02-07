@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { db, auth } from "../firebaseConfig"; // Tabbatar ka yi export na auth a can
+import { db, auth } from "../firebaseConfig";
 import { signOut } from "firebase/auth";
 import {
   collection,
@@ -12,9 +12,15 @@ import {
   query,
   orderBy,
   where,
+  getDoc,
+  setDoc, // Added setDoc for schedule management
 } from "firebase/firestore";
-
 import {
+  Calendar,
+  Clock,
+  Save,
+  AlertOctagon,
+  BellRing,
   Users,
   BookOpen,
   CreditCard,
@@ -58,18 +64,22 @@ const SuperAdmin = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [historyLogs, setHistoryLogs] = useState([]);
 
-  // New Academic State for Super Admin
+  // Academic & Scheduling State
   const [lessons, setLessons] = useState([]);
+  const [weeklyDates, setWeeklyDates] = useState({});
+  const [globalNotice, setGlobalNotice] = useState("");
+  const [selectedCourseForSchedule, setSelectedCourseForSchedule] =
+    useState("Web Development");
+
   const [academicData, setAcademicData] = useState({
-    type: "video", // video, assignment, or exam
+    type: "video",
     title: "",
     content: "",
     week: "1",
     course: "Web Development",
-    dueDate: "", // Added for assignments
+    dueDate: "",
   });
 
-  // Forum Creation State
   const [forumData, setForumData] = useState({
     title: "",
     content: "",
@@ -137,6 +147,20 @@ const SuperAdmin = () => {
       setHistoryLogs(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
 
+    // Fetch Schedule for the selected course
+    const unsubSchedule = onSnapshot(
+      doc(db, "course_schedules", selectedCourseForSchedule),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setWeeklyDates(docSnap.data().weeks || {});
+          setGlobalNotice(docSnap.data().globalNotice || "");
+        } else {
+          setWeeklyDates({});
+          setGlobalNotice("");
+        }
+      },
+    );
+
     return () => {
       unsubStudents();
       unsubUsers();
@@ -144,10 +168,48 @@ const SuperAdmin = () => {
       unsubForum();
       unsubLessons();
       unsubLogs();
+      unsubSchedule();
     };
-  }, []);
+  }, [selectedCourseForSchedule]);
 
-  // ADMINISTRATIVE ACTIONS
+  // SUPER ADMIN COMMAND: Save Academic Calendar
+  const handleUpdateSchedule = async () => {
+    setLoading(true);
+    try {
+      const scheduleRef = doc(
+        db,
+        "course_schedules",
+        selectedCourseForSchedule,
+      );
+      await setDoc(
+        scheduleRef,
+        {
+          weeks: weeklyDates,
+          globalNotice: globalNotice,
+          lastUpdatedBy: "SUPER_ADMIN",
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      // Logic for Weeks 12 & 24 Exam Protocol
+      await logActivity(
+        "CALENDAR_SYNC",
+        `Updated schedule & exam protocol for ${selectedCourseForSchedule}`,
+      );
+      alert("COMMAND EXECUTED: Academic calendar and Exam dates synchronized.");
+    } catch (err) {
+      alert("CRITICAL ERROR: Failed to sync schedule.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateWeekDate = (week, val) => {
+    setWeeklyDates((prev) => ({ ...prev, [week]: val }));
+  };
+
+  // ADMINISTRATIVE ACTIONS (Originals preserved)
   const logActivity = async (action, details) => {
     await addDoc(collection(db, "system_logs"), {
       action,
@@ -216,7 +278,6 @@ const SuperAdmin = () => {
     }
   };
 
-  // NEW: Forum Creation Function
   const handleCreateForum = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -433,6 +494,99 @@ const SuperAdmin = () => {
                 <p className="metric-label">Total Users</p>
                 <h3 className="text-2xl font-black">{systemUsers.length}</h3>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "schedule" && (
+          <div className="max-w-6xl mx-auto space-y-6">
+            <div className="bg-gray-900 text-white p-8 rounded-[3rem] border-b-8 border-blue-600 shadow-2xl">
+              <div className="flex flex-col md:flex-row justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-4 bg-blue-600 rounded-2xl shadow-lg">
+                    <ShieldCheck size={32} />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-black uppercase italic">
+                      Academic Command
+                    </h2>
+                    <p className="text-[10px] font-bold text-blue-400 tracking-[0.3em]">
+                      MANAGE COURSE CALENDAR & EXAMS
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <select
+                    className="bg-white/10 border border-white/20 rounded-xl px-4 py-2 text-xs font-bold outline-none"
+                    value={selectedCourseForSchedule}
+                    onChange={(e) =>
+                      setSelectedCourseForSchedule(e.target.value)
+                    }
+                  >
+                    {availableCourses.map((c) => (
+                      <option key={c} value={c} className="text-black">
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleUpdateSchedule}
+                    className="px-6 py-3 bg-blue-600 rounded-xl font-black text-xs uppercase flex items-center gap-2 hover:bg-blue-700 transition-all"
+                  >
+                    <Save size={16} /> Sync Calendar
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-8">
+                <label className="flex items-center gap-2 text-[10px] font-black text-blue-400 uppercase mb-2">
+                  <BellRing size={14} /> Global Student Notice (Forum Broadcast)
+                </label>
+                <input
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-4 text-sm font-bold outline-none focus:border-blue-500"
+                  placeholder="Set message for student forum notifications..."
+                  value={globalNotice}
+                  onChange={(e) => setGlobalNotice(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[...Array(24)].map((_, i) => {
+                const w = i + 1;
+                const isExam = w === 12 || w === 24;
+                return (
+                  <div
+                    key={w}
+                    className={`p-5 rounded-[2rem] border-2 transition-all ${isExam ? "bg-red-50 border-red-200" : "bg-white border-gray-100"}`}
+                  >
+                    <div className="flex justify-between items-center mb-3">
+                      <span className="font-black italic text-gray-900">
+                        Week {w}
+                      </span>
+                      {isExam && (
+                        <ShieldAlert
+                          size={16}
+                          className="text-red-600 animate-pulse"
+                        />
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Calendar
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                        size={14}
+                      />
+                      <input
+                        className="w-full pl-10 pr-3 py-2 bg-gray-50 border border-transparent focus:border-blue-500 rounded-xl text-[10px] font-bold outline-none"
+                        placeholder="Set Date/Range"
+                        value={weeklyDates[w] || ""}
+                        onChange={(e) => updateWeekDate(w, e.target.value)}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

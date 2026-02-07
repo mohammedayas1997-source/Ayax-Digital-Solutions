@@ -12,6 +12,7 @@ import {
   setDoc,
   serverTimestamp,
   orderBy,
+  onSnapshot,
 } from "firebase/firestore";
 import {
   MessageSquare,
@@ -20,6 +21,9 @@ import {
   Pin,
   Send,
   Reply,
+  Calendar,
+  AlertTriangle,
+  Bell,
 } from "lucide-react";
 
 const WeeklyForum = ({ weekId, courseId }) => {
@@ -30,80 +34,77 @@ const WeeklyForum = ({ weekId, courseId }) => {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [adminAssignment, setAdminAssignment] = useState(null);
   const [replyText, setReplyText] = useState({});
+  const [courseDates, setCourseDates] = useState(null);
+  const [notifications, setNotifications] = useState([]);
 
   const user = auth.currentUser;
   const progressPath = `students/${user?.uid}/progress/${courseId}_week_${weekId}`;
 
+  const isExamWeek = weekId === 12 || weekId === 24;
+
   useEffect(() => {
     if (!user) return;
 
-    const fetchData = async () => {
-      // 1. Check Student Completion Status
-      const progRef = doc(db, progressPath);
-      const progSnap = await getDoc(progRef);
-      if (progSnap.exists() && progSnap.data().status === "completed") {
-        setIsCompleted(true);
-      }
+    // 1. Real-time Chat Sync (onSnapshot)
+    const q = query(
+      collection(db, "submissions"),
+      where("weekId", "==", weekId),
+      where("courseId", "==", courseId),
+      orderBy("createdAt", "asc"),
+    );
 
-      // 2. Fetch Sticky Assignment from Administrative Records
+    const unsubscribeChat = onSnapshot(q, (snap) => {
+      const messages = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setOthersSubmissions(messages);
+
+      const userSub = messages.find((m) => m.userId === user.uid);
+      if (userSub) setHasSubmitted(true);
+    });
+
+    // 2. Notification Listener for Replies
+    const replyQ = query(
+      collection(db, "forum_replies"),
+      where("parentPostUserId", "==", user.uid),
+      where("weekId", "==", weekId),
+    );
+    const unsubscribeReplies = onSnapshot(replyQ, (snap) => {
+      setNotifications(snap.docs.map((d) => d.data()));
+    });
+
+    const fetchData = async () => {
+      // 3. Fetch Course Schedule/Dates
+      const courseRef = doc(db, "courses", courseId);
+      const courseSnap = await getDoc(courseRef);
+      if (courseSnap.exists())
+        setCourseDates(courseSnap.data().schedule?.[weekId]);
+
+      // 4. Admin Assignment Protocol
       const adminQ = query(
         collection(db, "forum_assignments"),
         where("weekId", "==", weekId),
         where("courseId", "==", courseId),
       );
       const adminSnap = await getDocs(adminQ);
-      if (!adminSnap.empty) {
-        setAdminAssignment(adminSnap.docs[0].data());
-      }
+      if (!adminSnap.empty) setAdminAssignment(adminSnap.docs[0].data());
 
-      // 3. Sync Peer Contributions
-      fetchPeerWork();
-
-      // 4. Validate and Count User Interaction
-      const repliesQ = query(
-        collection(db, "forum_replies"),
-        where("userId", "==", user.uid),
-        where("weekId", "==", weekId),
-      );
-      const repliesSnap = await getDocs(repliesQ);
-      setRepliesCount(repliesSnap.size);
-
-      // Verify if the student already has a main submission
-      const subQ = query(
-        collection(db, "submissions"),
-        where("userId", "==", user.uid),
-        where("weekId", "==", weekId),
-      );
-      const subSnap = await getDocs(subQ);
-      if (!subSnap.empty) setHasSubmitted(true);
-
-      if (repliesSnap.size >= 3 && !subSnap.empty) markAsComplete();
+      // 5. Completion Status
+      const progRef = doc(db, progressPath);
+      const progSnap = await getDoc(progRef);
+      if (progSnap.exists() && progSnap.data().status === "completed")
+        setIsCompleted(true);
     };
 
     fetchData();
-  }, [weekId, courseId, user, hasSubmitted]);
-
-  const fetchPeerWork = async () => {
-    try {
-      const q = query(
-        collection(db, "submissions"),
-        where("weekId", "==", weekId),
-        orderBy("createdAt", "desc"),
-      );
-      const snap = await getDocs(q);
-      const filtered = snap.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() }))
-        .filter((item) => item.userId !== user?.uid);
-      setOthersSubmissions(filtered);
-    } catch (error) {
-      console.error("Infrastructure Error: Unable to fetch peer data", error);
-    }
-  };
+    return () => {
+      unsubscribeChat();
+      unsubscribeReplies();
+    };
+  }, [weekId, courseId, user]);
 
   const handleSubmit = async () => {
-    if (mySubmission.trim().length < 100) {
+    if (mySubmission.trim().length < (isExamWeek ? 500 : 100)) {
       return alert(
-        "Input Validation Failed: Your response must be at least 100 characters to ensure academic quality.",
+        `VALIDATION ERROR: ${isExamWeek ? "EXAM" : "POST"} requires more depth.`,
       );
     }
 
@@ -114,25 +115,18 @@ const WeeklyForum = ({ weekId, courseId }) => {
         content: mySubmission,
         weekId,
         courseId,
-        type: "main_assignment",
+        type: isExamWeek ? "EXAM_SUBMISSION" : "chat_message",
         createdAt: serverTimestamp(),
       });
-      setHasSubmitted(true);
-      alert(
-        "Submission Successful: You must now engage with 3 peer contributions to unlock the next module.",
-      );
+      setMySubmission("");
     } catch (error) {
-      alert("Network Error: Submission could not be processed.");
+      alert("NETWORK ERROR: Post failed.");
     }
   };
 
   const handleReplySubmit = async (peer) => {
     const text = replyText[peer.id];
-    if (!text || text.trim().length < 10) {
-      return alert(
-        "Interaction Refused: Please provide meaningful scholarly feedback (min 10 characters).",
-      );
-    }
+    if (!text || text.trim().length < 5) return;
 
     try {
       await addDoc(collection(db, "forum_replies"), {
@@ -140,160 +134,125 @@ const WeeklyForum = ({ weekId, courseId }) => {
         userName: user.displayName || user.email,
         replyContent: text,
         parentPostId: peer.id,
-        parentPostContent: peer.content,
-        replyToName: peer.userName,
+        parentPostUserId: peer.userId,
         weekId,
         courseId,
         createdAt: serverTimestamp(),
       });
-
       setReplyText((prev) => ({ ...prev, [peer.id]: "" }));
-      const newCount = repliesCount + 1;
-      setRepliesCount(newCount);
-
-      alert("Scholarly Reply Logged.");
-      if (newCount >= 3 && hasSubmitted) markAsComplete();
     } catch (error) {
-      alert("Synchronisation Error: Reply failed to register.");
+      console.error(error);
     }
   };
 
-  const markAsComplete = async () => {
-    const progRef = doc(db, progressPath);
-    await setDoc(
-      progRef,
-      {
-        status: "completed",
-        completedAt: serverTimestamp(),
-        courseId,
-        weekId,
-      },
-      { merge: true },
-    );
-    setIsCompleted(true);
-  };
-
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-8 space-y-6">
-      {/* Administrative Instruction Header */}
-      {adminAssignment && (
-        <div className="sticky top-4 z-40 bg-blue-700 text-white p-6 md:p-8 rounded-[2.5rem] shadow-2xl border-b-8 border-yellow-400 mb-10">
-          <div className="flex items-center gap-3 mb-3">
-            <Pin className="rotate-45 text-yellow-300" size={24} />
-            <span className="font-black uppercase tracking-[0.3em] text-[10px] text-blue-100">
-              Official Assignment Protocol
-            </span>
+    <div className="max-w-6xl mx-auto p-4 space-y-6 font-sans">
+      {/* HEADER: Date & Exam Status */}
+      <div className="flex flex-wrap gap-4 items-center justify-between bg-gray-900 p-6 rounded-[2rem] text-white">
+        <div className="flex items-center gap-4">
+          <div
+            className={`p-4 rounded-2xl ${isExamWeek ? "bg-red-600 animate-pulse" : "bg-blue-600"}`}
+          >
+            <Calendar size={24} />
           </div>
-          <h3 className="text-xl md:text-2xl font-black leading-tight italic">
-            "{adminAssignment.instruction}"
-          </h3>
-          <div className="mt-4 flex items-center gap-4">
-            <div className="bg-white/10 px-4 py-2 rounded-full flex items-center gap-2">
-              <div
-                className={`w-3 h-3 rounded-full ${repliesCount >= 3 ? "bg-green-400" : "bg-red-400 animate-pulse"}`}
-              ></div>
-              <span className="text-[10px] font-black uppercase">
-                Engagement: {repliesCount} / 3 Peer Replies
-              </span>
-            </div>
+          <div>
+            <h2 className="font-black uppercase tracking-tighter text-xl">
+              Week {weekId} {isExamWeek && "- EXAMINATION PERIOD"}
+            </h2>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+              Scheduled Date: {courseDates || "TBD BY ADMINISTRATION"}
+            </p>
           </div>
+        </div>
+
+        {notifications.length > 0 && (
+          <div className="flex items-center gap-2 bg-yellow-400 text-black px-4 py-2 rounded-full font-black text-[10px] animate-bounce">
+            <Bell size={14} /> {notifications.length} NEW REPLIES
+          </div>
+        )}
+      </div>
+
+      {isExamWeek && (
+        <div className="bg-red-50 border-2 border-red-200 p-6 rounded-[2rem] flex items-center gap-4">
+          <AlertTriangle className="text-red-600" size={32} />
+          <p className="text-xs font-black text-red-800 uppercase tracking-widest leading-relaxed">
+            CRITICAL: Weeks 12 & 24 are official examination windows.
+            Submissions are monitored for academic integrity.
+          </p>
         </div>
       )}
 
-      {isCompleted ? (
-        <div className="bg-emerald-500 p-12 rounded-[3.5rem] text-center text-white shadow-2xl">
-          <CheckCircle size={80} className="mx-auto mb-6" />
-          <h3 className="text-4xl font-black">Curriculum Requirement Met</h3>
-          <p className="mt-4 font-bold opacity-90">
-            Your contributions have been verified. Module access granted.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <div className="lg:col-span-7 space-y-6">
-            <div className="bg-white p-8 rounded-[3rem] shadow-sm border border-gray-100">
-              <div className="flex justify-between items-center mb-6">
-                <h4 className="font-black text-gray-900 uppercase text-xs tracking-widest">
-                  Primary Submission Interface
-                </h4>
-                {hasSubmitted && (
-                  <span className="bg-green-100 text-green-600 px-4 py-1 rounded-full text-[10px] font-black italic">
-                    ✓ AUTHENTICATED
-                  </span>
-                )}
-              </div>
-              <textarea
-                className="w-full p-6 bg-gray-50 rounded-3xl border-2 border-transparent focus:border-blue-500 focus:bg-white transition-all h-64 font-bold text-gray-700 resize-none"
-                placeholder="Transcribe your findings here based on the Administrative Instruction..."
-                value={mySubmission}
-                onChange={(e) => setMySubmission(e.target.value)}
-                disabled={hasSubmitted}
-              />
-              {!hasSubmitted && (
-                <button
-                  onClick={handleSubmit}
-                  className="mt-6 w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-blue-700 shadow-xl active:scale-95 transition-all"
-                >
-                  Commit to Public Record
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="lg:col-span-5 space-y-6 overflow-y-auto max-h-[800px] pr-2">
-            <h4 className="font-black text-gray-400 uppercase text-[10px] tracking-widest px-4">
-              Academic Discussion Feed
-            </h4>
-
-            {othersSubmissions.map((peer) => (
+      {/* CHAT INTERFACE */}
+      <div className="bg-gray-50 rounded-[3rem] h-[600px] flex flex-col border border-gray-200 overflow-hidden shadow-inner">
+        <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          {othersSubmissions.map((msg) => (
+            <div
+              key={msg.id}
+              className={`flex ${msg.userId === user.uid ? "justify-end" : "justify-start"}`}
+            >
               <div
-                key={peer.id}
-                className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:border-blue-300 transition-all"
+                className={`max-w-[80%] p-5 rounded-[2rem] ${
+                  msg.userId === user.uid
+                    ? "bg-blue-600 text-white rounded-tr-none"
+                    : "bg-white text-gray-800 shadow-sm border border-gray-100 rounded-tl-none"
+                }`}
               >
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-black text-xs">
-                    {peer.userName.charAt(0).toUpperCase()}
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-black text-gray-900">
-                      {peer.userName}
-                    </p>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase">
-                      Peer Contributor
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-sm text-gray-600 font-medium leading-relaxed mb-6 italic">
-                  "{peer.content}"
+                <p className="text-[9px] font-black uppercase mb-1 opacity-70">
+                  {msg.userName}
+                </p>
+                <p className="font-bold text-sm leading-relaxed">
+                  {msg.content}
                 </p>
 
-                <div className="space-y-3">
-                  <div className="relative">
-                    <textarea
-                      className="w-full p-4 bg-gray-100 rounded-2xl text-xs font-bold focus:bg-white border-2 border-transparent focus:border-blue-200 outline-none transition-all resize-none"
-                      placeholder="Submit peer feedback..."
-                      value={replyText[peer.id] || ""}
+                <div className="mt-4 pt-3 border-t border-black/10">
+                  <div className="flex gap-2">
+                    <input
+                      className="flex-1 bg-black/5 rounded-xl px-3 py-2 text-[10px] outline-none"
+                      placeholder="Reply to peer..."
+                      value={replyText[msg.id] || ""}
                       onChange={(e) =>
                         setReplyText((prev) => ({
                           ...prev,
-                          [peer.id]: e.target.value,
+                          [msg.id]: e.target.value,
                         }))
                       }
                     />
                     <button
-                      onClick={() => handleReplySubmit(peer)}
-                      className="absolute bottom-3 right-3 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all"
+                      onClick={() => handleReplySubmit(msg)}
+                      className="p-2 bg-black/10 rounded-xl hover:bg-black/20"
                     >
-                      <Send size={14} />
+                      <Send size={12} />
                     </button>
                   </div>
                 </div>
               </div>
-            ))}
+            </div>
+          ))}
+        </div>
+
+        {/* INPUT BOX */}
+        <div className="p-6 bg-white border-t border-gray-100">
+          <div className="relative flex items-center gap-4">
+            <textarea
+              className="w-full p-6 bg-gray-100 rounded-[2rem] font-bold text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all resize-none"
+              placeholder={
+                isExamWeek
+                  ? "Type your Exam Response here..."
+                  : "Ask a question or share your findings..."
+              }
+              value={mySubmission}
+              onChange={(e) => setMySubmission(e.target.value)}
+              rows="2"
+            />
+            <button
+              onClick={handleSubmit}
+              className="bg-blue-600 text-white p-5 rounded-full hover:scale-105 active:scale-95 transition-all shadow-lg shadow-blue-200"
+            >
+              <Send size={24} />
+            </button>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };
