@@ -18,47 +18,43 @@ const StudentLogin = () => {
     setError("");
 
     try {
-      // 1. Authentication - Ensure email is lowercase and trimmed
+      // Final lowercase check before sending to Firebase
+      const cleanEmail = email.trim().toLowerCase();
+
       const userCredential = await signInWithEmailAndPassword(
         auth,
-        email.trim().toLowerCase(),
+        cleanEmail,
         password,
       );
       const user = userCredential.user;
 
-      // 2. Fetch User Data from Firestore
       const userRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userRef);
 
       if (userDoc.exists()) {
         const userData = userDoc.data();
 
-        // 3. Role Validation
         if (userData.role !== "student") {
           await signOut(auth);
-          setError("Access Denied: This portal is for students only.");
+          setError("Access Denied: Student portal only.");
           setLoading(false);
           return;
         }
 
-        // 4. Status Validation
         if (userData.status === "suspended" || userData.status === "inactive") {
           await signOut(auth);
-          setError("Account Inactive: Please contact the administrator.");
+          setError("Account Inactive: Contact administrator.");
           setLoading(false);
           return;
         }
 
-        // 5. Success
         navigate("/student-portal");
       } else {
-        console.error("No Firestore document found for UID:", user.uid);
         await signOut(auth);
-        setError("Account Error: No student profile found in the database.");
+        setError("Account Error: Profile not found.");
       }
     } catch (err) {
-      console.error("Login Error:", err.code);
-      setError("Invalid credentials. Please check your email and password.");
+      setError("Invalid credentials. Check email and password.");
     } finally {
       setLoading(false);
     }
@@ -98,9 +94,11 @@ const StudentLogin = () => {
               type="email"
               placeholder="student@example.com"
               required
-              // "lowercase" class forces the text to look lowercase while typing
-              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 lowercase"
+              autoComplete="email"
+              // ADDED: "normal-case" to stop visual capitalization
+              className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900 normal-case"
               value={email}
+              // FORCED: Convert to lowercase on every keystroke
               onChange={(e) => setEmail(e.target.value.toLowerCase())}
             />
           </div>
@@ -113,6 +111,7 @@ const StudentLogin = () => {
               type="password"
               placeholder="••••••••"
               required
+              autoComplete="current-password"
               className="w-full p-4 bg-gray-50 border border-gray-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-500 transition-all text-gray-900"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
