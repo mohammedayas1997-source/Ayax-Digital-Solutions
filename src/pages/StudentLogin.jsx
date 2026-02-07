@@ -1,15 +1,42 @@
 import React, { useState } from "react";
 import { auth, db } from "../firebaseConfig";
-import { signInWithEmailAndPassword, signOut } from "firebase/auth";
+import {
+  signInWithEmailAndPassword,
+  signOut,
+  sendPasswordResetEmail,
+} from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
-import { BookOpen, ArrowRight, Loader2, UserCheck } from "lucide-react";
+import {
+  BookOpen,
+  ArrowRight,
+  Loader2,
+  UserCheck,
+  KeyRound,
+} from "lucide-react";
 
 const StudentLogin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      alert("INPUT REQUIRED: Please enter your email address first.");
+      return;
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
+      alert(
+        "RESET DISPATCHED: Check your inbox for the password recovery link.",
+      );
+    } catch (error) {
+      console.error("Reset Error:", error.code);
+      alert("SYSTEM ERROR: Could not send reset email. Verify your address.");
+    }
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -50,7 +77,6 @@ const StudentLogin = () => {
         }
 
         // 5. SUCCESSFUL REDIRECT
-        // We use /student-portal because that's what is in your App.jsx
         console.log("Access Granted. Redirecting to Student Portal...");
         navigate("/student-portal");
       } else {
@@ -97,9 +123,18 @@ const StudentLogin = () => {
           </div>
 
           <div className="space-y-1">
-            <label className="ml-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">
-              Password
-            </label>
+            <div className="flex justify-between items-center pr-2">
+              <label className="ml-2 text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                Password
+              </label>
+              <button
+                type="button"
+                onClick={handleForgotPassword}
+                className="text-[9px] font-black text-blue-600 uppercase tracking-widest hover:underline flex items-center gap-1"
+              >
+                <KeyRound size={12} /> Recovery
+              </button>
+            </div>
             <input
               type="password"
               placeholder="••••••••"
