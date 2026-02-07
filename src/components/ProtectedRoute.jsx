@@ -15,13 +15,13 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       try {
         if (currentUser) {
-          // 1. Nemo bayanai daga Firestore
+          // 1. Fetch data from Firestore
           const userDoc = await getDoc(doc(db, "users", currentUser.uid));
 
           if (userDoc.exists()) {
             const userData = userDoc.data();
 
-            // 2. Duba Status: Idan suspended ne, kore shi nan take
+            // 2. Status Check
             if (
               userData.status === "suspended" ||
               userData.status === "inactive"
@@ -36,8 +36,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
               setUser(currentUser);
             }
           } else {
-            // Idan babu Doc a Firestore (kamar sabon Admin da ba'a saita ba)
-            console.error("User security document missing!");
+            console.error("Security profile missing for UID:", currentUser.uid);
             setRole(null);
             setUser(currentUser);
           }
@@ -56,7 +55,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return () => unsubscribe();
   }, []);
 
-  // 1. Loading State
+  // 1. Loading UI
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
@@ -70,15 +69,14 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     );
   }
 
-  // 2. Idan account dinsa a dakatar yake (Suspended)
+  // 2. Handle Suspended Accounts
   if (status === "suspended") {
-    // Tura shi login tare da nuna masa sako (zaka iya amfani da state don nuna alert)
     return (
       <Navigate to="/login" state={{ error: "Account Suspended" }} replace />
     );
   }
 
-  // 3. Idan ba'a yi login ba
+  // 3. Handle Unauthenticated Users
   if (!user) {
     const loginPath = location.pathname.includes("admin")
       ? "/admin-gateway"
@@ -88,13 +86,14 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
   // 4. Role-Based Access Control (RBAC)
   if (requiredRole && role !== requiredRole) {
-    // Idan Admin ne yake son shiga wajen Student, tura shi Dashboard dinsa
+    // IMPORTANT: Path normalization to prevent redirect loops
     const redirectPath =
       role === "admin"
         ? "/admin-dashboard"
         : role === "teacher"
           ? "/teacher-dashboard"
-          : "/student-portal";
+          : "/student-dashboard"; // Match this with your Login navigate path
+
     return <Navigate to={redirectPath} replace />;
   }
 
