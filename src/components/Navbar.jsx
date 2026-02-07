@@ -8,8 +8,8 @@ import {
   MessageCircle,
   Mail,
 } from "lucide-react";
-import { Link } from "react-router-dom";
-import { auth } from "../firebaseConfig"; // Integrated Firebase Auth
+import { Link, useLocation } from "react-router-dom"; // Added useLocation
+import { auth } from "../firebaseConfig";
 import LogoImg from "../assets/logo.png";
 import ChatNotificationIcon from "../pages/ChatNotificationIcon";
 
@@ -17,8 +17,15 @@ const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [user, setUser] = useState(null);
-
   const [currentCourseId, setCurrentCourseId] = useState(null);
+
+  const location = useLocation(); // Initialize location hook
+
+  // Hide Navbar if the path includes dashboard segments
+  const isDashboard =
+    location.pathname.includes("/student-portal") ||
+    location.pathname.includes("/admin-dashboard") ||
+    location.pathname.includes("/student-dashboard");
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,6 +45,9 @@ const Navbar = () => {
     };
   }, []);
 
+  // If we are in a dashboard, don't render the Navbar at all
+  if (isDashboard) return null;
+
   const navLinks = [
     { name: "Home", href: "/", isLink: true },
     { name: "About Us", href: "/about", isLink: true },
@@ -56,7 +66,7 @@ const Navbar = () => {
       }`}
     >
       <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
-        {/* LOGO AREA - Optimized height for mobile accessibility */}
+        {/* LOGO AREA */}
         <Link to="/" className="flex items-center gap-2 group cursor-pointer">
           <div className="relative">
             <img
