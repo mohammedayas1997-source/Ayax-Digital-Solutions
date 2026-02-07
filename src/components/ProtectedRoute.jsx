@@ -16,12 +16,13 @@ const ProtectedRoute = ({ children, requiredRole }) => {
       try {
         if (currentUser) {
           // 1. Fetch data from Firestore
-          const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+          const userRef = doc(db, "users", currentUser.uid);
+          const userDoc = await getDoc(userRef);
 
           if (userDoc.exists()) {
             const userData = userDoc.data();
 
-            // 2. Status Check
+            // 2. Status Check (Preserved)
             if (
               userData.status === "suspended" ||
               userData.status === "inactive"
@@ -55,7 +56,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return () => unsubscribe();
   }, []);
 
-  // 1. Loading UI
+  // 1. Loading UI (Preserved Design)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
@@ -78,23 +79,38 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
   // 3. Handle Unauthenticated Users
   if (!user) {
-    const loginPath = location.pathname.includes("admin")
-      ? "/admin-gateway"
-      : "/login";
+    // If trying to access admin/super-admin/teacher routes, send to authority gateway
+    const isAuthorityRoute =
+      location.pathname.includes("admin") ||
+      location.pathname.includes("super") ||
+      location.pathname.includes("teacher");
+
+    const loginPath = isAuthorityRoute ? "/admin-gateway" : "/login";
     return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
-  // 4. Role-Based Access Control (RBAC)
-  if (requiredRole && role !== requiredRole) {
-    // IMPORTANT: Path normalization to prevent redirect loops
-    const redirectPath =
-      role === "admin"
-        ? "/admin-dashboard"
-        : role === "teacher"
-          ? "/teacher-dashboard"
-          : "/student-dashboard"; // Match this with your Login navigate path
+  // 4. Enhanced Role-Based Access Control (RBAC)
+  // Logic: Super Admin has "God Mode" (can access anything), others are restricted.
+  if (requiredRole) {
+    const hasAccess =
+      role === "super-admin" || // Super Admin bypasses all checks
+      role === requiredRole ||
+      (requiredRole === "admin" && role === "super-admin") ||
+      (requiredRole === "malami" && role === "super-admin");
 
-    return <Navigate to={redirectPath} replace />;
+    if (!hasAccess) {
+      // Path normalization for unauthorized access
+      const redirectPath =
+        role === "super-admin"
+          ? "/super-dashboard"
+          : role === "admin"
+            ? "/admin-dashboard"
+            : role === "malami" || role === "teacher"
+              ? "/teacher-dashboard"
+              : "/student-portal";
+
+      return <Navigate to={redirectPath} replace />;
+    }
   }
 
   return children;
