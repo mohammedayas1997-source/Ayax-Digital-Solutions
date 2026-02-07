@@ -53,6 +53,7 @@ const midtermQuestions = [
 ];
 
 function App() {
+  const [darkMode, setDarkMode] = useState(false);
   return (
     <Router>
       <div className="App">
@@ -70,7 +71,16 @@ function App() {
             path="/verify/:certificateId"
             element={<VerifyCertificate />}
           />
-
+          <Route
+            path="/portal"
+            element={
+              <StudentPortal darkMode={darkMode} setDarkMode={setDarkMode} />
+            }
+          />
+          <Route
+            path="/forum/thread/:threadId"
+            element={<ForumDetails darkMode={darkMode} />}
+          />
           <Route path="/courses" element={<CourseSection />} />
           <Route path="/pricing" element={<PricingCard />} />
 

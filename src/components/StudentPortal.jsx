@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebaseConfig";
+import { signOut } from "firebase/auth";
 import {
   collection,
   getDocs,
@@ -13,14 +14,12 @@ import {
   onSnapshot,
   where,
 } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom"; // Wannan shi ne zai ba ka damar tafiya ForumDetails
 import {
   BookOpen,
   GraduationCap,
   LayoutDashboard,
   MessageSquare,
-  Bell,
-  UserCircle,
   PlayCircle,
   CheckCircle,
   Clock,
@@ -28,19 +27,27 @@ import {
   Lock,
   Award,
   Send,
-  Search,
   ShieldCheck,
+  LogOut,
+  Moon,
+  Sun,
+  Menu,
+  X,
+  Layers,
+  Users,
+  Search,
+  Bell,
 } from "lucide-react";
 
 // ==========================================
-// 1. HELPERS (OUTSIDE COMPONENT)
+// 1. HELPERS & CONFIGURATION
 // ==========================================
 const getWeekVideoId = (week) => {
   const videoDatabase = {
-    1: "dQw4w9WgXcQ", // Misali: Sanya YouTube ID na gaskiya a nan
+    1: "dQw4w9WgXcQ",
     2: "y6120QOlsfU",
-    3: "VIDEO_ID_3",
-    // Haka har zuwa week 24...
+    12: "dQw4w9WgXcQ",
+    24: "dQw4w9WgXcQ",
   };
   return videoDatabase[week] || "dQw4w9WgXcQ";
 };
@@ -52,7 +59,7 @@ const getWeekTitle = (week) => {
     12: "Midterm Certification Exam",
     24: "Final Project Defense",
   };
-  return titles[week] || "Advanced Study Phase";
+  return titles[week] || "Advanced Technical Study Phase";
 };
 
 // ==========================================
@@ -60,86 +67,99 @@ const getWeekTitle = (week) => {
 // ==========================================
 const StudentPortal = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [loading, setLoading] = useState(true);
-  const [hasPassedMidterm, setHasPassedMidterm] = useState(false);
-  const [currentWeek, setCurrentWeek] = useState(1);
-  const [studentData, setStudentData] = useState(null);
 
-  // Forum State
+  // Interface States
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [darkMode, setDarkMode] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Student & Progress States
+  const [studentData, setStudentData] = useState(null);
+  const [currentWeek, setCurrentWeek] = useState(1);
+  const [hasPassedMidterm, setHasPassedMidterm] = useState(false);
+  const totalWeeks = 24;
+
+  // Forum & Selection States
+  const [viewState, setViewState] = useState("list"); // list, selection, forum
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [selectedPath, setSelectedPath] = useState(null); // Path 1: New, Path 2: Old
   const [forumThreads, setForumThreads] = useState([]);
   const [newPost, setNewPost] = useState({ title: "", content: "" });
 
-  const totalWeeks = 24;
-  const courseStartDate = "2026-01-01";
+  const availableCourses = [
+    {
+      id: "software_eng",
+      name: "Software Engineering",
+      icon: <Layers size={20} />,
+    },
+    {
+      id: "data_science",
+      name: "Data Science & AI",
+      icon: <Layers size={20} />,
+    },
+    { id: "cyber_sec", name: "Cybersecurity Ops", icon: <Layers size={20} /> },
+  ];
 
-  // REAL-TIME ACTIVITY & PROFILE ENGINE
+  // ==========================================
+  // 3. CORE LOGIC & EFFECTS
+  // ==========================================
   useEffect(() => {
     const initPortal = async () => {
       const user = auth.currentUser;
-      if (user) {
-        // Fetch Student Detailed Info
+      if (!user) return navigate("/login");
+
+      try {
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
+
         if (userSnap.exists()) {
-          setStudentData(userSnap.data());
-          // Log initial activity for Super Admin
+          const data = userSnap.data();
+          setStudentData(data);
+
+          // Calculate Week Progress based on Start Date
+          const courseStartDate = new Date("2026-01-01");
+          const now = new Date();
+          const diffTime = now - courseStartDate;
+          const weekCount =
+            Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
+          setCurrentWeek(weekCount > 24 ? 24 : weekCount < 1 ? 1 : weekCount);
+
+          // Real-time Update for Admin
           await updateDoc(userRef, {
             lastOnline: serverTimestamp(),
             status: "Active",
-            currentActivity: "Viewing Dashboard",
+            currentActivity: "Browsing Portal",
           });
         }
 
-        // Check Exam Status
-        const examRef = doc(
-          db,
-          `students/${user.uid}/exams/global-course_midterm`,
-        );
+        // Check Midterm Status
+        const examRef = doc(db, `students/${user.uid}/exams/midterm`);
         const examSnap = await getDoc(examRef);
         if (examSnap.exists() && examSnap.data().status === "passed") {
           setHasPassedMidterm(true);
         }
+      } catch (error) {
+        console.error("Portal Initialization Error:", error);
+      } finally {
+        setLoading(false);
       }
     };
-    const calculateGrade = (studentAnswers, examQuestions) => {
-      let correctCount = 0;
-
-      examQuestions.forEach((q, index) => {
-        if (studentAnswers[index] === q.correctOption) {
-          correctCount++;
-        }
-      });
-
-      const totalQuestions = examQuestions.length;
-      const score = (correctCount / totalQuestions) * 100;
-
-      return {
-        percentage: score.toFixed(2),
-        passed: score >= 50 ? true : false, // Misali 50% shine pass mark
-      };
-    };
-
-    const calculateProgress = () => {
-      const start = new Date(courseStartDate);
-      const now = new Date();
-      const diffTime = now - start;
-      const weekCount = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
-      setCurrentWeek(
-        weekCount > totalWeeks ? totalWeeks : weekCount < 1 ? 1 : weekCount,
-      );
-    };
-
-    calculateProgress();
     initPortal();
-  }, []);
+  }, [navigate]);
 
-  // Sync Forum Threads
+  // Forum Real-time Sync
   useEffect(() => {
-    if (activeTab === "discussions" && studentData?.course) {
+    if (
+      activeTab === "discussions" &&
+      viewState === "forum" &&
+      selectedCourse &&
+      selectedPath
+    ) {
       const q = query(
         collection(db, "forum_threads"),
-        where("course", "==", studentData.course),
+        where("courseId", "==", selectedCourse.id),
+        where("studentType", "==", selectedPath),
         orderBy("createdAt", "desc"),
       );
       const unsub = onSnapshot(q, (snap) => {
@@ -149,36 +169,27 @@ const StudentPortal = () => {
       });
       return () => unsub();
     }
-  }, [activeTab, studentData]);
+  }, [activeTab, viewState, selectedCourse, selectedPath]);
 
-  // AUTHORITY TRACKING
-  const trackStudentAction = async (action) => {
-    const user = auth.currentUser;
-    if (user) {
-      const logRef = doc(db, "users", user.uid);
-      await updateDoc(logRef, {
-        currentActivity: action,
-        lastInteraction: serverTimestamp(),
-      });
-    }
+  // ==========================================
+  // 4. ACTION HANDLERS
+  // ==========================================
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate("/login");
   };
 
   const markWeekAsCompleted = async (weekNumber) => {
     const user = auth.currentUser;
     if (user) {
-      try {
-        const userRef = doc(db, "users", user.uid);
-        await updateDoc(userRef, {
-          [`progress.week_${weekNumber}`]: {
-            completed: true,
-            completedAt: serverTimestamp(),
-          },
-          currentActivity: `Finished Week ${weekNumber} Lesson`,
-        });
-        alert(`EXCELLENT: Week ${weekNumber} marked as completed.`);
-      } catch (err) {
-        alert("ERROR: Could not sync progress.");
-      }
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        [`progress.week_${weekNumber}`]: {
+          completed: true,
+          completedAt: serverTimestamp(),
+        },
+      });
+      alert(`SUCCESS: Week ${weekNumber} verified.`);
     }
   };
 
@@ -190,31 +201,52 @@ const StudentPortal = () => {
         ...newPost,
         studentName: studentData.fullName,
         studentId: auth.currentUser.uid,
-        course: studentData.course,
+        courseId: selectedCourse.id,
+        studentType: selectedPath,
         createdAt: serverTimestamp(),
-        replies: 0,
       });
       setNewPost({ title: "", content: "" });
-      alert("SUCCESS: Your question is live. The Admin has been notified.");
     } catch (err) {
-      alert("ERROR: Could not post.");
+      alert("Error: Transmission failed.");
     }
   };
 
+  if (loading)
+    return (
+      <div className="min-h-screen flex items-center justify-center font-black">
+        INITIALIZING SYSTEMS...
+      </div>
+    );
+
   return (
-    <div className="min-h-screen bg-gray-50 flex font-sans selection:bg-blue-600 selection:text-white">
+    <div
+      className={`min-h-screen flex font-sans selection:bg-blue-600 selection:text-white ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"} transition-colors duration-300`}
+    >
+      {/* Mobile Sidebar Overlay */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
       {/* Sidebar Navigation */}
-      <aside className="w-80 bg-white border-r border-gray-100 hidden lg:flex flex-col sticky top-0 h-screen overflow-hidden">
+      <aside
+        className={`fixed lg:sticky top-0 z-50 h-screen w-80 border-r flex flex-col transition-transform duration-300 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+      >
         <div className="p-10">
-          <h1 className="text-2xl font-black text-blue-600 tracking-tighter italic">
-            AYAX <span className="text-gray-900 not-italic">UNI</span>
+          <h1 className="text-2xl font-black text-blue-600 italic">
+            AYAX{" "}
+            <span className={darkMode ? "text-white" : "text-gray-900"}>
+              UNI
+            </span>
           </h1>
-          <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mt-2">
-            Learning Management System
+          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-2">
+            LMS Terminal v3.0
           </p>
         </div>
 
-        <nav className="px-6 space-y-2">
+        <nav className="px-6 space-y-2 flex-1 overflow-y-auto custom-scrollbar">
           {[
             {
               id: "dashboard",
@@ -224,7 +256,7 @@ const StudentPortal = () => {
             { id: "courses", name: "Curriculum", icon: <BookOpen size={18} /> },
             {
               id: "discussions",
-              name: "Student Forum",
+              name: "Community Forum",
               icon: <MessageSquare size={18} />,
             },
             {
@@ -237,368 +269,443 @@ const StudentPortal = () => {
               key={item.id}
               onClick={() => {
                 setActiveTab(item.id);
-                trackStudentAction(`Viewing ${item.name}`);
+                setViewState("list");
+                setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-2xl shadow-blue-200" : "text-gray-400 hover:bg-gray-50 hover:text-gray-900"}`}
+              className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-xl" : "text-gray-400 hover:bg-blue-50/10"}`}
             >
               {item.icon} {item.name}
             </button>
           ))}
-        </nav>
 
-        {/* 24-WEEK TIMELINE ROADMAP */}
-        <div className="mt-10 px-6 flex-grow overflow-y-auto custom-scrollbar">
-          <h3 className="px-4 text-[9px] font-black text-gray-300 uppercase tracking-[0.4em] mb-6">
-            24-Week Progress
-          </h3>
-          <div className="space-y-2 pb-20">
+          <div className="mt-10 mb-4 px-4 text-[9px] font-black text-gray-400 uppercase tracking-[0.4em]">
+            24-Week Roadmap
+          </div>
+          <div className="space-y-1 pb-10">
             {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => {
-              let isLocked = week > currentWeek;
-              if (week > 12 && !hasPassedMidterm) isLocked = true;
-              const isExamWeek = week === 12 || week === 24;
-
+              const isLocked =
+                week > currentWeek || (week > 12 && !hasPassedMidterm);
               return (
                 <div
                   key={week}
-                  onClick={() => {
-                    if (!isLocked) {
-                      trackStudentAction(`Studying Week ${week}`);
-                      if (week === 12)
-                        navigate(`/course/global-course/exam/week/12`);
-                      else if (week === 24)
-                        navigate(`/course/global-course/exam/week/24`);
-                      else navigate(`/course/global-course/week/${week}`);
-                    }
-                  }}
-                  className={`flex items-center justify-between px-5 py-4 rounded-2xl transition-all ${
-                    isLocked
-                      ? "opacity-30 cursor-not-allowed bg-gray-50"
-                      : "hover:bg-blue-50 cursor-pointer group border border-transparent hover:border-blue-100"
-                  } ${week === 12 && !hasPassedMidterm ? "bg-orange-50/50 border-orange-100" : ""}`}
+                  className={`flex items-center justify-between px-6 py-3 rounded-xl transition-all ${isLocked ? "opacity-30 grayscale cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer group"}`}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-3">
                     <div
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center text-[10px] font-black transition-all ${
-                        isLocked
-                          ? "bg-gray-200 text-gray-400"
-                          : isExamWeek
-                            ? "bg-orange-500 text-white shadow-lg"
-                            : "bg-blue-100 text-blue-600 group-hover:bg-blue-600 group-hover:text-white"
-                      }`}
+                      className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${isLocked ? "bg-gray-200 text-gray-400" : "bg-blue-100 text-blue-600"}`}
                     >
                       {week}
                     </div>
-                    <span
-                      className={`text-[11px] font-black uppercase tracking-tight ${isLocked ? "text-gray-400" : "text-gray-900"}`}
-                    >
-                      Week {week}{" "}
-                      {isExamWeek && (
-                        <span className="ml-1 text-orange-600 font-black italic">
-                          ! EXAM
-                        </span>
-                      )}
+                    <span className="text-[10px] font-black uppercase">
+                      Week {week}
                     </span>
                   </div>
                   {isLocked ? (
-                    <Lock size={12} className="text-gray-300" />
+                    <Lock size={12} />
                   ) : (
                     <ChevronRight
-                      size={14}
-                      className="text-blue-200 group-hover:translate-x-1 transition-transform"
+                      size={12}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity"
                     />
                   )}
                 </div>
               );
             })}
           </div>
+        </nav>
+
+        <div className="p-6 border-t dark:border-slate-800 space-y-2">
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest ${darkMode ? "bg-slate-800 text-yellow-400" : "bg-gray-100 text-slate-600"}`}
+          >
+            {darkMode ? <Sun size={18} /> : <Moon size={18} />}{" "}
+            {darkMode ? "Light Mode" : "Dark Mode"}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-4 px-6 py-4 rounded-xl font-black text-[10px] uppercase tracking-widest bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all"
+          >
+            <LogOut size={18} /> Log Out
+          </button>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 p-8 lg:p-14 overflow-y-auto">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-8 mb-16">
-          <div>
-            <h2 className="text-5xl font-black text-gray-900 tracking-tighter italic uppercase">
-              Academic Core
-            </h2>
-            <p className="text-gray-400 font-bold uppercase text-[11px] tracking-[0.3em] mt-3 flex items-center gap-2">
-              <span className="text-blue-600">{studentData?.course}</span>
-              <span className="text-gray-200">|</span>
-              <span>
-                Global Progress: {Math.round((currentWeek / totalWeeks) * 100)}%
-              </span>
-            </p>
-          </div>
-
-          <div className="bg-white p-3 pr-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex items-center gap-4">
-            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-xl shadow-lg shadow-blue-100">
-              {studentData?.fullName?.charAt(0) || "A"}
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">
-                Authenticated Student
-              </p>
-              <p className="font-black text-sm text-gray-900 tracking-tight">
-                {studentData?.fullName || "Loading Profile..."}
-              </p>
-            </div>
+      {/* Main Content */}
+      <main className="flex-1 p-6 lg:p-14 overflow-y-auto">
+        {/* Mobile Header Top */}
+        <header className="lg:hidden flex justify-between items-center mb-10">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="p-3 bg-blue-600 text-white rounded-xl"
+          >
+            <Menu size={20} />
+          </button>
+          <h2 className="text-sm font-black italic">ACADEMIC CORE</h2>
+          <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black">
+            {studentData?.fullName?.charAt(0)}
           </div>
         </header>
 
-        {/* --- CURRICULUM/COURSES TAB --- */}
+        {/* Dashboard Tab */}
+        {activeTab === "dashboard" && (
+          <div className="space-y-10 animate-in fade-in duration-700">
+            <div className="bg-blue-600 p-10 lg:p-16 rounded-[4rem] text-white shadow-2xl relative overflow-hidden group">
+              <Award className="absolute -right-10 -bottom-10 w-64 h-64 opacity-10 -rotate-12 group-hover:rotate-0 transition-transform duration-1000" />
+              <div className="relative z-10">
+                <h2 className="text-4xl lg:text-6xl font-black italic tracking-tighter mb-4 uppercase">
+                  Academic Status
+                </h2>
+                <p className="text-sm lg:text-lg font-bold opacity-80 max-w-xl">
+                  Welcome back, {studentData?.fullName}. You are currently at
+                  Week {currentWeek} of the 24-week curriculum.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div
+                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"}`}
+              >
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                  Completion Rate
+                </p>
+                <h4 className="text-4xl font-black italic text-blue-600">
+                  {Math.round((currentWeek / 24) * 100)}%
+                </h4>
+              </div>
+              <div
+                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"}`}
+              >
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                  Current Phase
+                </p>
+                <h4 className="text-4xl font-black italic text-emerald-500 uppercase">
+                  WEEK {currentWeek}
+                </h4>
+              </div>
+              <div
+                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"}`}
+              >
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
+                  Midterm Status
+                </p>
+                <h4
+                  className={`text-4xl font-black italic ${hasPassedMidterm ? "text-blue-500" : "text-orange-500"}`}
+                >
+                  {hasPassedMidterm ? "PASSED" : "PENDING"}
+                </h4>
+              </div>
+            </div>
+
+            {currentWeek >= 12 && !hasPassedMidterm && (
+              <div className="p-12 bg-orange-600 rounded-[3.5rem] text-white flex flex-col md:flex-row justify-between items-center shadow-xl">
+                <div className="text-center md:text-left mb-6 md:mb-0">
+                  <h3 className="text-3xl font-black italic uppercase tracking-tighter mb-2">
+                    Gatekeeper Alert
+                  </h3>
+                  <p className="font-bold text-orange-100">
+                    Access to Week 13+ is restricted until you complete your
+                    Midterm Exam.
+                  </p>
+                </div>
+                <button
+                  onClick={() => navigate("/exam/midterm")}
+                  className="px-12 py-5 bg-white text-orange-600 rounded-2xl font-black uppercase text-xs shadow-2xl"
+                >
+                  Start Exam
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Curriculum/Courses Tab */}
         {activeTab === "courses" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in fade-in duration-700">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
             <div className="lg:col-span-2 space-y-8">
-              <div className="bg-black rounded-[3rem] overflow-hidden shadow-2xl aspect-video relative group">
+              <div className="bg-black aspect-video rounded-[3rem] overflow-hidden shadow-2xl border-4 border-white/5">
                 <iframe
                   width="100%"
                   height="100%"
-                  src={`https://www.youtube.com/embed/${getWeekVideoId(currentWeek)}?rel=0&modestbranding=1`}
-                  title="AYAX Academy Lesson"
+                  src={`https://www.youtube.com/embed/${getWeekVideoId(currentWeek)}`}
                   frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                   allowFullScreen
                 ></iframe>
               </div>
-
-              <div className="mt-8 flex justify-between items-center bg-blue-50 p-6 rounded-[2rem] border border-blue-100">
-                <div>
-                  <h4 className="font-black text-blue-900 text-sm uppercase tracking-tight">
-                    Kammala Darasin Satin Nan?
-                  </h4>
-                  <p className="text-[10px] text-blue-600 font-bold uppercase tracking-widest mt-1">
-                    Wannan zai sanar da Admin dinka ka gama.
-                  </p>
-                </div>
-                <button
-                  onClick={() => markWeekAsCompleted(currentWeek)}
-                  className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-200 hover:bg-slate-900 transition-all flex items-center gap-3"
-                >
-                  <CheckCircle size={16} /> Mark as Completed
-                </button>
-              </div>
-
-              <div className="bg-white p-10 rounded-[3rem] border border-gray-100 shadow-sm">
-                <h3 className="text-2xl font-black text-slate-900 tracking-tight mb-4 uppercase">
+              <div
+                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}
+              >
+                <h3 className="text-3xl font-black uppercase italic mb-4 tracking-tighter">
                   Week {currentWeek}: {getWeekTitle(currentWeek)}
                 </h3>
-                <p className="text-slate-500 leading-relaxed font-medium">
-                  Wannan shine babban darasinmu na wannan satin. Tabbatar ka
-                  kalli bidiyon nan duka sannan ka duba assignment dake kasa.
-                  Idan kana da tambaya, kayi amfani da "Student Forum" tab.
+                <p className="text-gray-400 leading-relaxed font-medium mb-8">
+                  This session covers foundational concepts required for your
+                  specialization. Ensure you take notes before proceeding to the
+                  forum discussion.
                 </p>
+                <button
+                  onClick={() => markWeekAsCompleted(currentWeek)}
+                  className="px-10 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center gap-3"
+                >
+                  <CheckCircle size={18} /> Mark as Completed
+                </button>
               </div>
             </div>
-
-            <div className="lg:col-span-1 space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-2">
-              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">
-                Course Syllabus
+            <div className="lg:col-span-1 space-y-4">
+              <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2 mb-4">
+                Up Next
               </h3>
-              {Array.from({ length: totalWeeks }, (_, i) => i + 1).map(
-                (week) => {
-                  const isLocked =
-                    week > currentWeek || (week > 12 && !hasPassedMidterm);
-                  return (
+              {[currentWeek, currentWeek + 1, currentWeek + 2].map(
+                (w) =>
+                  w <= 24 && (
                     <div
-                      key={week}
-                      onClick={() =>
-                        !isLocked &&
-                        trackStudentAction(`Switching to Week ${week} Video`)
-                      }
-                      className={`p-5 rounded-2xl flex items-center gap-4 border transition-all ${
-                        isLocked
-                          ? "opacity-40 bg-gray-50"
-                          : "bg-white hover:border-blue-300 cursor-pointer"
-                      }`}
+                      key={w}
+                      className={`p-6 rounded-[2rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} flex items-center gap-4`}
                     >
-                      <div
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center ${isLocked ? "bg-gray-200" : "bg-blue-50 text-blue-600"}`}
-                      >
-                        {isLocked ? (
-                          <Lock size={16} />
-                        ) : (
-                          <PlayCircle size={18} />
-                        )}
+                      <div className="w-10 h-10 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-xl flex items-center justify-center font-black text-xs">
+                        {w}
                       </div>
-                      <div>
-                        <p className="text-[10px] font-black text-slate-900 uppercase">
-                          Lesson {week}
-                        </p>
-                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
-                          Fundamentals & Practice
-                        </p>
-                      </div>
+                      <p className="text-[10px] font-black uppercase">
+                        {getWeekTitle(w)}
+                      </p>
                     </div>
-                  );
-                },
+                  ),
               )}
             </div>
           </div>
         )}
 
-        {/* --- FORUM / DISCUSSIONS TAB --- */}
+        {/* --- STUDENT FORUM SYSTEM --- */}
         {activeTab === "discussions" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in fade-in duration-700">
-            <div className="lg:col-span-1">
-              <div className="bg-white p-10 rounded-[3.5rem] shadow-2xl shadow-blue-900/5 border border-blue-50 sticky top-10">
-                <div className="w-14 h-14 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mb-6">
-                  <MessageSquare size={28} />
+          <div className="animate-in fade-in slide-in-from-bottom-5 duration-700">
+            {/* View 1: Select Course */}
+            {viewState === "list" && (
+              <div className="space-y-10">
+                <div className="text-center max-w-2xl mx-auto mb-16">
+                  <h2 className="text-5xl font-black italic uppercase tracking-tighter mb-4">
+                    Forum Repositories
+                  </h2>
+                  <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">
+                    Select your current module to enter the discussion stream.
+                  </p>
                 </div>
-                <h3 className="text-2xl font-black italic uppercase mb-2 text-slate-900 tracking-tight">
-                  Open Inquiry
-                </h3>
-                <p className="text-gray-400 text-xs font-medium mb-8">
-                  Your instructor and the Super Admin monitor these threads for
-                  quality assurance.
-                </p>
-                <form onSubmit={handlePostQuestion} className="space-y-4">
-                  <input
-                    className="s-input"
-                    placeholder="THREAD SUBJECT"
-                    value={newPost.title}
-                    onChange={(e) =>
-                      setNewPost({ ...newPost, title: e.target.value })
-                    }
-                  />
-                  <textarea
-                    className="s-input h-40 pt-6"
-                    placeholder="DESCRIBE YOUR CHALLENGE..."
-                    value={newPost.content}
-                    onChange={(e) =>
-                      setNewPost({ ...newPost, content: e.target.value })
-                    }
-                  />
-                  <button className="w-full py-5 bg-blue-600 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-slate-900 transition-all flex items-center justify-center gap-3">
-                    <Send size={16} /> Dispatch Question
-                  </button>
-                </form>
-              </div>
-            </div>
-
-            <div className="lg:col-span-2 space-y-6">
-              <h3 className="text-[10px] font-black text-gray-300 uppercase tracking-[0.4em] mb-4">
-                Live Discussions ({forumThreads.length})
-              </h3>
-              {forumThreads.length > 0 ? (
-                forumThreads.map((thread) => (
-                  <div
-                    key={thread.id}
-                    className="bg-white p-10 rounded-[3rem] border border-gray-100 hover:border-blue-200 transition-all shadow-sm hover:shadow-xl group"
-                  >
-                    <div className="flex justify-between items-center mb-6">
-                      <span className="px-4 py-1.5 bg-slate-100 text-slate-500 text-[9px] font-black rounded-full uppercase tracking-widest italic">
-                        Technical Thread
-                      </span>
-                      <span className="text-[10px] font-black text-gray-300 uppercase italic flex items-center gap-2">
-                        <Clock size={12} />{" "}
-                        {thread.createdAt?.toDate().toLocaleDateString()}
-                      </span>
-                    </div>
-                    <h4 className="text-2xl font-black text-slate-900 mb-4 tracking-tight group-hover:text-blue-600 transition-colors">
-                      {thread.title}
-                    </h4>
-                    <p className="text-slate-500 text-sm mb-8 leading-relaxed font-medium">
-                      {thread.content}
-                    </p>
-                    <div className="flex items-center justify-between border-t border-gray-50 pt-8">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 font-black text-xs border border-blue-100">
-                          {thread.studentName?.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black uppercase text-gray-400 mb-1 leading-none">
-                            Status
-                          </p>
-                          <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest">
-                            Active & Monitored
-                          </p>
-                        </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  {availableCourses.map((course) => (
+                    <div
+                      key={course.id}
+                      onClick={() => {
+                        setSelectedCourse(course);
+                        setViewState("selection");
+                      }}
+                      className={`p-10 rounded-[3.5rem] border cursor-pointer group transition-all hover:-translate-y-2 ${darkMode ? "bg-slate-900 border-slate-800 hover:border-blue-600" : "bg-white border-gray-100 hover:border-blue-600 shadow-sm"}`}
+                    >
+                      <div className="w-16 h-16 bg-blue-50 dark:bg-blue-900/40 text-blue-600 rounded-[1.5rem] flex items-center justify-center mb-8 group-hover:scale-110 transition-transform">
+                        {course.icon}
                       </div>
-                      <button className="px-8 py-3 bg-gray-50 text-slate-900 font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-blue-600 hover:text-white transition-all flex items-center gap-3">
-                        View Thread <ChevronRight size={14} />
-                      </button>
+                      <h4 className="text-2xl font-black uppercase italic tracking-tighter mb-2">
+                        {course.name}
+                      </h4>
+                      <div className="flex items-center gap-2 text-[10px] font-black text-blue-500 uppercase tracking-widest">
+                        Enter Repo <ChevronRight size={14} />
+                      </div>
                     </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-20 opacity-20">
-                  <MessageSquare size={64} className="mx-auto mb-4" />
-                  <p className="font-black uppercase tracking-widest text-xs">
-                    No active discussions in your course yet.
-                  </p>
+                  ))}
                 </div>
-              )}
-            </div>
-          </div>
-        )}
+              </div>
+            )}
 
-        {/* --- DASHBOARD TAB --- */}
-        {activeTab === "dashboard" && (
-          <div className="space-y-12 animate-in slide-in-from-bottom-10 duration-1000">
-            {currentWeek >= 12 && !hasPassedMidterm && (
-              <div className="p-12 bg-gradient-to-br from-orange-600 to-red-600 rounded-[4rem] text-white flex flex-col md:flex-row justify-between items-center shadow-3xl relative overflow-hidden group">
-                <Award className="absolute -right-16 -bottom-16 w-80 h-80 opacity-10 rotate-12 group-hover:rotate-45 transition-transform duration-1000" />
-                <div className="relative z-10">
-                  <h3 className="text-4xl font-black italic tracking-tighter uppercase mb-4">
-                    Academic Blockade
-                  </h3>
-                  <p className="font-bold text-orange-100 max-w-lg text-lg leading-relaxed mb-4">
-                    You have reached Week 12. Access to advanced content is
-                    locked until you pass your Midterm Examination.
-                  </p>
-                  <div className="flex items-center gap-4 text-orange-200 font-black text-[10px] uppercase tracking-[0.3em]">
-                    <ShieldCheck size={16} /> Requirement: Score 70%+
+            {/* View 2: Select Path (New vs Old) */}
+            {viewState === "selection" && (
+              <div className="max-w-4xl mx-auto py-20 text-center">
+                <h3 className="text-4xl font-black uppercase italic mb-4 tracking-tighter">
+                  Student Registry Level
+                </h3>
+                <p className="text-gray-400 font-black uppercase text-[10px] tracking-widest mb-16">
+                  Classify your status for the {selectedCourse?.name} forum.
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  <div
+                    onClick={() => {
+                      setSelectedPath("Path 1");
+                      setViewState("forum");
+                    }}
+                    className="group p-12 bg-blue-600 text-white rounded-[4rem] cursor-pointer hover:scale-105 transition-all shadow-2xl"
+                  >
+                    <Users
+                      size={48}
+                      className="mx-auto mb-6 group-hover:bounce"
+                    />
+                    <h4 className="text-3xl font-black italic uppercase">
+                      Path 1
+                    </h4>
+                    <p className="text-xs font-black uppercase tracking-widest opacity-80 mt-2">
+                      New Student / Entry Level
+                    </p>
+                  </div>
+
+                  <div
+                    onClick={() => {
+                      setSelectedPath("Path 2");
+                      setViewState("forum");
+                    }}
+                    className={`group p-12 rounded-[4rem] cursor-pointer hover:scale-105 transition-all border-2 border-dashed ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-gray-200"}`}
+                  >
+                    <ShieldCheck
+                      size={48}
+                      className="mx-auto mb-6 text-blue-600"
+                    />
+                    <h4 className="text-3xl font-black italic uppercase">
+                      Path 2
+                    </h4>
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400 mt-2">
+                      Old Student / Returning
+                    </p>
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate("/course/global-course/exam/week/12")}
-                  className="relative z-10 mt-8 md:mt-0 px-14 py-6 bg-white text-orange-600 rounded-[2rem] font-black text-xs uppercase shadow-2xl hover:scale-105 transition-all"
+                  onClick={() => setViewState("list")}
+                  className="mt-16 text-[10px] font-black uppercase tracking-[0.4em] opacity-40 hover:opacity-100 underline"
                 >
-                  Initiate Exam
+                  Switch Course Selection
                 </button>
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div className="bg-white p-10 rounded-[3.5rem] border border-gray-100 shadow-sm">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                  Current Phase
-                </p>
-                <h4 className="text-3xl font-black italic text-blue-600 tracking-tighter">
-                  WEEK {currentWeek}
-                </h4>
+            {/* View 3: Live Forum */}
+            {viewState === "forum" && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+                <div className="lg:col-span-1">
+                  <div
+                    className={`p-10 rounded-[3.5rem] border sticky top-10 ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-gray-100 shadow-xl"}`}
+                  >
+                    <div className="flex items-center gap-3 mb-8">
+                      <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center">
+                        <MessageSquare size={24} />
+                      </div>
+                      <div>
+                        <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest leading-none mb-1">
+                          {selectedPath}
+                        </p>
+                        <h4 className="font-black uppercase text-xs">
+                          Live Inquiry
+                        </h4>
+                      </div>
+                    </div>
+                    <form onSubmit={handlePostQuestion} className="space-y-4">
+                      <input
+                        className="s-input dark:bg-slate-800"
+                        placeholder="SUBJECT"
+                        value={newPost.title}
+                        onChange={(e) =>
+                          setNewPost({ ...newPost, title: e.target.value })
+                        }
+                      />
+                      <textarea
+                        className="s-input dark:bg-slate-800 h-40 pt-5"
+                        placeholder="DESCRIBE YOUR TECHNICAL CHALLENGE..."
+                        value={newPost.content}
+                        onChange={(e) =>
+                          setNewPost({ ...newPost, content: e.target.value })
+                        }
+                      />
+                      <button className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest shadow-xl hover:bg-slate-900 transition-all flex items-center justify-center gap-3">
+                        <Send size={18} /> Dispatch Thread
+                      </button>
+                    </form>
+                    <button
+                      onClick={() => setViewState("selection")}
+                      className="w-full mt-6 text-[9px] font-black uppercase opacity-30 hover:opacity-100 tracking-[0.2em]"
+                    >
+                      Switch Access Level
+                    </button>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2 space-y-8">
+                  <div className="flex justify-between items-center mb-6 px-4">
+                    <h3 className="text-[11px] font-black uppercase tracking-[0.4em] text-gray-400">
+                      Activity Stream ({forumThreads.length})
+                    </h3>
+                    <div className="flex items-center gap-2 text-emerald-500 text-[10px] font-black uppercase">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />{" "}
+                      Live System
+                    </div>
+                  </div>
+
+                  {forumThreads.length > 0 ? (
+                    forumThreads.map((thread) => (
+                      <div
+                        key={thread.id}
+                        className={`p-10 rounded-[3rem] border transition-all hover:shadow-2xl ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-50 shadow-sm"}`}
+                      >
+                        <div className="flex justify-between items-center mb-8">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-black">
+                              {thread.studentName?.charAt(0)}
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-black uppercase">
+                                {thread.studentName}
+                              </p>
+                              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                                {new Date(
+                                  thread.createdAt?.seconds * 1000,
+                                ).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+                          <span
+                            className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase ${darkMode ? "bg-slate-800 text-blue-400" : "bg-blue-50 text-blue-600"}`}
+                          >
+                            {thread.studentType}
+                          </span>
+                        </div>
+                        <h4 className="text-2xl font-black italic uppercase tracking-tight mb-4">
+                          {thread.title}
+                        </h4>
+                        <p className="text-gray-500 dark:text-gray-400 leading-relaxed font-medium mb-8">
+                          {thread.content}
+                        </p>
+                        // Nemo wannan wajen a kasan StudentPortal dinka (Wajen
+                        Forum Threads)
+                        <div className="pt-8 border-t dark:border-slate-800 flex justify-end">
+                          <button
+                            onClick={() =>
+                              navigate(`/forum/thread/${thread.id}`)
+                            }
+                            className="text-[10px] font-black uppercase tracking-widest text-blue-600 flex items-center gap-2 hover:gap-4 transition-all"
+                          >
+                            View Discussion <ChevronRight size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-40 opacity-20 flex flex-col items-center">
+                      <MessageSquare size={60} className="mb-4" />
+                      <p className="font-black uppercase tracking-[0.4em] text-xs">
+                        No Records Found In This Path
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="bg-white p-10 rounded-[3.5rem] border border-gray-100 shadow-sm">
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-2">
-                  Total Modules
-                </p>
-                <h4 className="text-3xl font-black italic text-slate-900 tracking-tighter">
-                  24 PHASES
-                </h4>
-              </div>
-              <div className="bg-slate-900 p-10 rounded-[3.5rem] text-white shadow-2xl">
-                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
-                  Next Milestone
-                </p>
-                <h4 className="text-3xl font-black italic text-emerald-400 tracking-tighter">
-                  {currentWeek < 12
-                    ? "MIDTERM"
-                    : currentWeek < 24
-                      ? "FINALS"
-                      : "GRADUATION"}
-                </h4>
-              </div>
-            </div>
+            )}
           </div>
         )}
       </main>
 
       <style>{`
-        .s-input { width: 100%; padding: 1.5rem; background: #f8fafc; border: 2px solid transparent; border-radius: 2rem; font-weight: 800; font-size: 0.85rem; outline: none; transition: 0.3s; color: #1e293b; }
-        .s-input:focus { border-color: #2563eb; background: white; box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.1); }
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #f1f5f9; border-radius: 20px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+        .s-input { width: 100%; padding: 1.25rem 1.75rem; background: #f8fafc; border: 2px solid transparent; border-radius: 1.75rem; font-weight: 800; font-size: 0.85rem; outline: none; transition: 0.3s; }
+        .s-input:focus { border-color: #2563eb; background: white; box-shadow: 0 10px 30px -10px rgba(37, 99, 235, 0.2); }
+        .dark .s-input { background: #1e293b; color: white; }
+        .dark .s-input:focus { background: #0f172a; border-color: #3b82f6; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(37, 99, 235, 0.1); border-radius: 10px; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        .group:hover .group-hover\:bounce { animation: bounce 1s infinite; }
       `}</style>
     </div>
   );
