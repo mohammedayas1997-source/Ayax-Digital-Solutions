@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect } from "react"; // Na kara useState a nan
 import {
   BrowserRouter as Router,
   Routes,
@@ -37,11 +37,11 @@ import AdminChatManager from "./pages/AdminChatManager";
 import AdminCourseList from "./pages/AdminCourseList";
 import AdminCourseDashboard from "./pages/AdminCourseDashboard";
 import AdminStudentsList from "./pages/AdminStudentsList";
+import ForumDetails from "./components/ForumDetails"; // <--- NA KARA WANNAN
 
 // --- ADDED COURSE & PRICING COMPONENTS ---
 import CourseSection from "./components/CourseSection";
 import PricingCard from "./components/PricingCard";
-
 const midtermQuestions = [
   {
     text: "What is React?",
@@ -67,6 +67,13 @@ function App() {
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/launch-project" element={<ProjectForm />} />
           <Route path="/enroll" element={<CourseEnrollment />} />
+          <Route
+            path="/portal"
+            element={
+              <StudentPortal darkMode={darkMode} setDarkMode={setDarkMode} />
+            }
+          />
+          <Route path="/portal" element={<AuthPortal />} />
           <Route
             path="/verify/:certificateId"
             element={<VerifyCertificate />}
