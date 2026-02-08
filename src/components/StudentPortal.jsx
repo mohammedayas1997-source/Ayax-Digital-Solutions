@@ -38,6 +38,9 @@ import {
   Search,
   Bell,
   Cpu,
+  FileText,
+  Download,
+  Calendar,
 } from "lucide-react";
 
 // ==========================================
@@ -61,6 +64,13 @@ const getWeekTitle = (week) => {
     24: "Final Project Defense",
   };
   return titles[week] || "Advanced Technical Study Phase";
+};
+
+// Helper don tsara date (DD/MM/YYYY)
+const formatDate = (timestamp) => {
+  if (!timestamp) return "TBD";
+  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+  return date.toLocaleDateString("en-GB");
 };
 
 // ==========================================
@@ -141,14 +151,12 @@ const StudentPortal = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // 1. Check idan user ya yi login
       if (!user) {
         navigate("/login");
         return;
       }
 
       try {
-        // 2. Nemo bayanan user daga Firestore
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
 
@@ -156,7 +164,6 @@ const StudentPortal = () => {
           const data = userSnap.data();
           setStudentData(data);
 
-          // 3. Calculate Week
           const courseStartDate = new Date("2026-01-01");
           const now = new Date();
           const diffTime = now - courseStartDate;
@@ -170,11 +177,9 @@ const StudentPortal = () => {
             currentActivity: "Browsing Portal",
           });
         } else {
-          // Fallback don kar ya nuna blank idan babu doc a Firestore
           setStudentData({ fullName: user.displayName || "Elite Student" });
         }
 
-        // 4. Check Midterm
         const examRef = doc(db, `students/${user.uid}/exams/midterm`);
         const examSnap = await getDoc(examRef);
         if (examSnap.exists() && examSnap.data().status === "passed") {
@@ -183,7 +188,6 @@ const StudentPortal = () => {
       } catch (error) {
         console.error("Portal Initialization Error:", error);
       } finally {
-        // 5. Tabbatar mun daina loading
         setLoading(false);
       }
     });
@@ -193,12 +197,16 @@ const StudentPortal = () => {
 
   const isWeekLocked = (weekNumber) => {
     const weekSettings = weeksData[`week_${weekNumber}`];
-    if (!weekSettings || !weekSettings.releaseDate)
+    // Idan Admin bai saka date ba, lissafin automatic zai yi aiki
+    if (!weekSettings || !weekSettings.startDate)
       return weekNumber > currentWeek;
-    const releaseDate = new Date(weekSettings.releaseDate.seconds * 1000);
+
+    // Amfani da startDate daga Admin don budewa
+    const startDate = weekSettings.startDate.toDate();
     const today = new Date();
-    const isDateReached = today >= releaseDate;
+    const isDateReached = today >= startDate;
     const isMidtermLocked = weekNumber > 12 && !hasPassedMidterm;
+
     return !isDateReached || isMidtermLocked;
   };
 
@@ -261,7 +269,6 @@ const StudentPortal = () => {
     }
   };
 
-  // Wannan loading state din ne zai hana blank screen kafin data ta fito
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center font-black text-blue-600 bg-slate-950">
@@ -282,6 +289,7 @@ const StudentPortal = () => {
         />
       )}
 
+      {/* SIDEBAR */}
       <aside
         className={`fixed lg:sticky top-0 z-50 h-screen w-72 md:w-80 border-r flex flex-col transition-transform duration-300 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
@@ -343,29 +351,39 @@ const StudentPortal = () => {
           <div className="space-y-1 pb-10">
             {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => {
               const isLocked = isWeekLocked(week);
+              const weekSet = weeksData[`week_${week}`];
               return (
                 <div
                   key={week}
                   onClick={() => !isLocked && setCurrentWeek(week)}
-                  className={`flex items-center justify-between px-4 py-2 md:py-3 rounded-xl transition-all ${isLocked ? "opacity-30 grayscale cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer group"}`}
+                  className={`flex flex-col px-4 py-2 md:py-3 rounded-xl transition-all ${isLocked ? "opacity-30 grayscale cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer group"}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-5 h-5 md:w-6 md:h-6 rounded-lg flex items-center justify-center text-[8px] md:text-[9px] font-black ${isLocked ? "bg-gray-200 text-gray-400" : "bg-blue-100 text-blue-600"}`}
-                    >
-                      {week}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-5 h-5 md:w-6 md:h-6 rounded-lg flex items-center justify-center text-[8px] md:text-[9px] font-black ${isLocked ? "bg-gray-200 text-gray-400" : "bg-blue-100 text-blue-600"}`}
+                      >
+                        {week}
+                      </div>
+                      <span className="text-[9px] md:text-[10px] font-black uppercase">
+                        Week {week}
+                      </span>
                     </div>
-                    <span className="text-[9px] md:text-[10px] font-black uppercase">
-                      Week {week}
-                    </span>
+                    {isLocked ? (
+                      <Lock size={10} />
+                    ) : (
+                      <ChevronRight
+                        size={10}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                      />
+                    )}
                   </div>
-                  {isLocked ? (
-                    <Lock size={10} />
-                  ) : (
-                    <ChevronRight
-                      size={10}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    />
+                  {/* ADMIN DATE DISPLAY ON ICON */}
+                  {!isLocked && weekSet?.startDate && (
+                    <div className="mt-1 ml-8 flex items-center gap-1 text-[7px] font-black text-blue-500/60 uppercase">
+                      <Calendar size={8} /> {formatDate(weekSet.startDate)} -{" "}
+                      {formatDate(weekSet.endDate)}
+                    </div>
                   )}
                 </div>
               );
@@ -390,6 +408,7 @@ const StudentPortal = () => {
         </div>
       </aside>
 
+      {/* MAIN PANEL */}
       <main className="flex-1 p-4 md:p-10 lg:p-14 overflow-y-auto">
         <header className="lg:hidden flex justify-between items-center mb-6">
           <button
@@ -406,6 +425,7 @@ const StudentPortal = () => {
           </div>
         </header>
 
+        {/* DASHBOARD TAB */}
         {activeTab === "dashboard" && (
           <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700">
             <div className="bg-blue-600 p-8 md:p-16 rounded-[2.5rem] md:rounded-[4rem] text-white shadow-2xl relative overflow-hidden group">
@@ -457,9 +477,11 @@ const StudentPortal = () => {
           </div>
         )}
 
+        {/* CURRICULUM TAB */}
         {activeTab === "courses" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
             <div className="lg:col-span-2 space-y-6 md:space-y-8">
+              {/* VIDEO PLAYER */}
               <div className="bg-black aspect-video rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border-2 md:border-4 border-white/5">
                 <iframe
                   width="100%"
@@ -469,21 +491,51 @@ const StudentPortal = () => {
                   allowFullScreen
                 ></iframe>
               </div>
+
+              {/* LECTURE NOTES & DETAILS SECTION */}
               <div
                 className={`p-6 md:p-10 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}
               >
                 <h3 className="text-xl md:text-3xl font-black uppercase italic mb-4 tracking-tighter">
                   Week {currentWeek}: {getWeekTitle(currentWeek)}
                 </h3>
-                <div className="p-4 md:p-6 bg-blue-50 dark:bg-blue-900/20 rounded-2xl mb-6">
-                  <h5 className="text-[8px] font-black text-blue-600 uppercase mb-2 tracking-[0.2em]">
-                    Assignment
-                  </h5>
-                  <p className="text-[11px] md:text-sm font-bold opacity-80 leading-relaxed">
-                    {weeksData[`week_${currentWeek}`]?.assignment ||
-                      "Complete current module tasks."}
-                  </p>
+
+                {/* NEW: PDF NOTE SECTION */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  <div className="p-5 bg-blue-600 rounded-3xl text-white">
+                    <div className="flex items-center gap-3 mb-3">
+                      <FileText size={20} />
+                      <h5 className="text-[10px] font-black uppercase tracking-widest">
+                        Lecture Notes (PDF)
+                      </h5>
+                    </div>
+                    {weeksData[`week_${currentWeek}`]?.pdfUrl ? (
+                      <a
+                        href={weeksData[`week_${currentWeek}`].pdfUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center justify-center gap-2 w-full py-3 bg-white text-blue-600 rounded-xl font-black text-[9px] uppercase hover:scale-105 transition-transform"
+                      >
+                        <Download size={14} /> Download PDF
+                      </a>
+                    ) : (
+                      <div className="py-3 bg-white/10 rounded-xl text-center text-[9px] font-black uppercase opacity-50">
+                        No PDF Uploaded Yet
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-3xl">
+                    <h5 className="text-[8px] font-black text-blue-600 uppercase mb-2 tracking-[0.2em]">
+                      Assignment
+                    </h5>
+                    <p className="text-[11px] md:text-sm font-bold opacity-80 leading-relaxed">
+                      {weeksData[`week_${currentWeek}`]?.assignment ||
+                        "Complete current module tasks."}
+                    </p>
+                  </div>
                 </div>
+
                 <button
                   onClick={() => markWeekAsCompleted(currentWeek)}
                   className="w-full md:w-auto px-8 py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-3"
@@ -507,9 +559,16 @@ const StudentPortal = () => {
                       <div className="w-8 h-8 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-lg flex items-center justify-center font-black text-[10px]">
                         {w}
                       </div>
-                      <p className="text-[9px] font-black uppercase truncate">
-                        {getWeekTitle(w)}
-                      </p>
+                      <div>
+                        <p className="text-[9px] font-black uppercase truncate">
+                          {getWeekTitle(w)}
+                        </p>
+                        <p className="text-[7px] font-bold text-gray-400">
+                          {weeksData[`week_${w}`]?.startDate
+                            ? formatDate(weeksData[`week_${w}`].startDate)
+                            : "Session Pending"}
+                        </p>
+                      </div>
                     </div>
                   ),
               )}
@@ -517,6 +576,7 @@ const StudentPortal = () => {
           </div>
         )}
 
+        {/* FORUM TAB */}
         {activeTab === "discussions" && (
           <div className="animate-in fade-in duration-700">
             {viewState === "list" && (
