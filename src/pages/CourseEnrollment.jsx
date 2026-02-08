@@ -5,21 +5,16 @@ import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   GraduationCap,
-  MapPin,
   Globe,
   Home,
-  BookOpen,
   Camera,
   UploadCloud,
-  X,
-  CreditCard,
   School,
   Info,
-  ExternalLink,
   ArrowRight,
-  Award,
-  Building2,
-  CalendarDays,
+  Plus,
+  Trash2,
+  BookOpen,
 } from "lucide-react";
 
 const CourseEnrollment = () => {
@@ -27,9 +22,14 @@ const CourseEnrollment = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
-  // State for Passport Image
+  // Passport State
   const [passportImage, setPassportImage] = useState(null);
   const [passportPreview, setPassportPreview] = useState(null);
+
+  // Dynamic Education State
+  const [educationList, setEducationList] = useState([
+    { qualification: "", institution: "", course: "", year: "" },
+  ]);
 
   const preSelectedCourse = location.state?.selectedCourse || "";
   const [selectedCourse, setSelectedCourse] = useState("");
@@ -38,7 +38,6 @@ const CourseEnrollment = () => {
     if (preSelectedCourse) setSelectedCourse(preSelectedCourse);
   }, [preSelectedCourse]);
 
-  // Handle Image Previews
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -51,9 +50,28 @@ const CourseEnrollment = () => {
     }
   };
 
+  // Logic to add/remove/update Education rows
+  const addEducation = () => {
+    setEducationList([
+      ...educationList,
+      { qualification: "", institution: "", course: "", year: "" },
+    ]);
+  };
+
+  const removeEducation = (index) => {
+    const list = [...educationList];
+    list.splice(index, 1);
+    setEducationList(list);
+  };
+
+  const handleEducationChange = (index, field, value) => {
+    const list = [...educationList];
+    list[index][field] = value;
+    setEducationList(list);
+  };
+
   const handleApply = async (e) => {
     e.preventDefault();
-
     if (!passportImage) {
       alert("Please upload your Passport photograph!");
       return;
@@ -63,12 +81,10 @@ const CourseEnrollment = () => {
     const formData = new FormData(e.target);
 
     try {
-      // 1. Upload Passport to Storage
       const passportRef = ref(storage, `passports/${Date.now()}_passport`);
       const pSnapshot = await uploadBytes(passportRef, passportImage);
       const passportURL = await getDownloadURL(pSnapshot.ref);
 
-      // 2. Save Everything to Firestore
       await addDoc(collection(db, "course_applications"), {
         studentName: formData.get("name"),
         email: formData.get("email"),
@@ -81,14 +97,11 @@ const CourseEnrollment = () => {
         country: formData.get("country"),
         stateOfOrigin: formData.get("stateOfOrigin"),
         lgaOfOrigin: formData.get("lgaOfOrigin"),
-        qualification: formData.get("qualification") || "N/A",
-        institution: formData.get("institution") || "Not Provided",
-        graduationYear: formData.get("graduationYear") || "N/A",
+        educationBackground: educationList, // Saving the dynamic list
         appliedAt: serverTimestamp(),
         status: "Pending Review",
       });
 
-      // 3. Redirect to Payment Page immediately after successful Firestore save
       navigate("/payment");
     } catch (err) {
       console.error("Submission Error:", err);
@@ -103,15 +116,14 @@ const CourseEnrollment = () => {
       <div className="max-w-5xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-gray-100">
         <div className="bg-gray-900 p-12 text-white text-center">
           <GraduationCap className="w-16 h-16 mx-auto mb-4 text-blue-500" />
-          <h1 className="text-4xl font-black tracking-tighter uppercase text-white">
+          <h1 className="text-4xl font-black tracking-tighter uppercase">
             Elite Enrollment
           </h1>
           <p className="text-blue-400 font-bold mt-2">
-            Complete your information to proceed to payment.
+            Complete your information to proceed.
           </p>
         </div>
 
-        {/* PAYMENT NOTICE BAR */}
         <div className="bg-blue-50 p-8 mx-8 mt-8 rounded-[2rem] border-2 border-blue-100 flex flex-col md:flex-row items-center gap-6">
           <div className="bg-blue-600 p-4 rounded-2xl text-white shadow-lg">
             <Info size={32} />
@@ -120,13 +132,9 @@ const CourseEnrollment = () => {
             <h4 className="text-blue-900 font-black uppercase text-xs tracking-[0.2em] mb-1">
               Step 1 of 2: Personal Details
             </h4>
-            <p className="text-blue-700 text-sm font-medium leading-relaxed">
-              Fill the form below accurately. After submission, you will be
-              automatically redirected to the{" "}
-              <span className="font-black underline">
-                Secure Payment Gateway
-              </span>
-              .
+            <p className="text-blue-700 text-sm font-medium">
+              After submission, you will be redirected to the Secure Payment
+              Gateway.
             </p>
           </div>
         </div>
@@ -137,7 +145,7 @@ const CourseEnrollment = () => {
             <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">
               01. Student Passport
             </h3>
-            <div className="relative w-40 h-40 bg-gray-100 rounded-3xl border-4 border-dashed border-gray-200 flex items-center justify-center overflow-hidden transition-all hover:border-blue-400 group">
+            <div className="relative w-40 h-40 bg-gray-100 rounded-3xl border-4 border-dashed border-gray-200 flex items-center justify-center overflow-hidden group">
               {passportPreview ? (
                 <img
                   src={passportPreview}
@@ -146,7 +154,7 @@ const CourseEnrollment = () => {
                 />
               ) : (
                 <Camera
-                  className="text-gray-300 group-hover:text-blue-400 transition-colors"
+                  className="text-gray-300 group-hover:text-blue-400"
                   size={40}
                 />
               )}
@@ -158,9 +166,6 @@ const CourseEnrollment = () => {
                 className="absolute inset-0 opacity-0 cursor-pointer"
               />
             </div>
-            <p className="text-[10px] font-bold text-gray-400">
-              Click to upload (Max 2MB)
-            </p>
           </div>
 
           {/* PERSONAL INFO */}
@@ -216,48 +221,90 @@ const CourseEnrollment = () => {
             </div>
           </div>
 
-          {/* EDUCATIONAL BACKGROUND - NOW EXPANDED AND SEPARATED */}
-          <div className="space-y-8">
-            <h3 className="text-sm font-black flex items-center gap-2 border-b pb-4 uppercase text-blue-600">
-              <School size={18} /> Educational Background (Optional)
-            </h3>
+          {/* DYNAMIC EDUCATIONAL BACKGROUND */}
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b pb-4">
+              <h3 className="text-sm font-black flex items-center gap-2 uppercase text-blue-600">
+                <School size={18} /> Educational Background
+              </h3>
+              <button
+                type="button"
+                onClick={addEducation}
+                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-gray-900 transition-all"
+              >
+                <Plus size={14} /> Add Qualification
+              </button>
+            </div>
 
             <div className="space-y-6">
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-4 flex items-center gap-2">
-                  <Award size={12} /> Highest Qualification
-                </label>
-                <select name="qualification" className="input-style">
-                  <option value="">Select Qualification</option>
-                  <option value="SSCE">SSCE</option>
-                  <option value="Diploma">Diploma</option>
-                  <option value="NCE">NCE</option>
-                  <option value="Degree">Degree</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-4 flex items-center gap-2">
-                  <Building2 size={12} /> Institution Name
-                </label>
-                <input
-                  name="institution"
-                  className="input-style"
-                  placeholder="e.g. Ahmadu Bello University"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <label className="text-[10px] font-black uppercase text-gray-400 ml-4 flex items-center gap-2">
-                  <CalendarDays size={12} /> Year of Graduation
-                </label>
-                <input
-                  name="graduationYear"
-                  className="input-style"
-                  placeholder="e.g. 2022"
-                />
-              </div>
+              {educationList.map((edu, index) => (
+                <div
+                  key={index}
+                  className="p-6 bg-gray-50 rounded-3xl border border-gray-100 relative animate-in slide-in-from-top-4"
+                >
+                  {educationList.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeEducation(index)}
+                      className="absolute top-4 right-4 text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  )}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <select
+                      className="input-style"
+                      value={edu.qualification}
+                      onChange={(e) =>
+                        handleEducationChange(
+                          index,
+                          "qualification",
+                          e.target.value,
+                        )
+                      }
+                      required
+                    >
+                      <option value="">Select Qualification</option>
+                      <option value="SSCE">SSCE</option>
+                      <option value="ND/Diploma">ND / Diploma</option>
+                      <option value="NCE">NCE</option>
+                      <option value="HND/Degree">HND / Degree</option>
+                      <option value="Postgraduate">Postgraduate</option>
+                    </select>
+                    <input
+                      className="input-style"
+                      placeholder="Institution Name"
+                      value={edu.institution}
+                      onChange={(e) =>
+                        handleEducationChange(
+                          index,
+                          "institution",
+                          e.target.value,
+                        )
+                      }
+                      required
+                    />
+                    <input
+                      className="input-style"
+                      placeholder="Course of Study / Subjects"
+                      value={edu.course}
+                      onChange={(e) =>
+                        handleEducationChange(index, "course", e.target.value)
+                      }
+                      required
+                    />
+                    <input
+                      className="input-style"
+                      placeholder="Year of Graduation"
+                      value={edu.year}
+                      onChange={(e) =>
+                        handleEducationChange(index, "year", e.target.value)
+                      }
+                      required
+                    />
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -309,8 +356,7 @@ const CourseEnrollment = () => {
           >
             {loading ? (
               <>
-                <UploadCloud className="animate-spin" /> Finalizing
-                Application...
+                <UploadCloud className="animate-spin" /> Processing...
               </>
             ) : (
               <>
@@ -323,11 +369,11 @@ const CourseEnrollment = () => {
 
       <style>{`
         .input-style {
-          width: 100%; padding: 1.25rem; background: #fcfcfc; border: 1px solid #eeeeee;
+          width: 100%; padding: 1.25rem; background: #white; border: 1px solid #eeeeee;
           border-radius: 1.25rem; outline: none; font-weight: 700; font-size: 0.875rem;
           transition: all 0.3s ease;
         }
-        .input-style:focus { border-color: #2563eb; background: white; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.1); }
+        .input-style:focus { border-color: #2563eb; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.1); }
       `}</style>
     </div>
   );
