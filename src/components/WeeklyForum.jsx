@@ -26,6 +26,19 @@ import {
   Bell,
 } from "lucide-react";
 
+// ==========================================
+// GYARARREN SUNAYEN COURSES (MAPPING)
+// ==========================================
+const availableCourses = [
+  { id: "cyber_security", name: "Cyber security" },
+  { id: "data_analytics", name: "Data Analytics" },
+  { id: "software_engineering", name: "Software Engineering" },
+  { id: "ai", name: "Artificial Intelligence" },
+  { id: "blockchain", name: "Blockchain Technology" },
+  { id: "web_development", name: "Web development" },
+  { id: "digital_marketing", name: "advanced Digital Marketing" },
+];
+
 const WeeklyForum = ({ weekId, courseId }) => {
   const [mySubmission, setMySubmission] = useState("");
   const [othersSubmissions, setOthersSubmissions] = useState([]);
@@ -36,6 +49,10 @@ const WeeklyForum = ({ weekId, courseId }) => {
   const [replyText, setReplyText] = useState({});
   const [courseDates, setCourseDates] = useState(null);
   const [notifications, setNotifications] = useState([]);
+
+  // Nemo sunan course din da ake kai a halin yanzu
+  const currentCourseName =
+    availableCourses.find((c) => c.id === courseId)?.name || "Unknown Course";
 
   const user = auth.currentUser;
   const progressPath = `students/${user?.uid}/progress/${courseId}_week_${weekId}`;
@@ -115,6 +132,7 @@ const WeeklyForum = ({ weekId, courseId }) => {
         content: mySubmission,
         weekId,
         courseId,
+        courseName: currentCourseName, // Mun kara sunan course a submission
         type: isExamWeek ? "EXAM_SUBMISSION" : "chat_message",
         createdAt: serverTimestamp(),
       });
@@ -157,7 +175,8 @@ const WeeklyForum = ({ weekId, courseId }) => {
           </div>
           <div>
             <h2 className="font-black uppercase tracking-tighter text-xl">
-              Week {weekId} {isExamWeek && "- EXAMINATION PERIOD"}
+              {currentCourseName} - Week {weekId}{" "}
+              {isExamWeek && "- EXAMINATION PERIOD"}
             </h2>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
               Scheduled Date: {courseDates || "TBD BY ADMINISTRATION"}

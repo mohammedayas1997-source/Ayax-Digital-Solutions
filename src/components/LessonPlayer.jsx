@@ -22,6 +22,19 @@ import {
   Reply,
 } from "lucide-react";
 
+// ==========================================
+// OFFICIAL COURSE CURRICULUM LIST
+// ==========================================
+const VALID_COURSES = [
+  "Cyber security",
+  "Data Analytics",
+  "Software Engineering",
+  "Artificial Intelligence",
+  "Blockchain Technology",
+  "Web development",
+  "advanced Digital Marketing",
+];
+
 const WeeklyForum = ({ weekId, courseId }) => {
   const [mySubmission, setMySubmission] = useState("");
   const [othersSubmissions, setOthersSubmissions] = useState([]);
@@ -113,7 +126,7 @@ const WeeklyForum = ({ weekId, courseId }) => {
         userName: user.displayName || user.email,
         content: mySubmission,
         weekId,
-        courseId,
+        courseId, // Wannan zai dauki daya daga cikin jerin: Cyber security, Data Analytics, da sauransu
         type: "main_assignment",
         createdAt: serverTimestamp(),
       });

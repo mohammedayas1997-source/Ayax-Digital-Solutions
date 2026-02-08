@@ -90,18 +90,43 @@ const StudentPortal = () => {
   const [forumThreads, setForumThreads] = useState([]);
   const [newPost, setNewPost] = useState({ title: "", content: "" });
 
+  // --- GYARARREN SUNAYEN COURSES ---
   const availableCourses = [
+    {
+      id: "cyber_security",
+      name: "Cyber Security",
+      icon: <ShieldCheck size={20} />,
+    },
+    {
+      id: "data_analytics",
+      name: "Data Analytics",
+      icon: <Search size={20} />,
+    },
     {
       id: "software_eng",
       name: "Software Engineering",
       icon: <Layers size={20} />,
     },
     {
-      id: "data_science",
-      name: "Data Science & AI",
-      icon: <Layers size={20} />,
+      id: "ai_tech",
+      name: "Artificial Intelligence",
+      icon: <Cpu size={20} />, // Idan baka sa Cpu ba, Layers zai zauna
     },
-    { id: "cyber_sec", name: "Cybersecurity Ops", icon: <Layers size={20} /> },
+    {
+      id: "blockchain",
+      name: "Blockchain Technology",
+      icon: <Lock size={20} />,
+    },
+    {
+      id: "web_dev",
+      name: "Web Development",
+      icon: <PlayCircle size={20} />,
+    },
+    {
+      id: "digital_marketing",
+      name: "Advanced Digital Marketing",
+      icon: <Send size={20} />,
+    },
   ];
 
   // ==========================================
@@ -234,7 +259,7 @@ const StudentPortal = () => {
 
   if (loading)
     return (
-      <div className="min-h-screen flex items-center justify-center font-black">
+      <div className="min-h-screen flex items-center justify-center font-black text-blue-600 bg-slate-950">
         INITIALIZING SYSTEMS...
       </div>
     );
@@ -251,7 +276,7 @@ const StudentPortal = () => {
         />
       )}
 
-      {/* Sidebar Navigation - Optimized for Mobile */}
+      {/* Sidebar Navigation */}
       <aside
         className={`fixed lg:sticky top-0 z-50 h-screen w-72 md:w-80 border-r flex flex-col transition-transform duration-300 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
@@ -386,13 +411,11 @@ const StudentPortal = () => {
                   Academic Status
                 </h2>
                 <p className="text-[10px] md:text-lg font-bold opacity-80 max-w-xl leading-relaxed">
-                  Welcome, {studentData?.fullName}. Active at Week {currentWeek}
-                  .
+                  Welcome, {studentData?.fullName}. Active at Week {currentWeek}.
                 </p>
               </div>
             </div>
 
-            {/* Dashboard Stats - Grid 2 columns on mobile */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-8">
               {[
                 {
@@ -507,7 +530,8 @@ const StudentPortal = () => {
                     Select module to enter forum.
                   </p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
+                {/* --- DISPLAYING THE NEW LIST OF COURSES --- */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
                   {availableCourses.map((course) => (
                     <div
                       key={course.id}

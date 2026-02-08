@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react"; // Na kara useState a nan
+import React, { useState, useEffect } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -37,11 +37,13 @@ import AdminChatManager from "./pages/AdminChatManager";
 import AdminCourseList from "./pages/AdminCourseList";
 import AdminCourseDashboard from "./pages/AdminCourseDashboard";
 import AdminStudentsList from "./pages/AdminStudentsList";
-import ForumDetails from "./components/ForumDetails"; // <--- NA KARA WANNAN
+import ForumDetails from "./components/ForumDetails";
+import TeacherDashboard from "./pages/TeacherDashboard"; // <--- ADDED MALAMI DASHBOARD
 
 // --- ADDED COURSE & PRICING COMPONENTS ---
 import CourseSection from "./components/CourseSection";
 import PricingCard from "./components/PricingCard";
+
 const midtermQuestions = [
   {
     text: "What is React?",
@@ -54,6 +56,7 @@ const midtermQuestions = [
 
 function App() {
   const [darkMode, setDarkMode] = useState(false);
+
   return (
     <Router>
       <div className="App">
@@ -68,21 +71,8 @@ function App() {
           <Route path="/launch-project" element={<ProjectForm />} />
           <Route path="/enroll" element={<CourseEnrollment />} />
           <Route
-            path="/portal"
-            element={
-              <StudentPortal darkMode={darkMode} setDarkMode={setDarkMode} />
-            }
-          />
-          <Route path="/portal" element={<AuthPortal />} />
-          <Route
             path="/verify/:certificateId"
             element={<VerifyCertificate />}
-          />
-          <Route
-            path="/portal"
-            element={
-              <StudentPortal darkMode={darkMode} setDarkMode={setDarkMode} />
-            }
           />
           <Route
             path="/forum/thread/:threadId"
@@ -94,11 +84,21 @@ function App() {
           {/* --- AUTHENTICATION TERMINALS --- */}
           <Route path="/portal" element={<AuthPortal />} />
           <Route path="/login" element={<StudentLogin />} />
-
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
 
-          {/* Super Admin Route */}
+          {/* --- MALAMI / TEACHER SECURE INFRASTRUCTURE --- */}
+          <Route
+            path="/teacher-dashboard"
+            element={
+              <ProtectedRoute requiredRole="malami">
+                <TeacherDashboard />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* --- SUPER ADMIN SECURE INFRASTRUCTURE --- */}
+          {/* Super Admin can access the command center and all admin tools */}
           <Route
             path="/super-admin"
             element={
@@ -108,79 +108,6 @@ function App() {
             }
           />
 
-          {/* --- STUDENT SECURE INFRASTRUCTURE --- */}
-
-          {/* FIXED: Muna amfani da /student-portal a matsayin main dashboard din dalibi */}
-          <Route
-            path="/student-portal"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <StudentPortal />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* ADDED: Wannan redirect ne idan wani ya tafi /dashboard direct */}
-          <Route
-            path="/dashboard"
-            element={<Navigate to="/student-portal" replace />}
-          />
-
-          <Route
-            path="/course/:courseId/grades"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <StudentGrades />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/lesson/:lessonId"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <LessonPlayer />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/course/:courseId/forum/week/:weekId"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <WeeklyForum />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/course/:courseId/exam/week/:weekId"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <AcademicExam questions={midtermQuestions} />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/certificate/:courseId"
-            element={
-              <ProtectedRoute requiredRole="student">
-                <Certificate
-                  studentName={auth.currentUser?.displayName || "Student"}
-                  courseName="Full Stack Web Development"
-                  dateCompleted={new Date().toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
-                  certificateId={`AYX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`}
-                />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* --- ADMIN SECURE INFRASTRUCTURE --- */}
           <Route
             path="/admin-dashboard"
             element={
@@ -245,19 +172,79 @@ function App() {
           />
 
           <Route
-            path="/admin/questions/:courseId"
+            path="/admin/chat/:courseId"
             element={
               <ProtectedRoute requiredRole="super-admin">
-                <AdminQuestionBank />
+                <AdminChatManager />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* --- STUDENT SECURE INFRASTRUCTURE --- */}
+          <Route
+            path="/student-portal"
+            element={
+              <ProtectedRoute requiredRole="student">
+                <StudentPortal darkMode={darkMode} setDarkMode={setDarkMode} />
               </ProtectedRoute>
             }
           />
 
           <Route
-            path="/admin/chat/:courseId"
+            path="/dashboard"
+            element={<Navigate to="/student-portal" replace />}
+          />
+
+          <Route
+            path="/course/:courseId/grades"
             element={
-              <ProtectedRoute requiredRole="super-admin">
-                <AdminChatManager />
+              <ProtectedRoute requiredRole="student">
+                <StudentGrades />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/lesson/:lessonId"
+            element={
+              <ProtectedRoute requiredRole="student">
+                <LessonPlayer />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/course/:courseId/forum/week/:weekId"
+            element={
+              <ProtectedRoute requiredRole="student">
+                <WeeklyForum />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/course/:courseId/exam/week/:weekId"
+            element={
+              <ProtectedRoute requiredRole="student">
+                <AcademicExam questions={midtermQuestions} />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/certificate/:courseId"
+            element={
+              <ProtectedRoute requiredRole="student">
+                <Certificate
+                  studentName={auth.currentUser?.displayName || "Student"}
+                  courseName="Full Stack Web Development"
+                  dateCompleted={new Date().toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}
+                  certificateId={`AYX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`}
+                />
               </ProtectedRoute>
             }
           />

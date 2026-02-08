@@ -41,10 +41,13 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
   const [loading, setLoading] = useState(false);
 
   const availableCourses = [
-    "Web Development",
-    "Graphic Design",
-    "Digital Marketing",
-    "Cyber Security",
+    "Cyber security",
+    "Data Analytics",
+    "Software Engineering",
+    "Artificial Intelligence",
+    "Blockchain Technology",
+    "Web development",
+    "advanced Digital Marketing",
   ];
 
   // Form State

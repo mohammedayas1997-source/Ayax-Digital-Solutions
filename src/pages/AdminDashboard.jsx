@@ -29,7 +29,7 @@ const AdminDashboard = () => {
     title: "",
     description: "",
     videoUrl: "",
-    category: "Computer Science",
+    category: "Cyber security", // Default category set to first new course
     pdfUrl: "",
   });
 
@@ -64,7 +64,7 @@ const AdminDashboard = () => {
         title: "",
         description: "",
         videoUrl: "",
-        category: "Computer Science",
+        category: "Cyber security",
         pdfUrl: "",
       });
     } catch (error) {
@@ -172,7 +172,7 @@ const AdminDashboard = () => {
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-black uppercase tracking-widest text-gray-400">
-                    Category
+                    Category (Select Course)
                   </label>
                   <select
                     className="w-full p-4 bg-gray-50 rounded-2xl border border-gray-100 outline-none font-bold"
@@ -181,9 +181,21 @@ const AdminDashboard = () => {
                       setCourseData({ ...courseData, category: e.target.value })
                     }
                   >
-                    <option>Computer Science</option>
-                    <option>Business Admin</option>
-                    <option>Digital Marketing</option>
+                    <option value="Cyber security">Cyber security</option>
+                    <option value="Data Analytics">Data Analytics</option>
+                    <option value="Software Engineering">
+                      Software Engineering
+                    </option>
+                    <option value="Artificial Intelligence">
+                      Artificial Intelligence
+                    </option>
+                    <option value="Blockchain Technology">
+                      Blockchain Technology
+                    </option>
+                    <option value="Web development">Web development</option>
+                    <option value="advanced Digital Marketing">
+                      advanced Digital Marketing
+                    </option>
                   </select>
                 </div>
               </div>
