@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom"; // Added useNavigate
 import { db, storage } from "../firebaseConfig";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -15,14 +15,16 @@ import {
   CreditCard,
   School,
   Info,
+  ExternalLink, // Added for the button icon
 } from "lucide-react";
 
 const CourseEnrollment = () => {
   const location = useLocation();
+  const navigate = useNavigate(); // For navigation
   const [loading, setLoading] = useState(false);
   const [applied, setApplied] = useState(false);
 
-  // State na hoton Passport kawai (tunda an cire receipt)
+  // State for Passport Image
   const [passportImage, setPassportImage] = useState(null);
   const [passportPreview, setPassportPreview] = useState(null);
 
@@ -76,7 +78,6 @@ const CourseEnrollment = () => {
         country: formData.get("country"),
         stateOfOrigin: formData.get("stateOfOrigin"),
         lgaOfOrigin: formData.get("lgaOfOrigin"),
-        // Educational Background (Optional)
         qualification: formData.get("qualification") || "N/A",
         institution: formData.get("institution") || "Not Provided",
         graduationYear: formData.get("graduationYear") || "N/A",
@@ -128,12 +129,12 @@ const CourseEnrollment = () => {
           </p>
         </div>
 
-        {/* PAYMENT INFORMATION SECTION */}
+        {/* UPDATED PAYMENT INFORMATION SECTION WITH BUTTON */}
         <div className="bg-blue-50 p-8 mx-8 mt-8 rounded-[2rem] border-2 border-blue-100 flex flex-col md:flex-row items-center gap-6">
           <div className="bg-blue-600 p-4 rounded-2xl text-white shadow-lg">
             <CreditCard size={32} />
           </div>
-          <div>
+          <div className="flex-1">
             <h4 className="text-blue-900 font-black uppercase text-xs tracking-[0.2em] mb-1">
               Registration Fee: 3,000 Naira
             </h4>
@@ -144,11 +145,20 @@ const CourseEnrollment = () => {
               Account: <span className="font-black">8123456789</span>
             </p>
           </div>
-          <div className="ml-auto bg-white/50 px-4 py-2 rounded-xl border border-blue-200 flex items-center gap-2">
-            <Info size={16} className="text-blue-600" />
-            <span className="text-[10px] font-bold text-blue-800 uppercase">
-              Save your receipt after payment
-            </span>
+          <div className="flex flex-col items-end gap-3">
+            <button
+              type="button"
+              onClick={() => window.open("/payment", "_blank")} // Or navigate("/payment")
+              className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-gray-900 transition-all shadow-md active:scale-95"
+            >
+              Pay Online Now <ExternalLink size={14} />
+            </button>
+            <div className="bg-white/50 px-4 py-2 rounded-xl border border-blue-200 flex items-center gap-2">
+              <Info size={16} className="text-blue-600" />
+              <span className="text-[10px] font-bold text-blue-800 uppercase">
+                Save your receipt after payment
+              </span>
+            </div>
           </div>
         </div>
 
@@ -237,7 +247,7 @@ const CourseEnrollment = () => {
             </div>
           </div>
 
-          {/* EDUCATIONAL BACKGROUND (OPTIONAL) */}
+          {/* EDUCATIONAL BACKGROUND */}
           <div className="space-y-6">
             <h3 className="text-sm font-black flex items-center gap-2 border-b pb-4 uppercase text-blue-600">
               <School size={18} /> Educational Background (Optional)
