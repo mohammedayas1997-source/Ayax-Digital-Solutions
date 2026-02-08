@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebaseConfig";
-import { signOut } from "firebase/auth";
+import { signOut, onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   getDocs,
@@ -37,6 +37,7 @@ import {
   Users,
   Search,
   Bell,
+  Cpu,
 } from "lucide-react";
 
 // ==========================================
@@ -90,7 +91,6 @@ const StudentPortal = () => {
   const [forumThreads, setForumThreads] = useState([]);
   const [newPost, setNewPost] = useState({ title: "", content: "" });
 
-  // --- GYARARREN SUNAYEN COURSES ---
   const availableCourses = [
     {
       id: "cyber_security",
@@ -107,21 +107,13 @@ const StudentPortal = () => {
       name: "Software Engineering",
       icon: <Layers size={20} />,
     },
-    {
-      id: "ai_tech",
-      name: "Artificial Intelligence",
-      icon: <Cpu size={20} />, // Idan baka sa Cpu ba, Layers zai zauna
-    },
+    { id: "ai_tech", name: "Artificial Intelligence", icon: <Cpu size={20} /> },
     {
       id: "blockchain",
       name: "Blockchain Technology",
       icon: <Lock size={20} />,
     },
-    {
-      id: "web_dev",
-      name: "Web Development",
-      icon: <PlayCircle size={20} />,
-    },
+    { id: "web_dev", name: "Web Development", icon: <PlayCircle size={20} /> },
     {
       id: "digital_marketing",
       name: "Advanced Digital Marketing",
@@ -148,11 +140,15 @@ const StudentPortal = () => {
   }, []);
 
   useEffect(() => {
-    const initPortal = async () => {
-      const user = auth.currentUser;
-      if (!user) return navigate("/login");
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // 1. Check idan user ya yi login
+      if (!user) {
+        navigate("/login");
+        return;
+      }
 
       try {
+        // 2. Nemo bayanan user daga Firestore
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
 
@@ -160,6 +156,7 @@ const StudentPortal = () => {
           const data = userSnap.data();
           setStudentData(data);
 
+          // 3. Calculate Week
           const courseStartDate = new Date("2026-01-01");
           const now = new Date();
           const diffTime = now - courseStartDate;
@@ -172,8 +169,12 @@ const StudentPortal = () => {
             status: "Active",
             currentActivity: "Browsing Portal",
           });
+        } else {
+          // Fallback don kar ya nuna blank idan babu doc a Firestore
+          setStudentData({ fullName: user.displayName || "Elite Student" });
         }
 
+        // 4. Check Midterm
         const examRef = doc(db, `students/${user.uid}/exams/midterm`);
         const examSnap = await getDoc(examRef);
         if (examSnap.exists() && examSnap.data().status === "passed") {
@@ -182,15 +183,18 @@ const StudentPortal = () => {
       } catch (error) {
         console.error("Portal Initialization Error:", error);
       } finally {
+        // 5. Tabbatar mun daina loading
         setLoading(false);
       }
-    };
-    initPortal();
+    });
+
+    return () => unsubscribe();
   }, [navigate]);
 
   const isWeekLocked = (weekNumber) => {
     const weekSettings = weeksData[`week_${weekNumber}`];
-    if (!weekSettings || !weekSettings.releaseDate) return true;
+    if (!weekSettings || !weekSettings.releaseDate)
+      return weekNumber > currentWeek;
     const releaseDate = new Date(weekSettings.releaseDate.seconds * 1000);
     const today = new Date();
     const isDateReached = today >= releaseDate;
@@ -245,7 +249,7 @@ const StudentPortal = () => {
     try {
       await addDoc(collection(db, "forum_threads"), {
         ...newPost,
-        studentName: studentData.fullName,
+        studentName: studentData?.fullName || "Student",
         studentId: auth.currentUser.uid,
         courseId: selectedCourse.id,
         studentType: selectedPath,
@@ -257,18 +261,20 @@ const StudentPortal = () => {
     }
   };
 
-  if (loading)
+  // Wannan loading state din ne zai hana blank screen kafin data ta fito
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center font-black text-blue-600 bg-slate-950">
-        INITIALIZING SYSTEMS...
+      <div className="min-h-screen flex flex-col items-center justify-center font-black text-blue-600 bg-slate-950">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-600 mb-4"></div>
+        <p className="tracking-widest animate-pulse">INITIALIZING SYSTEMS...</p>
       </div>
     );
+  }
 
   return (
     <div
       className={`min-h-screen flex font-sans selection:bg-blue-600 selection:text-white ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"} transition-colors duration-300`}
     >
-      {/* Mobile Sidebar Overlay */}
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/60 lg:hidden"
@@ -276,7 +282,6 @@ const StudentPortal = () => {
         />
       )}
 
-      {/* Sidebar Navigation */}
       <aside
         className={`fixed lg:sticky top-0 z-50 h-screen w-72 md:w-80 border-r flex flex-col transition-transform duration-300 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
@@ -385,7 +390,6 @@ const StudentPortal = () => {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <main className="flex-1 p-4 md:p-10 lg:p-14 overflow-y-auto">
         <header className="lg:hidden flex justify-between items-center mb-6">
           <button
@@ -398,7 +402,7 @@ const StudentPortal = () => {
             AYAX PORTAL
           </h2>
           <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-black">
-            {studentData?.fullName?.charAt(0)}
+            {studentData?.fullName?.charAt(0) || "U"}
           </div>
         </header>
 
@@ -411,7 +415,8 @@ const StudentPortal = () => {
                   Academic Status
                 </h2>
                 <p className="text-[10px] md:text-lg font-bold opacity-80 max-w-xl leading-relaxed">
-                  Welcome, {studentData?.fullName}. Active at Week {currentWeek}.
+                  Welcome, {studentData?.fullName || "Elite Student"}. Active at
+                  Week {currentWeek}.
                 </p>
               </div>
             </div>
@@ -456,19 +461,13 @@ const StudentPortal = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
             <div className="lg:col-span-2 space-y-6 md:space-y-8">
               <div className="bg-black aspect-video rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border-2 md:border-4 border-white/5">
-                {weeksData[`week_${currentWeek}`]?.videoId ? (
-                  <iframe
-                    width="100%"
-                    height="100%"
-                    src={`https://www.youtube.com/embed/${weeksData[`week_${currentWeek}`].videoId}`}
-                    frameBorder="0"
-                    allowFullScreen
-                  ></iframe>
-                ) : (
-                  <div className="flex items-center justify-center h-full text-white font-black opacity-20 uppercase tracking-widest text-[10px]">
-                    Video Pending...
-                  </div>
-                )}
+                <iframe
+                  width="100%"
+                  height="100%"
+                  src={`https://www.youtube.com/embed/${weeksData[`week_${currentWeek}`]?.videoId || getWeekVideoId(currentWeek)}`}
+                  frameBorder="0"
+                  allowFullScreen
+                ></iframe>
               </div>
               <div
                 className={`p-6 md:p-10 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}
@@ -482,7 +481,7 @@ const StudentPortal = () => {
                   </h5>
                   <p className="text-[11px] md:text-sm font-bold opacity-80 leading-relaxed">
                     {weeksData[`week_${currentWeek}`]?.assignment ||
-                      "No specific instructions provided."}
+                      "Complete current module tasks."}
                   </p>
                 </div>
                 <button
@@ -530,7 +529,6 @@ const StudentPortal = () => {
                     Select module to enter forum.
                   </p>
                 </div>
-                {/* --- DISPLAYING THE NEW LIST OF COURSES --- */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
                   {availableCourses.map((course) => (
                     <div
@@ -631,7 +629,6 @@ const StudentPortal = () => {
                     </form>
                   </div>
                 </div>
-
                 <div className="lg:col-span-2 space-y-4 md:space-y-8">
                   {forumThreads.map((thread) => (
                     <div
