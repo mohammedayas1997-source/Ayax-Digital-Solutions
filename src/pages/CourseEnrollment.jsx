@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useLocation, useNavigate } from "react-router-dom"; // Added useNavigate
+import { useLocation, useNavigate } from "react-router-dom";
 import { db, storage } from "../firebaseConfig";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
@@ -15,14 +15,17 @@ import {
   CreditCard,
   School,
   Info,
-  ExternalLink, // Added for the button icon
+  ExternalLink,
+  ArrowRight,
+  Award,
+  Building2,
+  CalendarDays,
 } from "lucide-react";
 
 const CourseEnrollment = () => {
   const location = useLocation();
-  const navigate = useNavigate(); // For navigation
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [applied, setApplied] = useState(false);
 
   // State for Passport Image
   const [passportImage, setPassportImage] = useState(null);
@@ -85,7 +88,8 @@ const CourseEnrollment = () => {
         status: "Pending Review",
       });
 
-      setApplied(true);
+      // 3. Redirect to Payment Page immediately after successful Firestore save
+      navigate("/payment");
     } catch (err) {
       console.error("Submission Error:", err);
       alert("Submission failed. Check your internet or Firebase config.");
@@ -93,28 +97,6 @@ const CourseEnrollment = () => {
       setLoading(false);
     }
   };
-
-  if (applied) {
-    return (
-      <div className="pt-40 pb-20 text-center animate-in fade-in duration-700">
-        <div className="w-24 h-24 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-6">
-          <GraduationCap size={50} />
-        </div>
-        <h2 className="text-4xl font-black text-gray-900 tracking-tighter uppercase">
-          Application Received!
-        </h2>
-        <p className="text-gray-500 mt-2 font-medium">
-          Thank you for applying. We will contact you shortly.
-        </p>
-        <button
-          onClick={() => (window.location.href = "/")}
-          className="mt-8 px-10 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-gray-900 transition-all"
-        >
-          Back to Home
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="pt-32 pb-20 bg-gray-50 min-h-screen px-6">
@@ -125,40 +107,27 @@ const CourseEnrollment = () => {
             Elite Enrollment
           </h1>
           <p className="text-blue-400 font-bold mt-2">
-            Fill the form below to secure your future.
+            Complete your information to proceed to payment.
           </p>
         </div>
 
-        {/* UPDATED PAYMENT INFORMATION SECTION WITH BUTTON */}
+        {/* PAYMENT NOTICE BAR */}
         <div className="bg-blue-50 p-8 mx-8 mt-8 rounded-[2rem] border-2 border-blue-100 flex flex-col md:flex-row items-center gap-6">
           <div className="bg-blue-600 p-4 rounded-2xl text-white shadow-lg">
-            <CreditCard size={32} />
+            <Info size={32} />
           </div>
           <div className="flex-1">
             <h4 className="text-blue-900 font-black uppercase text-xs tracking-[0.2em] mb-1">
-              Registration Fee: 3,000 Naira
+              Step 1 of 2: Personal Details
             </h4>
             <p className="text-blue-700 text-sm font-medium leading-relaxed">
-              Pay to: <span className="font-black">AYAX ACADEMY LTD</span>{" "}
-              <br />
-              Bank: <span className="font-black">OPAY / MONIEPOINT</span> <br />
-              Account: <span className="font-black">8123456789</span>
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-3">
-            <button
-              type="button"
-              onClick={() => window.open("/payment", "_blank")} // Or navigate("/payment")
-              className="bg-blue-600 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-gray-900 transition-all shadow-md active:scale-95"
-            >
-              Pay Online Now <ExternalLink size={14} />
-            </button>
-            <div className="bg-white/50 px-4 py-2 rounded-xl border border-blue-200 flex items-center gap-2">
-              <Info size={16} className="text-blue-600" />
-              <span className="text-[10px] font-bold text-blue-800 uppercase">
-                Save your receipt after payment
+              Fill the form below accurately. After submission, you will be
+              automatically redirected to the{" "}
+              <span className="font-black underline">
+                Secure Payment Gateway
               </span>
-            </div>
+              .
+            </p>
           </div>
         </div>
 
@@ -247,30 +216,48 @@ const CourseEnrollment = () => {
             </div>
           </div>
 
-          {/* EDUCATIONAL BACKGROUND */}
-          <div className="space-y-6">
+          {/* EDUCATIONAL BACKGROUND - NOW EXPANDED AND SEPARATED */}
+          <div className="space-y-8">
             <h3 className="text-sm font-black flex items-center gap-2 border-b pb-4 uppercase text-blue-600">
               <School size={18} /> Educational Background (Optional)
             </h3>
-            <div className="grid md:grid-cols-3 gap-6">
-              <select name="qualification" className="input-style">
-                <option value="">Select Qualification</option>
-                <option value="SSCE">SSCE</option>
-                <option value="Diploma">Diploma</option>
-                <option value="NCE">NCE</option>
-                <option value="Degree">Degree</option>
-                <option value="Other">Other</option>
-              </select>
-              <input
-                name="institution"
-                className="input-style"
-                placeholder="Institution Name"
-              />
-              <input
-                name="graduationYear"
-                className="input-style"
-                placeholder="Year of Graduation"
-              />
+
+            <div className="space-y-6">
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-4 flex items-center gap-2">
+                  <Award size={12} /> Highest Qualification
+                </label>
+                <select name="qualification" className="input-style">
+                  <option value="">Select Qualification</option>
+                  <option value="SSCE">SSCE</option>
+                  <option value="Diploma">Diploma</option>
+                  <option value="NCE">NCE</option>
+                  <option value="Degree">Degree</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-4 flex items-center gap-2">
+                  <Building2 size={12} /> Institution Name
+                </label>
+                <input
+                  name="institution"
+                  className="input-style"
+                  placeholder="e.g. Ahmadu Bello University"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="text-[10px] font-black uppercase text-gray-400 ml-4 flex items-center gap-2">
+                  <CalendarDays size={12} /> Year of Graduation
+                </label>
+                <input
+                  name="graduationYear"
+                  className="input-style"
+                  placeholder="e.g. 2022"
+                />
+              </div>
             </div>
           </div>
 
@@ -322,10 +309,13 @@ const CourseEnrollment = () => {
           >
             {loading ? (
               <>
-                <UploadCloud className="animate-spin" /> Submitting...
+                <UploadCloud className="animate-spin" /> Finalizing
+                Application...
               </>
             ) : (
-              "Submit Application"
+              <>
+                Save & Proceed to Payment <ArrowRight size={20} />
+              </>
             )}
           </button>
         </form>
