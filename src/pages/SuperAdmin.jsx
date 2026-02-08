@@ -13,7 +13,7 @@ import {
   orderBy,
   where,
   getDoc,
-  setDoc, // Added setDoc for schedule management
+  setDoc,
 } from "firebase/firestore";
 import {
   Calendar,
@@ -48,6 +48,7 @@ import {
   Sun,
   LogOut,
   History,
+  UploadCloud, // Added for PDF Upload UI
 } from "lucide-react";
 
 const SuperAdmin = () => {
@@ -69,23 +70,33 @@ const SuperAdmin = () => {
   const [weeklyDates, setWeeklyDates] = useState({});
   const [globalNotice, setGlobalNotice] = useState("");
   const [selectedCourseForSchedule, setSelectedCourseForSchedule] =
-    useState("Web Development");
+    useState("Web development");
+
+  // PDF Material Deployment State
+  const [pdfData, setPdfData] = useState({
+    courseTitle: "Web development",
+    weekNumber: "1",
+    pdfUrl: "",
+    materialTitle: "",
+    description: "",
+  });
 
   const [academicData, setAcademicData] = useState({
     type: "video",
     title: "",
     content: "",
     week: "1",
-    course: "Web Development",
+    course: "Web development",
     dueDate: "",
   });
 
   const [forumData, setForumData] = useState({
     title: "",
     content: "",
-    course: "Web Development",
+    course: "Web development",
   });
 
+  // Updated Course List
   const availableCourses = [
     "Cyber security",
     "Data Analytics",
@@ -95,6 +106,8 @@ const SuperAdmin = () => {
     "Web development",
     "advanced Digital Marketing",
   ];
+
+  const weeks = Array.from({ length: 12 }, (_, i) => i + 1);
 
   const [userData, setUserData] = useState({
     name: "",
@@ -150,7 +163,6 @@ const SuperAdmin = () => {
       setHistoryLogs(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
     });
 
-    // Fetch Schedule for the selected course
     const unsubSchedule = onSnapshot(
       doc(db, "course_schedules", selectedCourseForSchedule),
       (docSnap) => {
@@ -175,6 +187,37 @@ const SuperAdmin = () => {
     };
   }, [selectedCourseForSchedule]);
 
+  // Handle PDF Material Deployment
+  const handleDeployPDF = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "course_materials"), {
+        ...pdfData,
+        type: "PDF",
+        deployedBy: "SUPER_ADMIN",
+        createdAt: serverTimestamp(),
+      });
+
+      await logActivity(
+        "PDF_DEPLOYMENT",
+        `Dispatched ${pdfData.materialTitle} for Week ${pdfData.weekNumber} (${pdfData.courseTitle})`,
+      );
+
+      alert(`SUCCESS: Week ${pdfData.weekNumber} PDF deployed to students.`);
+      setPdfData({
+        ...pdfData,
+        pdfUrl: "",
+        materialTitle: "",
+        description: "",
+      });
+    } catch (err) {
+      alert("CRITICAL ERROR: Failed to deploy material.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // SUPER ADMIN COMMAND: Save Academic Calendar
   const handleUpdateSchedule = async () => {
     setLoading(true);
@@ -195,7 +238,6 @@ const SuperAdmin = () => {
         { merge: true },
       );
 
-      // Logic for Weeks 12 & 24 Exam Protocol
       await logActivity(
         "CALENDAR_SYNC",
         `Updated schedule & exam protocol for ${selectedCourseForSchedule}`,
@@ -212,7 +254,7 @@ const SuperAdmin = () => {
     setWeeklyDates((prev) => ({ ...prev, [week]: val }));
   };
 
-  // ADMINISTRATIVE ACTIONS (Originals preserved)
+  // ADMINISTRATIVE ACTIONS
   const logActivity = async (action, details) => {
     await addDoc(collection(db, "system_logs"), {
       action,
@@ -293,7 +335,7 @@ const SuperAdmin = () => {
       });
       await logActivity("FORUM", `Started discussion: ${forumData.title}`);
       alert("OFFICIAL: Discussion thread launched.");
-      setForumData({ title: "", content: "", course: "Web Development" });
+      setForumData({ title: "", content: "", course: "Web development" });
     } catch (err) {
       alert(err.message);
     } finally {
@@ -358,6 +400,76 @@ const SuperAdmin = () => {
     alert("AUTHORITY_RESPONSE: Message injected into forum.");
   };
 
+  // Rendering logic for the PDF tab - Insert this in your return UI
+  const renderPDFManager = () => (
+    <div className="p-8 bg-white rounded-[3rem] shadow-xl border border-gray-100">
+      <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tighter mb-8 flex items-center gap-2">
+        <UploadCloud className="text-blue-600" /> Weekly Material Deployment
+      </h3>
+      <form onSubmit={handleDeployPDF} className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <select
+            className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+            value={pdfData.courseTitle}
+            onChange={(e) =>
+              setPdfData({ ...pdfData, courseTitle: e.target.value })
+            }
+          >
+            {availableCourses.map((c) => (
+              <option key={c} value={c}>
+                {c.toUpperCase()}
+              </option>
+            ))}
+          </select>
+          <select
+            className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+            value={pdfData.weekNumber}
+            onChange={(e) =>
+              setPdfData({ ...pdfData, weekNumber: e.target.value })
+            }
+          >
+            {weeks.map((w) => (
+              <option key={w} value={w}>
+                WEEK {w}
+              </option>
+            ))}
+          </select>
+        </div>
+        <input
+          placeholder="Material Title (e.g. Introduction to Cryptography)"
+          className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+          value={pdfData.materialTitle}
+          onChange={(e) =>
+            setPdfData({ ...pdfData, materialTitle: e.target.value })
+          }
+          required
+        />
+        <input
+          placeholder="PDF URL (Cloud Link)"
+          className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+          value={pdfData.pdfUrl}
+          onChange={(e) => setPdfData({ ...pdfData, pdfUrl: e.target.value })}
+          required
+        />
+        <textarea
+          placeholder="Short Description..."
+          className="w-full p-4 bg-gray-50 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-600 transition-all"
+          value={pdfData.description}
+          onChange={(e) =>
+            setPdfData({ ...pdfData, description: e.target.value })
+          }
+        />
+        <button
+          className="w-full py-5 bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all shadow-lg active:scale-95"
+          disabled={loading}
+        >
+          {loading ? "DEPLOYING MATERIAL..." : "DEPLOY WEEKLY PDF"}
+        </button>
+      </form>
+    </div>
+  );
+
+  // Return logic continues as per your original UI...
   return (
     <div
       className={`flex min-h-screen font-sans transition-colors duration-300 ${darkMode ? "bg-[#0f172a] text-white" : "bg-[#f1f5f9] text-slate-900"}`}
