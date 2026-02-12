@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { db, auth } from "../firebaseConfig";
 import {
   collection,
@@ -24,7 +24,12 @@ import {
   Calendar,
   AlertTriangle,
   Bell,
-  ShieldCheck, // Added for Admin Badge
+  ShieldCheck,
+  MoreVertical,
+  Smile,
+  Paperclip,
+  Check,
+  ChevronLeft,
 } from "lucide-react";
 
 // ==========================================
@@ -43,15 +48,13 @@ const availableCourses = [
 const WeeklyForum = ({ weekId, courseId }) => {
   const [mySubmission, setMySubmission] = useState("");
   const [othersSubmissions, setOthersSubmissions] = useState([]);
-  const [repliesCount, setRepliesCount] = useState(0);
   const [isCompleted, setIsCompleted] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [adminAssignment, setAdminAssignment] = useState(null);
-  const [replyText, setReplyText] = useState({});
   const [courseDates, setCourseDates] = useState(null);
-  const [notifications, setNotifications] = useState([]);
-  const [userRole, setUserRole] = useState("student"); // To track if viewer is admin
+  const [userRole, setUserRole] = useState("student");
 
+  const scrollRef = useRef(null);
   const currentCourseName =
     availableCourses.find((c) => c.id === courseId)?.name || "Unknown Course";
 
@@ -59,10 +62,16 @@ const WeeklyForum = ({ weekId, courseId }) => {
   const progressPath = `students/${user?.uid}/progress/${courseId}_week_${weekId}`;
   const isExamWeek = weekId === 12 || weekId === 24;
 
+  // Auto-scroll to bottom on new message
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [othersSubmissions]);
+
   useEffect(() => {
     if (!user) return;
 
-    // Fetch User Role to identify Admin vs Student
     const fetchRole = async () => {
       const userRef = doc(db, "users", user.uid);
       const userSnap = await getDoc(userRef);
@@ -72,7 +81,7 @@ const WeeklyForum = ({ weekId, courseId }) => {
     };
     fetchRole();
 
-    // 1. Real-time Chat Sync (WhatsApp Style)
+    // Real-time Chat Sync
     const q = query(
       collection(db, "submissions"),
       where("weekId", "==", weekId),
@@ -83,27 +92,10 @@ const WeeklyForum = ({ weekId, courseId }) => {
     const unsubscribeChat = onSnapshot(q, (snap) => {
       const messages = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setOthersSubmissions(messages);
-
-      const userSub = messages.find((m) => m.userId === user.uid);
-      if (userSub) setHasSubmitted(true);
-    });
-
-    // 2. Notification Listener
-    const replyQ = query(
-      collection(db, "forum_replies"),
-      where("parentPostUserId", "==", user.uid),
-      where("weekId", "==", weekId),
-    );
-    const unsubscribeReplies = onSnapshot(replyQ, (snap) => {
-      setNotifications(snap.docs.map((d) => d.data()));
+      if (messages.find((m) => m.userId === user.uid)) setHasSubmitted(true);
     });
 
     const fetchData = async () => {
-      const courseRef = doc(db, "courses", courseId);
-      const courseSnap = await getDoc(courseRef);
-      if (courseSnap.exists())
-        setCourseDates(courseSnap.data().schedule?.[weekId]);
-
       const adminQ = query(
         collection(db, "forum_assignments"),
         where("weekId", "==", weekId),
@@ -119,10 +111,7 @@ const WeeklyForum = ({ weekId, courseId }) => {
     };
 
     fetchData();
-    return () => {
-      unsubscribeChat();
-      unsubscribeReplies();
-    };
+    return () => unsubscribeChat();
   }, [weekId, courseId, user]);
 
   const handleSubmit = async () => {
@@ -136,7 +125,7 @@ const WeeklyForum = ({ weekId, courseId }) => {
       await addDoc(collection(db, "submissions"), {
         userId: user.uid,
         userName: user.displayName || user.email,
-        role: userRole, // Storing role to show "Admin" tag later
+        role: userRole,
         content: mySubmission,
         weekId,
         courseId,
@@ -150,87 +139,109 @@ const WeeklyForum = ({ weekId, courseId }) => {
     }
   };
 
-  const handleReplySubmit = async (peer) => {
-    const text = replyText[msg.id] || ""; // logic remains from original
-    // Logic kept as per original file structure
-  };
-
   return (
-    <div className="max-w-4xl mx-auto p-2 h-screen flex flex-col font-sans bg-white shadow-2xl">
-      {/* GROUP HEADER */}
-      <div className="bg-[#075e54] p-4 text-white flex items-center justify-between shadow-md">
+    <div className="flex flex-col h-screen max-w-5xl mx-auto bg-[#efeae2] shadow-2xl relative overflow-hidden border-x border-gray-200">
+      {/* WHATSAPP STYLE HEADER */}
+      <header className="bg-[#075e54] text-white px-4 py-3 flex items-center justify-between z-50 shadow-lg">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center font-black">
-            {weekId}
+          <button className="lg:hidden p-1">
+            <ChevronLeft />
+          </button>
+          <div className="relative">
+            <div className="w-10 h-10 bg-blue-100 text-[#075e54] rounded-full flex items-center justify-center font-black text-sm">
+              {weekId}
+            </div>
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-[#075e54] rounded-full"></div>
           </div>
-          <div>
-            <h2 className="font-bold text-lg leading-tight uppercase">
-              {currentCourseName} - Group {weekId}
+          <div className="flex flex-col">
+            <h2 className="font-bold text-sm leading-tight uppercase truncate max-w-[200px]">
+              {currentCourseName}
             </h2>
-            <p className="text-[10px] opacity-80 uppercase tracking-widest">
-              {othersSubmissions.length} members participating
-            </p>
+            <span className="text-[10px] opacity-70 font-medium">
+              {othersSubmissions.length} Academic peers online
+            </span>
           </div>
         </div>
-        <div className="flex gap-4 opacity-80">
-          <Calendar size={20} />
-          <Users size={20} />
+        <div className="flex items-center gap-5 opacity-90">
+          <Calendar
+            size={18}
+            className="cursor-pointer hover:scale-110 transition"
+          />
+          <Users
+            size={18}
+            className="cursor-pointer hover:scale-110 transition"
+          />
+          <MoreVertical
+            size={18}
+            className="cursor-pointer hover:scale-110 transition"
+          />
         </div>
+      </header>
+
+      {/* ENCRYPTION NOTICE */}
+      <div className="bg-[#fff9c4] py-1.5 px-4 text-center shadow-sm z-40">
+        <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest flex items-center justify-center gap-2">
+          <ShieldCheck size={12} className="text-emerald-700" />
+          End-to-end encrypted academic repository. Only members can view.
+        </p>
       </div>
 
-      {/* SYSTEM ANNOUNCEMENT */}
-      <div className="bg-[#e1f5fe] p-3 text-center text-[11px] font-bold text-gray-600 uppercase tracking-tight">
-        Messages are end-to-end encrypted for academic integrity.
-        {isExamWeek && " | EXAMINATION MODE ACTIVE"}
-      </div>
-
-      {/* CHAT BUBBLES AREA */}
+      {/* MESSAGE AREA */}
       <div
-        className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#e5ddd5]"
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto px-4 md:px-10 py-6 space-y-4 custom-chat-scrollbar"
         style={{
           backgroundImage:
             "url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png')",
+          backgroundBlendMode: "overlay",
         }}
       >
         {othersSubmissions.map((msg) => {
           const isMe = msg.userId === user.uid;
           const isAdmin =
-            msg.role === "admin" ||
-            msg.role === "authority" ||
+            ["admin", "authority", "SUPER_ADMIN"].includes(msg.role) ||
             msg.userId === "SUPER_ADMIN";
 
           return (
             <div
               key={msg.id}
-              className={`flex ${isMe ? "justify-end" : "justify-start"}`}
+              className={`flex w-full ${isMe ? "justify-end" : "justify-start"} animate-in fade-in slide-in-from-bottom-2 duration-300`}
             >
               <div
-                className={`max-w-[85%] px-4 py-2 shadow-sm relative ${
+                className={`relative max-w-[80%] md:max-w-[65%] px-3 pt-1.5 pb-1 shadow-md
+                ${
                   isMe
-                    ? "bg-[#dcf8c6] rounded-l-xl rounded-br-xl"
-                    : "bg-white rounded-r-xl rounded-bl-xl"
-                }`}
+                    ? "bg-[#dcf8c6] rounded-l-xl rounded-br-xl ml-12"
+                    : "bg-white rounded-r-xl rounded-bl-xl mr-12"
+                }
+              `}
               >
-                {/* SENDER NAME & ROLE */}
-                <div className="flex items-center gap-2 mb-1">
-                  <span
-                    className={`text-[10px] font-black uppercase ${isAdmin ? "text-red-600" : "text-blue-600"}`}
-                  >
-                    {msg.userName}
-                  </span>
-                  {isAdmin && (
-                    <span className="bg-red-100 text-red-600 text-[8px] font-black px-1 rounded flex items-center gap-1">
-                      <ShieldCheck size={8} /> ADMIN
+                {/* ADMIN BADGE & SENDER NAME */}
+                {!isMe && (
+                  <div className="flex items-center justify-between gap-4 mb-1 border-b border-gray-100 pb-1">
+                    <span
+                      className={`text-[10px] font-black uppercase ${isAdmin ? "text-red-600" : "text-[#34b7f1]"}`}
+                    >
+                      {msg.userName.split("@")[0]}
                     </span>
-                  )}
+                    {isAdmin && (
+                      <span className="bg-red-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded flex items-center gap-1 shadow-sm">
+                        <ShieldCheck size={8} /> FACULTY
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* CONTENT */}
+                <div
+                  className={`text-sm leading-relaxed font-semibold whitespace-pre-wrap ${isAdmin ? "text-slate-900 italic" : "text-slate-800"}`}
+                >
+                  {msg.content}
                 </div>
 
-                <p className="text-sm text-gray-800 leading-relaxed font-medium">
-                  {msg.content}
-                </p>
-
-                <div className="flex justify-end mt-1">
-                  <span className="text-[9px] text-gray-400 font-bold uppercase">
+                {/* TIMESTAMP & STATUS */}
+                <div className="flex items-center justify-end gap-1 mt-1 opacity-60">
+                  <span className="text-[8px] font-bold uppercase italic">
                     {msg.createdAt
                       ? new Date(msg.createdAt.toDate()).toLocaleTimeString(
                           [],
@@ -238,43 +249,70 @@ const WeeklyForum = ({ weekId, courseId }) => {
                         )
                       : "..."}
                   </span>
+                  {isMe && <Check size={10} className="text-blue-500" />}
                 </div>
+
+                {/* WHATSAPP BUBBLE TAIL REPLACEMENT (CSS-LIKE) */}
+                <div
+                  className={`absolute top-0 w-2 h-2 ${isMe ? "-right-1 bg-[#dcf8c6] rotate-45" : "-left-1 bg-white rotate-45"}`}
+                ></div>
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* INPUT CONTROL */}
-      <div className="bg-[#f0f0f0] p-3 flex items-center gap-2">
-        <div className="flex-1 bg-white rounded-full flex items-center px-4 py-1 shadow-sm border border-gray-200">
+      {/* EXAM INDICATOR */}
+      {isExamWeek && (
+        <div className="mx-4 mb-2 bg-red-600 text-white p-2 rounded-xl text-center flex items-center justify-center gap-2 shadow-lg animate-pulse">
+          <AlertTriangle size={14} />
+          <span className="text-[9px] font-black uppercase">
+            EXAM MODE: 500+ Character Submission Required
+          </span>
+        </div>
+      )}
+
+      {/* INPUT PANEL */}
+      <footer className="bg-[#f0f2f5] px-4 py-3 flex items-end gap-3 shadow-2xl border-t border-gray-200">
+        <div className="flex items-center gap-3 pb-2 opacity-60">
+          <Smile
+            size={24}
+            className="cursor-pointer hover:text-[#075e54] transition"
+          />
+          <Paperclip
+            size={22}
+            className="cursor-pointer hover:text-[#075e54] transition"
+          />
+        </div>
+
+        <div className="flex-1 bg-white rounded-2xl flex items-center px-4 py-1.5 shadow-inner border border-gray-200">
           <textarea
-            className="flex-1 bg-transparent border-none outline-none py-2 text-sm font-semibold resize-none max-h-32"
+            className="flex-1 bg-transparent border-none outline-none py-1 text-sm font-bold text-slate-700 resize-none max-h-32 placeholder:text-gray-400"
             placeholder={
-              isExamWeek ? "Type Exam Submission..." : "Type a message..."
+              isExamWeek
+                ? "Enter Official Exam Submission..."
+                : "Type academic inquiry..."
             }
             rows="1"
             value={mySubmission}
             onChange={(e) => setMySubmission(e.target.value)}
           />
         </div>
+
         <button
           onClick={handleSubmit}
-          className="bg-[#128c7e] text-white p-3 rounded-full hover:bg-[#075e54] transition-all shadow-md active:scale-90"
+          className="bg-[#128c7e] text-white p-3.5 rounded-full hover:bg-[#075e54] transition-all shadow-xl active:scale-90 flex items-center justify-center"
         >
-          <Send size={20} />
+          <Send size={20} fill="currentColor" />
         </button>
-      </div>
+      </footer>
 
-      {/* EXAM OVERLAY */}
-      {isExamWeek && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[90%] bg-red-600 text-white p-2 rounded-lg text-center shadow-xl flex items-center justify-center gap-2 z-50">
-          <AlertTriangle size={16} />
-          <span className="text-[10px] font-black uppercase tracking-tighter">
-            Exam Submission Window Active - 500 Character Minimum Required
-          </span>
-        </div>
-      )}
+      <style>{`
+        .custom-chat-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-chat-scrollbar::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.1); border-radius: 10px; }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-in { animation: fade-in 0.4s ease-out forwards; }
+      `}</style>
     </div>
   );
 };

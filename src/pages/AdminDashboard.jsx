@@ -2,12 +2,12 @@ import React, { useState, useEffect } from "react";
 import { db } from "../firebaseConfig";
 import {
   collection,
-  addDoc,
   getDocs,
   serverTimestamp,
   query,
   orderBy,
   doc,
+  getDoc,
   updateDoc,
   setDoc,
   onSnapshot,
@@ -73,31 +73,41 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  // 2. Load Week Data when week selection changes
+  // 2. Load Week Data when week selection changes (FIXED LOGIC)
   useEffect(() => {
     const fetchWeekSettings = async () => {
-      const docRef = doc(db, "course_settings", `week_${selectedWeek}`);
-      const docSnap = await getDocs(query(collection(db, "course_settings")));
-      // Optimized: find specific week
-      const specificWeek = docSnap.docs.find(
-        (d) => d.id === `week_${selectedWeek}`,
-      );
-      if (specificWeek) {
-        const data = specificWeek.data();
-        setWeekData({
-          ...data,
-          startDate: data.startDate?.toDate().toISOString().split("T")[0] || "",
-          endDate: data.endDate?.toDate().toISOString().split("T")[0] || "",
-        });
-      } else {
-        setWeekData({
-          startDate: "",
-          endDate: "",
-          videoId: "",
-          pdfUrl: "",
-          assignment: "",
-          title: "",
-        });
+      try {
+        const docRef = doc(db, "course_settings", `week_${selectedWeek}`);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setWeekData({
+            ...data,
+            startDate: data.startDate?.toDate
+              ? data.startDate.toDate().toISOString().split("T")[0]
+              : data.startDate || "",
+            endDate: data.endDate?.toDate
+              ? data.endDate.toDate().toISOString().split("T")[0]
+              : data.endDate || "",
+            videoId: data.videoId || "",
+            pdfUrl: data.pdfUrl || "",
+            assignment: data.assignment || "",
+            title: data.title || "",
+          });
+        } else {
+          // Reset if doc doesn't exist
+          setWeekData({
+            startDate: "",
+            endDate: "",
+            videoId: "",
+            pdfUrl: "",
+            assignment: "",
+            title: "",
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching week settings:", error);
       }
     };
     fetchWeekSettings();
@@ -469,9 +479,11 @@ const AdminDashboard = () => {
                     {item.serviceTier}
                   </span>
                   <p className="text-[10px] font-bold opacity-40">
-                    {new Date(
-                      item.createdAt?.seconds * 1000,
-                    ).toLocaleDateString()}
+                    {item.createdAt?.seconds
+                      ? new Date(
+                          item.createdAt.seconds * 1000,
+                        ).toLocaleDateString()
+                      : "Pending"}
                   </p>
                 </div>
                 <h4 className="text-xl font-black italic uppercase">

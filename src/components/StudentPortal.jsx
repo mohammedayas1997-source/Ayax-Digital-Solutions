@@ -3,105 +3,57 @@ import { db, auth } from "../firebaseConfig";
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import {
   collection,
-  getDocs,
-  query,
-  orderBy,
   doc,
   getDoc,
   updateDoc,
   serverTimestamp,
-  addDoc,
   onSnapshot,
-  where,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen,
-  GraduationCap,
   LayoutDashboard,
   MessageSquare,
   PlayCircle,
   CheckCircle,
-  Clock,
-  ChevronRight,
   Lock,
   Award,
-  Send,
-  ShieldCheck,
   LogOut,
   Moon,
   Sun,
   Menu,
   X,
-  Layers,
-  Users,
-  Search,
-  Bell,
-  Cpu,
   FileText,
   Download,
   Calendar,
+  ChevronRight,
+  ShieldCheck,
+  Search,
+  Layers,
+  Cpu,
+  Globe,
 } from "lucide-react";
 
-// ==========================================
-// 1. HELPERS & CONFIGURATION
-// ==========================================
-const getWeekVideoId = (week) => {
-  const videoDatabase = {
-    1: "dQw4w9WgXcQ",
-    2: "y6120QOlsfU",
-    12: "dQw4w9WgXcQ",
-    24: "dQw4w9WgXcQ",
-  };
-  return videoDatabase[week] || "dQw4w9WgXcQ";
-};
-
-const getWeekTitle = (week) => {
-  const titles = {
-    1: "Introduction to System Architecture",
-    2: "Environment Setup & Frameworks",
-    12: "Midterm Certification Exam",
-    24: "Final Project Defense",
-  };
-  return titles[week] || "Advanced Technical Study Phase";
-};
-
-// Helper don tsara date (DD/MM/YYYY)
-const formatDate = (timestamp) => {
-  if (!timestamp) return "TBD";
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleDateString("en-GB");
-};
-
-// ==========================================
-// 2. MAIN COMPONENT
-// ==========================================
 const StudentPortal = () => {
   const navigate = useNavigate();
 
-  // Interface States
+  // --- States ---
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Student & Progress States
   const [studentData, setStudentData] = useState(null);
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(1);
-  const [hasPassedMidterm, setHasPassedMidterm] = useState(false);
-  const totalWeeks = 24;
-
-  // Admin Data State
-  const [weeksData, setWeeksData] = useState({});
-
-  // Forum & Selection States
-  const [viewState, setViewState] = useState("list");
-  const [selectedCourse, setSelectedCourse] = useState(null);
-  const [selectedPath, setSelectedPath] = useState(null);
-  const [forumThreads, setForumThreads] = useState([]);
-  const [newPost, setNewPost] = useState({ title: "", content: "" });
+  const [courseContent, setCourseContent] = useState({});
 
   const availableCourses = [
+    {
+      id: "software_eng",
+      name: "Software Engineering",
+      icon: <Layers size={20} />,
+    },
     {
       id: "cyber_security",
       name: "Cyber Security",
@@ -112,43 +64,11 @@ const StudentPortal = () => {
       name: "Data Analytics",
       icon: <Search size={20} />,
     },
-    {
-      id: "software_eng",
-      name: "Software Engineering",
-      icon: <Layers size={20} />,
-    },
     { id: "ai_tech", name: "Artificial Intelligence", icon: <Cpu size={20} /> },
-    {
-      id: "blockchain",
-      name: "Blockchain Technology",
-      icon: <Lock size={20} />,
-    },
-    { id: "web_dev", name: "Web Development", icon: <PlayCircle size={20} /> },
-    {
-      id: "digital_marketing",
-      name: "Advanced Digital Marketing",
-      icon: <Send size={20} />,
-    },
+    { id: "web_dev", name: "Web Development", icon: <Globe size={20} /> },
   ];
 
-  // ==========================================
-  // 3. CORE LOGIC & EFFECTS
-  // ==========================================
-
-  useEffect(() => {
-    const unsubWeeks = onSnapshot(
-      collection(db, "course_settings"),
-      (snapshot) => {
-        const data = {};
-        snapshot.forEach((doc) => {
-          data[doc.id] = doc.data();
-        });
-        setWeeksData(data);
-      },
-    );
-    return () => unsubWeeks();
-  }, []);
-
+  // --- 1. Auth & Initial Data Fetch ---
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -156,588 +76,298 @@ const StudentPortal = () => {
         return;
       }
 
-      try {
-        const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
+      const userRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userRef);
 
-        if (userSnap.exists()) {
-          const data = userSnap.data();
-          setStudentData(data);
-
-          const courseStartDate = new Date("2026-01-01");
-          const now = new Date();
-          const diffTime = now - courseStartDate;
-          const weekCount =
-            Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
-          setCurrentWeek(weekCount > 24 ? 24 : weekCount < 1 ? 1 : weekCount);
-
-          await updateDoc(userRef, {
-            lastOnline: serverTimestamp(),
-            status: "Active",
-            currentActivity: "Browsing Portal",
-          });
-        } else {
-          setStudentData({ fullName: user.displayName || "Elite Student" });
+      if (userSnap.exists()) {
+        const data = userSnap.data();
+        setStudentData(data);
+        if (data.selectedCourse) {
+          setSelectedCourseId(data.selectedCourse);
         }
-
-        const examRef = doc(db, `students/${user.uid}/exams/midterm`);
-        const examSnap = await getDoc(examRef);
-        if (examSnap.exists() && examSnap.data().status === "passed") {
-          setHasPassedMidterm(true);
-        }
-      } catch (error) {
-        console.error("Portal Initialization Error:", error);
-      } finally {
-        setLoading(false);
       }
+      setLoading(false);
     });
-
     return () => unsubscribe();
   }, [navigate]);
 
-  const isWeekLocked = (weekNumber) => {
-    const weekSettings = weeksData[`week_${weekNumber}`];
-    // Idan Admin bai saka date ba, lissafin automatic zai yi aiki
-    if (!weekSettings || !weekSettings.startDate)
-      return weekNumber > currentWeek;
-
-    // Amfani da startDate daga Admin don budewa
-    const startDate = weekSettings.startDate.toDate();
-    const today = new Date();
-    const isDateReached = today >= startDate;
-    const isMidtermLocked = weekNumber > 12 && !hasPassedMidterm;
-
-    return !isDateReached || isMidtermLocked;
-  };
-
+  // --- 2. Real-time Content Fetch (Admin Controlled) ---
   useEffect(() => {
-    if (
-      activeTab === "discussions" &&
-      viewState === "forum" &&
-      selectedCourse &&
-      selectedPath
-    ) {
-      const q = query(
-        collection(db, "forum_threads"),
-        where("courseId", "==", selectedCourse.id),
-        where("studentType", "==", selectedPath),
-        orderBy("createdAt", "desc"),
-      );
-      const unsub = onSnapshot(q, (snap) => {
-        setForumThreads(
-          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-        );
+    if (selectedCourseId) {
+      // Listen to specific course content managed by Admin
+      const contentRef = collection(db, "courses", selectedCourseId, "weeks");
+      const unsubContent = onSnapshot(contentRef, (snapshot) => {
+        const weeks = {};
+        snapshot.forEach((doc) => {
+          weeks[doc.id] = doc.data(); // doc.id is 'week_1', 'week_2', etc.
+        });
+        setCourseContent(weeks);
       });
-      return () => unsub();
+      return () => unsubContent();
     }
-  }, [activeTab, viewState, selectedCourse, selectedPath]);
+  }, [selectedCourseId]);
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/login");
-  };
-
-  const markWeekAsCompleted = async (weekNumber) => {
+  // --- 3. Actions ---
+  const handleCourseSelection = async (courseId) => {
     const user = auth.currentUser;
     if (user) {
       const userRef = doc(db, "users", user.uid);
       await updateDoc(userRef, {
-        [`progress.week_${weekNumber}`]: {
-          completed: true,
-          completedAt: serverTimestamp(),
-        },
+        selectedCourse: courseId,
+        courseJoinedAt: serverTimestamp(),
       });
-      alert(`SUCCESS: Week ${weekNumber} verified.`);
+      setSelectedCourseId(courseId);
     }
   };
 
-  const handlePostQuestion = async (e) => {
-    e.preventDefault();
-    if (!newPost.title || !newPost.content) return;
-    try {
-      await addDoc(collection(db, "forum_threads"), {
-        ...newPost,
-        studentName: studentData?.fullName || "Student",
-        studentId: auth.currentUser.uid,
-        courseId: selectedCourse.id,
-        studentType: selectedPath,
-        createdAt: serverTimestamp(),
+  const markCompleted = async (weekId) => {
+    const user = auth.currentUser;
+    if (user) {
+      const userRef = doc(db, "users", user.uid);
+      await updateDoc(userRef, {
+        [`progress.${selectedCourseId}.${weekId}`]: true,
       });
-      setNewPost({ title: "", content: "" });
-    } catch (err) {
-      alert("Error: Transmission failed.");
+      alert("System: Progress Synchronized.");
     }
   };
 
-  if (loading) {
+  // --- Helper: Check if week is locked ---
+  const isLocked = (weekNum) => {
+    const weekKey = `week_${weekNum}`;
+    const data = courseContent[weekKey];
+    if (!data) return true; // If admin hasn't added it, it's locked
+    if (data.isLocked) return true; // Direct admin toggle
+    return false;
+  };
+
+  if (loading)
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center font-black text-blue-600 bg-slate-950">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-600 mb-4"></div>
-        <p className="tracking-widest animate-pulse">INITIALIZING SYSTEMS...</p>
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center text-blue-500 font-black">
+        LOADING CORE SYSTEMS...
+      </div>
+    );
+
+  // --- SCREEN A: Course Selection (If no course selected) ---
+  if (!selectedCourseId) {
+    return (
+      <div
+        className={`min-h-screen p-6 md:p-20 ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-black"}`}
+      >
+        <div className="max-w-4xl mx-auto text-center">
+          <h1 className="text-4xl md:text-6xl font-black italic mb-4">
+            SELECT YOUR PATH
+          </h1>
+          <p className="text-gray-500 mb-12 uppercase tracking-widest text-xs">
+            Choose a specialization to initialize your dashboard
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {availableCourses.map((course) => (
+              <div
+                key={course.id}
+                onClick={() => handleCourseSelection(course.id)}
+                className="p-10 border-2 border-dashed border-slate-800 rounded-[2rem] hover:border-blue-600 hover:bg-blue-600/5 transition-all cursor-pointer group text-left"
+              >
+                <div className="text-blue-500 mb-4 group-hover:scale-110 transition-transform">
+                  {course.icon}
+                </div>
+                <h3 className="text-2xl font-black uppercase italic">
+                  {course.name}
+                </h3>
+                <p className="text-[10px] text-gray-500 mt-2">
+                  Click to register and access curriculum
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
 
+  // --- SCREEN B: Main Dashboard ---
+  const currentWeekData = courseContent[`week_${currentWeek}`] || {};
+
   return (
     <div
-      className={`min-h-screen flex font-sans selection:bg-blue-600 selection:text-white ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"} transition-colors duration-300`}
+      className={`min-h-screen flex ${darkMode ? "bg-slate-950 text-white" : "bg-white text-slate-900"}`}
     >
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* SIDEBAR */}
+      {/* Sidebar */}
       <aside
-        className={`fixed lg:sticky top-0 z-50 h-screen w-72 md:w-80 border-r flex flex-col transition-transform duration-300 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        className={`w-72 border-r ${darkMode ? "bg-slate-900 border-slate-800" : "bg-gray-50 border-gray-200"} hidden lg:flex flex-col`}
       >
-        <div className="p-6 md:p-10 flex justify-between items-center">
-          <div>
-            <h1 className="text-xl md:text-2xl font-black text-blue-600 italic">
-              AYAX{" "}
-              <span className={darkMode ? "text-white" : "text-gray-900"}>
-                UNI
-              </span>
-            </h1>
-            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mt-1">
-              LMS Terminal v3.0
-            </p>
-          </div>
-          <button
-            className="lg:hidden p-2"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <X size={20} />
-          </button>
+        <div className="p-8">
+          <h2 className="text-2xl font-black italic text-blue-600">AYAX UNI</h2>
+          <span className="text-[8px] tracking-[0.3em] text-gray-500 uppercase">
+            {selectedCourseId.replace("_", " ")}
+          </span>
         </div>
 
-        <nav className="px-4 md:px-6 space-y-1 md:space-y-2 flex-1 overflow-y-auto custom-scrollbar">
-          {[
-            {
-              id: "dashboard",
-              name: "Dashboard",
-              icon: <LayoutDashboard size={18} />,
-            },
-            { id: "courses", name: "Curriculum", icon: <BookOpen size={18} /> },
-            {
-              id: "discussions",
-              name: "Community Forum",
-              icon: <MessageSquare size={18} />,
-            },
-            {
-              id: "grades",
-              name: "Performance",
-              icon: <GraduationCap size={18} />,
-            },
-          ].map((item) => (
+        <nav className="flex-1 px-4 space-y-2 overflow-y-auto">
+          {["dashboard", "curriculum", "community"].map((t) => (
             <button
-              key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                setViewState("list");
-                setMobileMenuOpen(false);
-              }}
-              className={`w-full flex items-center gap-3 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-lg" : "text-gray-400 hover:bg-blue-50/10"}`}
+              key={t}
+              onClick={() => setActiveTab(t)}
+              className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest ${activeTab === t ? "bg-blue-600 text-white" : "text-gray-400 hover:bg-white/5"}`}
             >
-              {item.icon} {item.name}
+              {t === "dashboard" && <LayoutDashboard size={18} />}
+              {t === "curriculum" && <BookOpen size={18} />}
+              {t === "community" && <MessageSquare size={18} />}
+              {t}
             </button>
           ))}
 
-          <div className="mt-8 mb-2 px-4 text-[8px] font-black text-gray-400 uppercase tracking-[0.3em]">
-            24-Week Roadmap
+          <div className="pt-8 pb-2 px-6 text-[8px] font-black text-gray-500 uppercase tracking-widest">
+            Syllabus Progress
           </div>
-          <div className="space-y-1 pb-10">
-            {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => {
-              const isLocked = isWeekLocked(week);
-              const weekSet = weeksData[`week_${week}`];
-              return (
-                <div
-                  key={week}
-                  onClick={() => !isLocked && setCurrentWeek(week)}
-                  className={`flex flex-col px-4 py-2 md:py-3 rounded-xl transition-all ${isLocked ? "opacity-30 grayscale cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer group"}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-5 h-5 md:w-6 md:h-6 rounded-lg flex items-center justify-center text-[8px] md:text-[9px] font-black ${isLocked ? "bg-gray-200 text-gray-400" : "bg-blue-100 text-blue-600"}`}
-                      >
-                        {week}
-                      </div>
-                      <span className="text-[9px] md:text-[10px] font-black uppercase">
-                        Week {week}
-                      </span>
-                    </div>
-                    {isLocked ? (
-                      <Lock size={10} />
-                    ) : (
-                      <ChevronRight
-                        size={10}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      />
-                    )}
-                  </div>
-                  {/* ADMIN DATE DISPLAY ON ICON */}
-                  {!isLocked && weekSet?.startDate && (
-                    <div className="mt-1 ml-8 flex items-center gap-1 text-[7px] font-black text-blue-500/60 uppercase">
-                      <Calendar size={8} /> {formatDate(weekSet.startDate)} -{" "}
-                      {formatDate(weekSet.endDate)}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+          {[1, 2, 3, 4, 5, 6, 7, 8].map((w) => (
+            <button
+              key={w}
+              disabled={isLocked(w)}
+              onClick={() => {
+                setCurrentWeek(w);
+                setActiveTab("curriculum");
+              }}
+              className={`w-full flex items-center justify-between px-6 py-3 rounded-xl transition-all ${currentWeek === w ? "bg-blue-600/20 text-blue-500" : "text-gray-500"} ${isLocked(w) ? "opacity-20 cursor-not-allowed" : "hover:bg-white/5"}`}
+            >
+              <span className="text-[10px] font-black uppercase">Week {w}</span>
+              {isLocked(w) ? <Lock size={12} /> : <ChevronRight size={12} />}
+            </button>
+          ))}
         </nav>
 
-        <div className="p-4 md:p-6 border-t dark:border-slate-800 space-y-2">
+        <div className="p-6 border-t border-slate-800">
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest ${darkMode ? "bg-slate-800 text-yellow-400" : "bg-gray-100 text-slate-600"}`}
+            className="w-full py-3 text-[10px] font-black uppercase bg-slate-800 rounded-xl mb-2"
           >
-            {darkMode ? <Sun size={16} /> : <Moon size={16} />}{" "}
-            {darkMode ? "Light" : "Dark"}
+            {darkMode ? "Light Mode" : "Dark Mode"}
           </button>
           <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all"
+            onClick={() => signOut(auth)}
+            className="w-full py-3 text-[10px] font-black uppercase bg-red-600/10 text-red-500 rounded-xl"
           >
-            <LogOut size={16} /> Log Out
+            Logout
           </button>
         </div>
       </aside>
 
-      {/* MAIN PANEL */}
-      <main className="flex-1 p-4 md:p-10 lg:p-14 overflow-y-auto">
-        <header className="lg:hidden flex justify-between items-center mb-6">
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="p-2.5 bg-blue-600 text-white rounded-lg shadow-lg"
-          >
-            <Menu size={20} />
-          </button>
-          <h2 className="text-xs font-black italic tracking-tighter">
-            AYAX PORTAL
-          </h2>
-          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-black">
-            {studentData?.fullName?.charAt(0) || "U"}
-          </div>
-        </header>
-
-        {/* DASHBOARD TAB */}
+      {/* Main Content */}
+      <main className="flex-1 overflow-y-auto p-6 md:p-12">
         {activeTab === "dashboard" && (
-          <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700">
-            <div className="bg-blue-600 p-8 md:p-16 rounded-[2.5rem] md:rounded-[4rem] text-white shadow-2xl relative overflow-hidden group">
-              <Award className="absolute -right-10 -bottom-10 w-40 h-40 md:w-64 md:h-64 opacity-10 -rotate-12 group-hover:rotate-0 transition-transform duration-1000" />
-              <div className="relative z-10">
-                <h2 className="text-2xl md:text-6xl font-black italic tracking-tighter mb-2 md:mb-4 uppercase">
-                  Academic Status
-                </h2>
-                <p className="text-[10px] md:text-lg font-bold opacity-80 max-w-xl leading-relaxed">
-                  Welcome, {studentData?.fullName || "Elite Student"}. Active at
-                  Week {currentWeek}.
-                </p>
-              </div>
+          <div className="animate-in fade-in duration-500">
+            <div className="bg-blue-600 p-12 rounded-[3rem] mb-10 relative overflow-hidden">
+              <Award className="absolute right-0 bottom-0 size-48 opacity-10 rotate-12" />
+              <h1 className="text-4xl md:text-6xl font-black italic uppercase tracking-tighter">
+                Welcome Back
+              </h1>
+              <p className="font-bold opacity-80 uppercase text-sm tracking-widest">
+                {studentData?.fullName} | {selectedCourseId.toUpperCase()}
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-8">
-              {[
-                {
-                  label: "Completion",
-                  val: `${Math.round((currentWeek / 24) * 100)}%`,
-                  color: "text-blue-600",
-                },
-                {
-                  label: "Current Week",
-                  val: `W-${currentWeek}`,
-                  color: "text-emerald-500",
-                },
-                {
-                  label: "Midterm",
-                  val: hasPassedMidterm ? "PASS" : "PEND",
-                  color: hasPassedMidterm ? "text-blue-500" : "text-orange-500",
-                },
-              ].map((stat, idx) => (
-                <div
-                  key={idx}
-                  className={`p-5 md:p-10 rounded-[2rem] md:rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"}`}
-                >
-                  <p className="text-[7px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
-                    {stat.label}
-                  </p>
-                  <h4
-                    className={`text-xl md:text-4xl font-black italic ${stat.color}`}
-                  >
-                    {stat.val}
-                  </h4>
-                </div>
-              ))}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-8 bg-slate-900 rounded-[2rem] border border-slate-800">
+                <p className="text-gray-500 text-[10px] font-black uppercase mb-2">
+                  Active Week
+                </p>
+                <h3 className="text-4xl font-black italic">W-{currentWeek}</h3>
+              </div>
+              <div className="p-8 bg-slate-900 rounded-[2rem] border border-slate-800">
+                <p className="text-gray-500 text-[10px] font-black uppercase mb-2">
+                  Completion
+                </p>
+                <h3 className="text-4xl font-black italic text-blue-500">
+                  12%
+                </h3>
+              </div>
+              <div className="p-8 bg-slate-900 rounded-[2rem] border border-slate-800">
+                <p className="text-gray-500 text-[10px] font-black uppercase mb-2">
+                  Community Rank
+                </p>
+                <h3 className="text-4xl font-black italic text-emerald-500">
+                  Elite
+                </h3>
+              </div>
             </div>
           </div>
         )}
 
-        {/* CURRICULUM TAB */}
-        {activeTab === "courses" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
-            <div className="lg:col-span-2 space-y-6 md:space-y-8">
-              {/* VIDEO PLAYER */}
-              <div className="bg-black aspect-video rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border-2 md:border-4 border-white/5">
+        {activeTab === "curriculum" && (
+          <div className="max-w-5xl animate-in slide-in-from-bottom-4 duration-500">
+            <div className="mb-8">
+              <h2 className="text-3xl font-black italic uppercase tracking-tight">
+                Week {currentWeek}:{" "}
+                {currentWeekData.title || "Module Loading..."}
+              </h2>
+              <p className="text-gray-500 text-xs uppercase font-bold mt-1">
+                Admin Controlled Content
+              </p>
+            </div>
+
+            {/* Video Player */}
+            <div className="aspect-video bg-black rounded-[2.5rem] overflow-hidden border-4 border-slate-900 shadow-2xl mb-10">
+              {currentWeekData.videoUrl ? (
                 <iframe
                   width="100%"
                   height="100%"
-                  src={`https://www.youtube.com/embed/${weeksData[`week_${currentWeek}`]?.videoId || getWeekVideoId(currentWeek)}`}
+                  src={currentWeekData.videoUrl.replace("watch?v=", "embed/")}
                   frameBorder="0"
                   allowFullScreen
-                ></iframe>
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-slate-800">
+                  <PlayCircle size={64} className="mb-4 opacity-10" />
+                  <p className="font-black text-[10px] uppercase tracking-widest">
+                    No Video Uploaded for this Week
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* PDF Section */}
+              <div className="p-8 bg-blue-600 rounded-[2rem] text-white">
+                <FileText className="mb-4" />
+                <h4 className="text-xl font-black uppercase italic mb-2">
+                  Resources
+                </h4>
+                {currentWeekData.pdfUrl ? (
+                  <a
+                    href={currentWeekData.pdfUrl}
+                    target="_blank"
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white text-blue-600 rounded-xl font-black text-[10px] uppercase"
+                  >
+                    <Download size={14} /> Download PDF Material
+                  </a>
+                ) : (
+                  <p className="text-[10px] font-black opacity-50 uppercase">
+                    No PDF materials linked yet.
+                  </p>
+                )}
               </div>
 
-              {/* LECTURE NOTES & DETAILS SECTION */}
-              <div
-                className={`p-6 md:p-10 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}
-              >
-                <h3 className="text-xl md:text-3xl font-black uppercase italic mb-4 tracking-tighter">
-                  Week {currentWeek}: {getWeekTitle(currentWeek)}
-                </h3>
-
-                {/* NEW: PDF NOTE SECTION */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  <div className="p-5 bg-blue-600 rounded-3xl text-white">
-                    <div className="flex items-center gap-3 mb-3">
-                      <FileText size={20} />
-                      <h5 className="text-[10px] font-black uppercase tracking-widest">
-                        Lecture Notes (PDF)
-                      </h5>
-                    </div>
-                    {weeksData[`week_${currentWeek}`]?.pdfUrl ? (
-                      <a
-                        href={weeksData[`week_${currentWeek}`].pdfUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-center gap-2 w-full py-3 bg-white text-blue-600 rounded-xl font-black text-[9px] uppercase hover:scale-105 transition-transform"
-                      >
-                        <Download size={14} /> Download PDF
-                      </a>
-                    ) : (
-                      <div className="py-3 bg-white/10 rounded-xl text-center text-[9px] font-black uppercase opacity-50">
-                        No PDF Uploaded Yet
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-3xl">
-                    <h5 className="text-[8px] font-black text-blue-600 uppercase mb-2 tracking-[0.2em]">
-                      Assignment
-                    </h5>
-                    <p className="text-[11px] md:text-sm font-bold opacity-80 leading-relaxed">
-                      {weeksData[`week_${currentWeek}`]?.assignment ||
-                        "Complete current module tasks."}
-                    </p>
-                  </div>
-                </div>
-
+              {/* Assignment Section */}
+              <div className="p-8 bg-slate-900 rounded-[2rem] border border-slate-800">
+                <Calendar className="text-blue-500 mb-4" />
+                <h4 className="text-xl font-black uppercase italic mb-2">
+                  Assignment
+                </h4>
+                <p className="text-gray-400 text-sm leading-relaxed mb-6">
+                  {currentWeekData.assignment ||
+                    "Check back soon for this week's task."}
+                </p>
                 <button
-                  onClick={() => markWeekAsCompleted(currentWeek)}
-                  className="w-full md:w-auto px-8 py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-3"
+                  onClick={() => markCompleted(`week_${currentWeek}`)}
+                  className="flex items-center gap-2 text-emerald-500 font-black text-[10px] uppercase"
                 >
-                  <CheckCircle size={16} /> Mark Completed
+                  <CheckCircle size={14} /> Mark as Finished
                 </button>
               </div>
             </div>
-
-            <div className="space-y-3">
-              <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2">
-                Up Next
-              </h3>
-              {[currentWeek, currentWeek + 1, currentWeek + 2].map(
-                (w) =>
-                  w <= 24 && (
-                    <div
-                      key={w}
-                      className={`p-4 rounded-2xl border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} flex items-center gap-4`}
-                    >
-                      <div className="w-8 h-8 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-lg flex items-center justify-center font-black text-[10px]">
-                        {w}
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black uppercase truncate">
-                          {getWeekTitle(w)}
-                        </p>
-                        <p className="text-[7px] font-bold text-gray-400">
-                          {weeksData[`week_${w}`]?.startDate
-                            ? formatDate(weeksData[`week_${w}`].startDate)
-                            : "Session Pending"}
-                        </p>
-                      </div>
-                    </div>
-                  ),
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* FORUM TAB */}
-        {activeTab === "discussions" && (
-          <div className="animate-in fade-in duration-700">
-            {viewState === "list" && (
-              <div className="space-y-8">
-                <div className="text-center max-w-2xl mx-auto">
-                  <h2 className="text-2xl md:text-5xl font-black italic uppercase tracking-tighter mb-2">
-                    Repositories
-                  </h2>
-                  <p className="text-gray-400 font-bold uppercase text-[8px] tracking-widest">
-                    Select module to enter forum.
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-                  {availableCourses.map((course) => (
-                    <div
-                      key={course.id}
-                      onClick={() => {
-                        setSelectedCourse(course);
-                        setViewState("selection");
-                      }}
-                      className={`p-6 md:p-10 rounded-[2.5rem] border cursor-pointer group transition-all ${darkMode ? "bg-slate-900 border-slate-800 hover:border-blue-600" : "bg-white border-gray-100 hover:border-blue-600 shadow-sm"}`}
-                    >
-                      <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/40 text-blue-600 rounded-xl flex items-center justify-center mb-4">
-                        {course.icon}
-                      </div>
-                      <h4 className="text-lg md:text-2xl font-black uppercase italic tracking-tighter mb-1">
-                        {course.name}
-                      </h4>
-                      <div className="flex items-center gap-2 text-[8px] font-black text-blue-500 uppercase">
-                        Enter Repo <ChevronRight size={12} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {viewState === "selection" && (
-              <div className="max-w-4xl mx-auto py-10 md:py-20 text-center">
-                <h3 className="text-2xl md:text-4xl font-black uppercase italic mb-8">
-                  Registry Level
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10">
-                  <div
-                    onClick={() => {
-                      setSelectedPath("Path 1");
-                      setViewState("forum");
-                    }}
-                    className="p-8 md:p-12 bg-blue-600 text-white rounded-[2.5rem] md:rounded-[4rem] cursor-pointer shadow-xl"
-                  >
-                    <Users size={32} className="mx-auto mb-4" />
-                    <h4 className="text-xl md:text-3xl font-black italic uppercase">
-                      Path 1
-                    </h4>
-                    <p className="text-[8px] font-black uppercase opacity-70 mt-1">
-                      New Students
-                    </p>
-                  </div>
-                  <div
-                    onClick={() => {
-                      setSelectedPath("Path 2");
-                      setViewState("forum");
-                    }}
-                    className={`p-8 md:p-12 rounded-[2.5rem] md:rounded-[4rem] border-2 border-dashed cursor-pointer ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-gray-200"}`}
-                  >
-                    <ShieldCheck
-                      size={32}
-                      className="mx-auto mb-4 text-blue-600"
-                    />
-                    <h4 className="text-xl md:text-3xl font-black italic uppercase">
-                      Path 2
-                    </h4>
-                    <p className="text-[8px] font-black uppercase text-gray-400 mt-1">
-                      Returning
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {viewState === "forum" && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-12">
-                <div className="lg:col-span-1">
-                  <div
-                    className={`p-6 md:p-10 rounded-[2.5rem] border sticky top-4 ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-gray-100 shadow-xl"}`}
-                  >
-                    <h4 className="font-black uppercase text-[10px] text-blue-500 mb-6">
-                      New Inquiry
-                    </h4>
-                    <form onSubmit={handlePostQuestion} className="space-y-3">
-                      <input
-                        className="s-input dark:bg-slate-800"
-                        placeholder="SUBJECT"
-                        value={newPost.title}
-                        onChange={(e) =>
-                          setNewPost({ ...newPost, title: e.target.value })
-                        }
-                      />
-                      <textarea
-                        className="s-input dark:bg-slate-800 h-32 md:h-40 pt-4"
-                        placeholder="DETAILS..."
-                        value={newPost.content}
-                        onChange={(e) =>
-                          setNewPost({ ...newPost, content: e.target.value })
-                        }
-                      />
-                      <button className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] shadow-lg flex items-center justify-center gap-2">
-                        <Send size={14} /> Dispatch
-                      </button>
-                    </form>
-                  </div>
-                </div>
-                <div className="lg:col-span-2 space-y-4 md:space-y-8">
-                  {forumThreads.map((thread) => (
-                    <div
-                      key={thread.id}
-                      className={`p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-50 shadow-sm"}`}
-                    >
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-xs">
-                          {thread.studentName?.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-black uppercase">
-                            {thread.studentName}
-                          </p>
-                          <p className="text-[8px] font-bold text-gray-400">
-                            {new Date(
-                              thread.createdAt?.seconds * 1000,
-                            ).toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
-                      <h4 className="text-lg md:text-2xl font-black italic uppercase mb-3">
-                        {thread.title}
-                      </h4>
-                      <p className="text-[11px] md:text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6 line-clamp-3">
-                        {thread.content}
-                      </p>
-                      <button
-                        onClick={() => navigate(`/forum/thread/${thread.id}`)}
-                        className="text-[9px] font-black uppercase text-blue-600 flex items-center gap-2"
-                      >
-                        View Discussion <ChevronRight size={12} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         )}
       </main>
-
-      <style>{`
-        .s-input { width: 100%; padding: 1rem 1.25rem; background: #f8fafc; border: 2px solid transparent; border-radius: 1.25rem; font-weight: 800; font-size: 0.75rem; outline: none; transition: 0.3s; }
-        .s-input:focus { border-color: #2563eb; background: white; }
-        .dark .s-input { background: #1e293b; color: white; }
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #2563eb33; border-radius: 10px; }
-      `}</style>
     </div>
   );
 };
