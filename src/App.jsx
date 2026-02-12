@@ -28,6 +28,7 @@ import AdminGrading from "./pages/AdminGrading";
 import AcademicExam from "./components/AcademicExam";
 import AdminQuestionBank from "./pages/AdminQuestionBank";
 import SuperAdmin from "./pages/SuperAdmin";
+import AdminContentManager from "./components/AdminContentManager";
 
 // --- NEW TERMINALS & PAGES ---
 import StudentLogin from "./pages/StudentLogin";
@@ -69,6 +70,10 @@ function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/launch-project" element={<ProjectForm />} />
+          <Route
+            path="/admin-secret-portal"
+            element={<AdminContentManager />}
+          />
           <Route path="/enroll" element={<CourseEnrollment />} />
           <Route
             path="/verify/:certificateId"
