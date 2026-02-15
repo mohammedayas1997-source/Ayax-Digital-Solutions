@@ -39,7 +39,9 @@ import AdminCourseList from "./pages/AdminCourseList";
 import AdminCourseDashboard from "./pages/AdminCourseDashboard";
 import AdminStudentsList from "./pages/AdminStudentsList";
 import ForumDetails from "./components/ForumDetails";
-import SupervisorDashboard from "./pages/TeacherDashboard"; // <--- CHANGED TO SUPERVISOR
+
+// GYARAN YANA NAN: Mun sauya sunan fayil zuwa SupervisorDashboard
+import SupervisorDashboard from "./pages/SupervisorDashboard";
 
 // --- ADDED COURSE & PRICING COMPONENTS ---
 import CourseSection from "./components/CourseSection";
@@ -94,18 +96,15 @@ function App() {
 
           {/* --- SUPERVISOR SECURE INFRASTRUCTURE --- */}
           <Route
-            path="/supervisor-dashboard" // <--- CHANGED PATH
+            path="/supervisor-dashboard"
             element={
               <ProtectedRoute requiredRole="supervisor">
-                {" "}
-                {/* <--- CHANGED ROLE */}
                 <SupervisorDashboard />
               </ProtectedRoute>
             }
           />
 
           {/* --- SUPER ADMIN SECURE INFRASTRUCTURE --- */}
-          {/* Super Admin can access the command center and all admin tools */}
           <Route
             path="/super-admin"
             element={
