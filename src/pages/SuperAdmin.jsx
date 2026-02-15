@@ -218,6 +218,38 @@ const SuperAdmin = () => {
     }
   };
 
+  const issueManualCertificate = async (studentUid) => {
+    setLoading(true);
+    try {
+      const userRef = doc(db, "users", studentUid);
+      const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists()) {
+        // Samar da sabon Serial Number na gaske
+        const timestamp = Date.now().toString().slice(-6);
+        const randomString = Math.random()
+          .toString(36)
+          .substr(2, 4)
+          .toUpperCase();
+        const manualSerial = `AYX-MAN-2026-${timestamp}-${randomString}`;
+
+        // Shigar da shi cikin profile din dalibin
+        await updateDoc(userRef, {
+          certificateId: manualSerial,
+          manualIssuance: true,
+          issuedAt: new Date().toISOString(),
+        });
+
+        alert(`SUCCESS: Certificate Issued Manually with ID: ${manualSerial}`);
+      }
+    } catch (error) {
+      console.error("Manual Issuance Error:", error);
+      alert("CRITICAL ERROR: Failed to issue certificate.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // SUPER ADMIN COMMAND: Save Academic Calendar
   const handleUpdateSchedule = async () => {
     setLoading(true);
@@ -1168,6 +1200,62 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
+
+        <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="p-4 bg-amber-100 text-amber-600 rounded-2xl">
+              <Award size={24} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black uppercase italic tracking-tighter">
+                Manual Certification
+              </h3>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                Authority Override Terminal
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {allStudents.map((student) => (
+              <div
+                key={student.uid}
+                className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-blue-200 transition-all"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-xs uppercase">
+                    {student.fullName?.charAt(0)}
+                  </div>
+                  <div>
+                    <h4 className="font-black text-slate-900 text-sm uppercase italic">
+                      {student.fullName}
+                    </h4>
+                    <p className="text-[8px] font-bold text-slate-400 uppercase">
+                      {student.email}
+                    </p>
+                  </div>
+                </div>
+
+                {student.certificateId ? (
+                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                    <CheckCircle size={14} />
+                    <span className="text-[9px] font-black uppercase italic">
+                      Issued
+                    </span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => issueManualCertificate(student.uid)}
+                    disabled={loading}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg active:scale-95"
+                  >
+                    Issue Manually
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* ACCESS CONTROL */}
         {activeTab === "users" && (

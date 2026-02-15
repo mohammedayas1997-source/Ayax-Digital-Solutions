@@ -4,53 +4,70 @@ import html2canvas from "html2canvas";
 import { QRCodeSVG } from "qrcode.react";
 import { Award, ShieldCheck, Download } from "lucide-react";
 import { auth, db } from "../firebaseConfig";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, updateDoc } from "firebase/firestore";
 
 /**
- * AVAILABLE COURSES FOR CERTIFICATION:
- * - Cyber security
- * - Data Analytics
- * - Software Engineering
- * - Artificial Intelligence
- * - Blockchain Technology
- * - Web development
- * - advanced Digital Marketing
+ * PRODUCTION-READY CERTIFICATE SYSTEM
+ * Features:
+ * - Real-life QR Verification Path
+ * - Dynamic Serial Number Assignment
+ * - High-Resolution PDF Rendering
  */
 
 const Certificate = ({
-  courseName = "Web development", // Default can be changed based on student's course
-  dateCompleted = "February 3, 2026",
-  certificateId = "AYX-99281-Z",
+  courseName = "Web development",
+  dateCompleted = "February 15, 2026",
   logoUrl = "/logo.png",
+  signatureUrl = "/signature.png",
 }) => {
   const certificateRef = useRef();
-  const [studentName, setStudentName] = useState("Loading...");
+  const [studentName, setStudentName] = useState("LOADING...");
+  const [serialNumber, setSerialNumber] = useState("PENDING");
 
   useEffect(() => {
-    const fetchStudentData = async () => {
+    const initializeCertificate = async () => {
       const user = auth.currentUser;
       if (user) {
         try {
-          const userDoc = await getDoc(doc(db, "users", user.uid));
+          const userRef = doc(db, "users", user.uid);
+          const userDoc = await getDoc(userRef);
+
           if (userDoc.exists()) {
+            const userData = userDoc.data();
             setStudentName(
-              userDoc.data().fullName?.toUpperCase() || "STUDENT NAME",
+              userData.fullName?.toUpperCase() || "VERIFIED STUDENT",
             );
-          } else {
-            setStudentName(user.displayName?.toUpperCase() || "STUDENT NAME");
+
+            // REAL-LIFE SERIAL GENERATOR: Checks Firestore for existing ID or creates one
+            if (userData.certificateId) {
+              setSerialNumber(userData.certificateId);
+            } else {
+              const timestamp = Date.now().toString().slice(-6);
+              const randomString = Math.random()
+                .toString(36)
+                .substr(2, 4)
+                .toUpperCase();
+              const newSerial = `AYX-2026-${timestamp}-${randomString}`;
+
+              setSerialNumber(newSerial);
+
+              // Persist the Serial ID to Firestore for real-life verification persistence
+              await updateDoc(userRef, { certificateId: newSerial });
+            }
           }
         } catch (error) {
-          console.error("Error fetching student data:", error);
+          console.error("CERTIFICATE_INIT_ERROR:", error);
           setStudentName("VERIFIED STUDENT");
         }
       }
     };
-    fetchStudentData();
+    initializeCertificate();
   }, []);
 
   const downloadCertificate = async () => {
     const input = certificateRef.current;
 
+    // High scale (3) for professional print quality
     const canvas = await html2canvas(input, {
       scale: 3,
       useCORS: true,
@@ -69,19 +86,20 @@ const Certificate = ({
     const pdfHeight = pdf.internal.pageSize.getHeight();
 
     pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-    pdf.save(`${studentName}_AYAX_Certificate.pdf`);
+    pdf.save(`${studentName}_AYAX_OFFICIAL_CERTIFICATE.pdf`);
   };
 
-  const verificationURL = `https://ayax-university.com/verify/${certificateId}`;
+  // REAL-LIFE QR DESTINATION
+  const verificationURL = `https://ayax-university.com/verify/${serialNumber}`;
 
   return (
-    <div className="flex flex-col items-center p-10 bg-slate-50 min-h-screen font-sans">
-      {/* Certificate Design Container */}
+    <div className="flex flex-col items-center p-10 bg-slate-100 min-h-screen font-sans">
+      {/* CERTIFICATE TEMPLATE */}
       <div
         ref={certificateRef}
-        className="relative w-[842px] h-[595px] bg-white border-[16px] border-double border-[#1e3a8a] p-12 flex flex-col items-center justify-between shadow-[0_35px_60px_-15px_rgba(0,0,0,0.3)] overflow-hidden"
+        className="relative w-[842px] h-[595px] bg-white border-[16px] border-double border-[#1e3a8a] p-12 flex flex-col items-center justify-between shadow-2xl overflow-hidden"
       >
-        {/* Real-Life Logo Integration */}
+        {/* ACADEMY BRANDING */}
         <div className="text-center z-10 w-full">
           <div className="flex justify-center mb-4">
             <img
@@ -94,13 +112,13 @@ const Certificate = ({
           <h1 className="text-4xl font-black text-[#1e3a8a] tracking-[0.2em] uppercase italic">
             Ayax Academy
           </h1>
-          <div className="h-1 w-24 bg-amber-500 mx-auto mt-2"></div>
-          <p className="text-[10px] font-bold text-slate-400 mt-3 uppercase tracking-[0.4em]">
+          <div className="h-1.5 w-32 bg-amber-500 mx-auto mt-2"></div>
+          <p className="text-[10px] font-bold text-slate-400 mt-3 uppercase tracking-[0.5em]">
             Official Academic Excellence Credentials
           </p>
         </div>
 
-        {/* Recipient Section */}
+        {/* RECIPIENT DATA */}
         <div className="text-center z-10">
           <p className="text-lg font-serif italic text-slate-500">
             This international certification is proudly presented to
@@ -116,53 +134,74 @@ const Certificate = ({
           </p>
         </div>
 
-        {/* Authentication & Signatures */}
+        {/* SIGNATORIES & VALIDATION */}
         <div className="w-full flex justify-between items-end z-10">
-          <div className="text-center w-48">
-            <p className="font-serif border-t-2 border-slate-200 pt-2 font-bold text-slate-800 italic">
+          {/* DIRECTOR SIDE */}
+          <div className="text-center w-56 relative">
+            <div className="absolute top-[-55px] left-1/2 -translate-x-1/2 w-full flex justify-center pointer-events-none">
+              <img
+                src={signatureUrl}
+                alt="Director Signature"
+                className="h-20 w-auto object-contain mix-blend-multiply"
+                crossOrigin="anonymous"
+              />
+            </div>
+            <p className="font-serif border-t-2 border-slate-300 pt-2 font-bold text-slate-800 italic">
               Abdulrahman Mohammed Ayas
             </p>
             <p className="text-[9px] uppercase font-black text-slate-400 tracking-widest mt-1">
-              Director{" "}
+              Academy Director
             </p>
           </div>
 
-          {/* Secure QR Code */}
-          <div className="flex flex-col items-center gap-2 mb-[-10px]">
-            <div className="p-1.5 border-2 border-[#1e3a8a] rounded-xl bg-white shadow-sm">
-              <QRCodeSVG value={verificationURL} size={65} level="H" />
+          {/* REAL-LIFE VERIFICATION QR */}
+          <div className="flex flex-col items-center gap-1 mb-[-15px]">
+            <div className="p-1.5 border-2 border-[#1e3a8a] rounded-xl bg-white shadow-md">
+              <QRCodeSVG
+                value={verificationURL}
+                size={75}
+                level="H"
+                includeMargin={true}
+              />
             </div>
-            <p className="text-[8px] font-black text-slate-400 uppercase tracking-tighter">
-              Verified Credential
-            </p>
+            <div className="text-center mt-1">
+              <p className="text-[7px] font-black text-slate-500 uppercase">
+                Credential ID
+              </p>
+              <p className="text-[8px] font-black text-[#1e3a8a]">
+                {serialNumber}
+              </p>
+            </div>
           </div>
 
-          <div className="text-center w-48">
-            <p className="font-serif border-t-2 border-slate-200 pt-2 font-bold text-slate-800 italic">
+          {/* DATE SIDE */}
+          <div className="text-center w-56">
+            <p className="font-serif border-t-2 border-slate-300 pt-2 font-bold text-slate-800 italic">
               {dateCompleted}
             </p>
             <p className="text-[9px] uppercase font-black text-slate-400 tracking-widest mt-1">
-              Date of Achievement
+              Date of Issuance
             </p>
           </div>
         </div>
 
-        {/* Security Watermark */}
+        {/* SECURITY ASSETS */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-[0.04] pointer-events-none rotate-12">
-          <Award size={450} strokeWidth={1} />
+          <Award size={480} strokeWidth={0.5} />
         </div>
-
-        {/* Gold Corner Seal */}
-        <div className="absolute top-[-40px] left-[-40px] w-24 h-24 bg-amber-500 rotate-45"></div>
+        <div className="absolute top-[-50px] left-[-50px] w-32 h-32 bg-amber-500 rotate-45 shadow-inner"></div>
+        <div className="absolute bottom-10 right-10 opacity-10">
+          <ShieldCheck size={100} color="#1e3a8a" />
+        </div>
       </div>
 
-      {/* Action UI */}
-      <div className="mt-12 flex gap-4">
+      {/* ACTION PANEL */}
+      <div className="mt-12">
         <button
           onClick={downloadCertificate}
-          className="px-12 py-5 bg-[#1e3a8a] text-white rounded-[2rem] font-black flex items-center gap-3 hover:bg-slate-900 transition-all shadow-2xl hover:scale-105 active:scale-95"
+          className="px-16 py-5 bg-[#1e3a8a] text-white rounded-full font-black text-xs uppercase tracking-widest flex items-center gap-4 hover:bg-slate-900 transition-all shadow-xl hover:scale-105 active:scale-95"
         >
-          <Download size={20} /> Generate Official PDF
+          <Download size={20} /> Export Official Credential (PDF)
         </button>
       </div>
     </div>

@@ -5,7 +5,10 @@
 
 body {
   margin: 0;
-  font-family: 'Inter', sans-serif;
+  font-family: "Inter", sans-serif;
   -webkit-font-smoothing: antialiased;
   background-color: #f9fafb;
+}
+html {
+  scroll-behavior: smooth;
 }

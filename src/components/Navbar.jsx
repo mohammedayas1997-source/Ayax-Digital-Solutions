@@ -111,7 +111,13 @@ const Navbar = () => {
               </a>
             ),
           )}
-
+          // Cikin Navbar.jsx
+          <a
+            href="#verify-section"
+            className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-all"
+          >
+            Verify Certificate
+          </a>
           <div
             className={`flex items-center gap-3 ml-4 border-l pl-6 ${scrolled ? "border-blue-200" : "border-white/20"}`}
           >
@@ -138,7 +144,6 @@ const Navbar = () => {
               Admin <ExternalLink className="w-3 h-3" />
             </Link>
           </div>
-
           <div className="flex items-center gap-4 ml-4">
             {currentCourseId && (
               <ChatNotificationIcon courseId={currentCourseId} />
