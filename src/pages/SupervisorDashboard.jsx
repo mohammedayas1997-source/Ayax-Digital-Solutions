@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { db } from "../firebaseConfig";
+import { db, auth } from "../firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   onSnapshot,
@@ -10,6 +11,7 @@ import {
   deleteDoc,
   doc,
   orderBy,
+  getDoc,
 } from "firebase/firestore";
 import {
   BookOpen,
@@ -30,7 +32,8 @@ import {
   Loader2,
 } from "lucide-react";
 
-const TeacherDashboard = ({ teacherName = "Instructor" }) => {
+// SUNAN COMPONENT YA KOMA SUPERVISOR DASHBOARD
+const SupervisorDashboard = () => {
   const [activeTab, setActiveTab] = useState("classroom");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [lessons, setLessons] = useState([]);
@@ -39,6 +42,8 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
   const [activeThread, setActiveThread] = useState(null);
   const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(false);
+  const [supervisorName, setSupervisorName] = useState("Supervisor");
+  const [authLoading, setAuthLoading] = useState(true);
 
   const availableCourses = [
     "Cyber security",
@@ -57,38 +62,62 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
     description: "",
   });
 
+  // 1. AUTH WATCHER - DON HANA BLANK SCREEN
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Dauko sunan supervisor daga Firestore
+        const userDoc = await getDoc(doc(db, "users", user.uid));
+        if (userDoc.exists()) {
+          setSupervisorName(userDoc.data().fullName || "Supervisor");
+        }
+        setAuthLoading(false);
+      } else {
+        // Idan ba a yi login ba, za a iya tura shi login page a nan
+        setAuthLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. DATA SYNC LOGIC
   useEffect(() => {
     if (!selectedCourse) return;
 
-    // 1. Sync Filtered Lessons
-    const qLessons = query(
-      collection(db, "lessons"),
-      where("category", "==", selectedCourse),
-      orderBy("createdAt", "desc"),
+    const unsubLessons = onSnapshot(
+      query(
+        collection(db, "lessons"),
+        where("category", "==", selectedCourse),
+        orderBy("createdAt", "desc"),
+      ),
+      (snap) => {
+        setLessons(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
     );
-    const unsubLessons = onSnapshot(qLessons, (snap) => {
-      setLessons(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
 
-    // 2. Sync Filtered Students
-    const qStudents = query(
-      collection(db, "course_applications"),
-      where("status", "==", "Admitted"),
-      where("course", "==", selectedCourse),
+    const unsubStudents = onSnapshot(
+      query(
+        collection(db, "course_applications"),
+        where("status", "==", "Admitted"),
+        where("course", "==", selectedCourse),
+      ),
+      (snap) => {
+        setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
     );
-    const unsubStudents = onSnapshot(qStudents, (snap) => {
-      setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
 
-    // 3. Sync Course Forum
-    const qForum = query(
-      collection(db, "forum_threads"),
-      where("course", "==", selectedCourse),
-      orderBy("createdAt", "desc"),
+    const unsubForum = onSnapshot(
+      query(
+        collection(db, "forum_threads"),
+        where("course", "==", selectedCourse),
+        orderBy("createdAt", "desc"),
+      ),
+      (snap) => {
+        setForumThreads(
+          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+        );
+      },
     );
-    const unsubForum = onSnapshot(qForum, (snap) => {
-      setForumThreads(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    });
 
     return () => {
       unsubLessons();
@@ -103,8 +132,8 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
     try {
       await addDoc(collection(db, `forum_threads/${activeThread.id}/replies`), {
         text: reply,
-        sender: teacherName,
-        role: "instructor",
+        sender: supervisorName,
+        role: "supervisor",
         createdAt: serverTimestamp(),
       });
       setReply("");
@@ -118,19 +147,18 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Wannan bangaren yana tura darasin zuwa Firebase
       await addDoc(collection(db, "lessons"), {
         title: newLesson.title,
         videoLink: newLesson.videoLink,
         description: newLesson.description,
         category: selectedCourse,
-        instructor: teacherName,
+        instructor: supervisorName,
         createdAt: serverTimestamp(),
       });
 
       setNewLesson({ title: "", videoLink: "", description: "" });
-      setActiveTab("classroom"); // Maida malami gurin kallon darussan bayan ya yi upload
-      alert("CONTENT_LIVE: Curriculum updated successfully.");
+      setActiveTab("classroom");
+      alert("CONTENT_LIVE: Curriculum updated by Supervisor.");
     } catch (err) {
       alert("UPLOAD_FAILED: " + err.message);
     } finally {
@@ -139,11 +167,7 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
   };
 
   const deleteLesson = async (lessonId) => {
-    if (
-      window.confirm(
-        "Are you sure you want to remove this lesson from the curriculum?",
-      )
-    ) {
+    if (window.confirm("Are you sure you want to remove this lesson?")) {
       try {
         await deleteDoc(doc(db, "lessons", lessonId));
         alert("REMOVED: Lesson deleted.");
@@ -152,6 +176,18 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
       }
     }
   };
+
+  // HANA BLANK SCREEN YAYIN DA AKE DUBA AUTH
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center text-blue-500">
+        <Loader2 className="animate-spin mb-4" size={48} />
+        <p className="font-black uppercase tracking-[0.3em] text-xs">
+          Authenticating Supervisor...
+        </p>
+      </div>
+    );
+  }
 
   // COURSE SELECTION OVERLAY
   if (!selectedCourse) {
@@ -163,11 +199,13 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
               AYAX.OS
             </h1>
             <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">
-              Instructor Initialization
+              Supervisor Initialization
             </p>
-            <h2 className="text-2xl font-bold mt-6">Welcome, {teacherName}</h2>
+            <h2 className="text-2xl font-bold mt-6">
+              Welcome, {supervisorName}
+            </h2>
             <p className="text-slate-500 mt-2">
-              Select your primary department to access the command center.
+              Select a department to monitor and manage resources.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-4">
@@ -234,7 +272,7 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
               {activeTab} Hub
             </h1>
             <p className="text-blue-600 text-xs font-black uppercase tracking-widest">
-              {selectedCourse}
+              {selectedCourse} | Supervisor Mode
             </p>
           </div>
           <button
@@ -284,7 +322,7 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
                   <div className="flex-1 p-8 overflow-y-auto space-y-4">
                     <div className="bg-blue-600 text-white p-4 rounded-2xl rounded-tr-none self-end max-w-[80%] ml-auto">
                       <p className="text-xs font-bold italic mb-1 uppercase text-blue-200">
-                        Instructor {teacherName}
+                        Supervisor {supervisorName}
                       </p>
                       <p className="text-sm font-medium italic text-white/90">
                         Awaiting your response to this student...
@@ -318,7 +356,7 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
           </div>
         )}
 
-        {/* UPLOAD TAB - INDA MALAMI ZAI YI UPLOADING VIDEO */}
+        {/* UPLOAD TAB */}
         {activeTab === "upload" && (
           <div className="max-w-2xl bg-white p-12 rounded-[3.5rem] shadow-2xl border border-slate-50 animate-in slide-in-from-bottom-8 duration-700">
             <h2 className="text-2xl font-black italic uppercase mb-8 flex items-center gap-3">
@@ -340,10 +378,9 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
                   }
                 />
               </div>
-
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-4">
-                  Video URL (YouTube/Vimeo)
+                  Video URL
                 </label>
                 <input
                   required
@@ -355,7 +392,6 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
                   }
                 />
               </div>
-
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-4">
                   Description
@@ -370,7 +406,6 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
                   }
                 />
               </div>
-
               <button
                 disabled={loading}
                 className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-slate-900 transition-all flex items-center justify-center gap-3"
@@ -379,7 +414,7 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
                   <Loader2 className="animate-spin" />
                 ) : (
                   <>
-                    <Send size={18} /> Publish to {selectedCourse} Curriculum
+                    <Send size={18} /> Publish to Curriculum
                   </>
                 )}
               </button>
@@ -387,45 +422,35 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
           </div>
         )}
 
-        {/* CLASSROOM TAB - INDA AKA JERI VIDEOS DIN DA AKA YI UPLOAD */}
+        {/* CLASSROOM TAB */}
         {activeTab === "classroom" && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
-            {lessons.length > 0 ? (
-              lessons.map((lesson) => (
-                <div
-                  key={lesson.id}
-                  className="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm group relative hover:shadow-md transition-all"
-                >
-                  <div className="h-40 bg-slate-900 rounded-[2rem] mb-4 flex flex-col items-center justify-center text-blue-500 font-black italic overflow-hidden">
-                    {/* Misali: Idan kana so ka nuna preview na YouTube image */}
-                    <Video size={32} className="mb-2 opacity-50" />
-                    <span className="text-[10px] uppercase tracking-widest">
-                      Video Active
-                    </span>
-                  </div>
-                  <h3 className="font-black text-slate-900 mb-2 truncate pr-8">
-                    {lesson.title}
-                  </h3>
-                  <p className="text-slate-400 text-[10px] font-bold uppercase">
-                    {lesson.instructor} •{" "}
-                    {new Date(lesson.createdAt?.toDate()).toLocaleDateString()}
-                  </p>
-                  <button
-                    onClick={() => deleteLesson(lesson.id)}
-                    className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-red-500 hover:text-white text-slate-400 rounded-full transition-all"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+            {lessons.map((lesson) => (
+              <div
+                key={lesson.id}
+                className="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm group relative hover:shadow-md transition-all"
+              >
+                <div className="h-40 bg-slate-900 rounded-[2rem] mb-4 flex flex-col items-center justify-center text-blue-500 font-black italic overflow-hidden">
+                  <Video size={32} className="mb-2 opacity-50" />
+                  <span className="text-[10px] uppercase tracking-widest">
+                    Video Active
+                  </span>
                 </div>
-              ))
-            ) : (
-              <div className="col-span-full py-20 text-center text-slate-300">
-                <Video size={48} className="mx-auto mb-4 opacity-10" />
-                <p className="font-black uppercase text-xs tracking-widest">
-                  No lessons uploaded for this course yet.
+                <h3 className="font-black text-slate-900 mb-2 truncate pr-8">
+                  {lesson.title}
+                </h3>
+                <p className="text-slate-400 text-[10px] font-bold uppercase">
+                  {lesson.instructor} •{" "}
+                  {new Date(lesson.createdAt?.toDate()).toLocaleDateString()}
                 </p>
+                <button
+                  onClick={() => deleteLesson(lesson.id)}
+                  className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-red-500 hover:text-white text-slate-400 rounded-full transition-all"
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
-            )}
+            ))}
           </div>
         )}
 
@@ -472,7 +497,7 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
       </div>
 
       <style>{`
-        .t-nav { width: 100%; display: flex; align-items: center; gap: 12px; padding: 18px 25px; border-radius: 20px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #94a3b8; transition: 0.3s; letter-spacing: 0.05em; }
+        .t-nav { width: 100%; display: flex; align-items: center; gap: 12px; padding: 18px 25px; border-radius: 20px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #94a3b8; transition: 0.3s; letter-spacing: 0.05em; border:none; background:none; cursor:pointer;}
         .t-active { background: #eff6ff; color: #2563eb; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.1); }
         .t-input { width: 100%; padding: 1.25rem; background: #f8fafc; border: 2px solid transparent; border-radius: 1.5rem; font-weight: 700; font-size: 0.8rem; outline: none; transition: 0.3s; }
         .t-input:focus { border-color: #2563eb; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
@@ -481,4 +506,4 @@ const TeacherDashboard = ({ teacherName = "Instructor" }) => {
   );
 };
 
-export default TeacherDashboard;
+export default SupervisorDashboard;

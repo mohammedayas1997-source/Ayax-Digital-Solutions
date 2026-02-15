@@ -79,11 +79,11 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
   // 3. Handle Unauthenticated Users
   if (!user) {
-    // If trying to access admin/super-admin/teacher routes, send to authority gateway
+    // If trying to access admin/super-admin/supervisor routes, send to authority gateway
     const isAuthorityRoute =
       location.pathname.includes("admin") ||
       location.pathname.includes("super") ||
-      location.pathname.includes("teacher");
+      location.pathname.includes("supervisor"); // CHANGED FROM TEACHER
 
     const loginPath = isAuthorityRoute ? "/admin-gateway" : "/login";
     return <Navigate to={loginPath} state={{ from: location }} replace />;
@@ -96,7 +96,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
       role === "super-admin" || // Super Admin bypasses all checks
       role === requiredRole ||
       (requiredRole === "admin" && role === "super-admin") ||
-      (requiredRole === "malami" && role === "super-admin");
+      (requiredRole === "supervisor" && role === "super-admin"); // CHANGED FROM MALAMI
 
     if (!hasAccess) {
       // Path normalization for unauthorized access
@@ -105,8 +105,8 @@ const ProtectedRoute = ({ children, requiredRole }) => {
           ? "/super-dashboard"
           : role === "admin"
             ? "/admin-dashboard"
-            : role === "malami" || role === "teacher"
-              ? "/teacher-dashboard"
+            : role === "supervisor" // CHANGED FROM MALAMI
+              ? "/supervisor-dashboard" // CHANGED FROM TEACHER-DASHBOARD
               : "/student-portal";
 
       return <Navigate to={redirectPath} replace />;

@@ -30,12 +30,14 @@ import {
   Trash2,
   Reply,
   ShieldAlert,
+  Loader2,
 } from "lucide-react";
 
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState("lms"); // Default to manager
+  const [activeTab, setActiveTab] = useState("lms");
   const [darkMode, setDarkMode] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [initialSync, setInitialSync] = useState(true); // Added to prevent blank screen flicker
 
   // Data States
   const [inquiries, setInquiries] = useState([]);
@@ -58,7 +60,14 @@ const AdminDashboard = () => {
   useEffect(() => {
     const unsubInquiries = onSnapshot(
       query(collection(db, "inquiries"), orderBy("createdAt", "desc")),
-      (snap) => setInquiries(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (snap) => {
+        setInquiries(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setInitialSync(false);
+      },
+      (error) => {
+        console.error("Inquiry Sync Error:", error);
+        setInitialSync(false);
+      },
     );
 
     const unsubForum = onSnapshot(
@@ -73,7 +82,7 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  // 2. Load Week Data when week selection changes (FIXED LOGIC)
+  // 2. Load Week Data - FIXED CRASH LOGIC
   useEffect(() => {
     const fetchWeekSettings = async () => {
       try {
@@ -82,21 +91,25 @@ const AdminDashboard = () => {
 
         if (docSnap.exists()) {
           const data = docSnap.data();
+
+          // Safety Date Parser: If date is missing or not a timestamp, don't crash with .toISOString()
+          const parseDate = (dateField) => {
+            if (dateField?.toDate)
+              return dateField.toDate().toISOString().split("T")[0];
+            if (typeof dateField === "string" && dateField.length > 0)
+              return dateField;
+            return "";
+          };
+
           setWeekData({
-            ...data,
-            startDate: data.startDate?.toDate
-              ? data.startDate.toDate().toISOString().split("T")[0]
-              : data.startDate || "",
-            endDate: data.endDate?.toDate
-              ? data.endDate.toDate().toISOString().split("T")[0]
-              : data.endDate || "",
+            title: data.title || "",
             videoId: data.videoId || "",
             pdfUrl: data.pdfUrl || "",
             assignment: data.assignment || "",
-            title: data.title || "",
+            startDate: parseDate(data.startDate),
+            endDate: parseDate(data.endDate),
           });
         } else {
-          // Reset if doc doesn't exist
           setWeekData({
             startDate: "",
             endDate: "",
@@ -113,7 +126,7 @@ const AdminDashboard = () => {
     fetchWeekSettings();
   }, [selectedWeek]);
 
-  // 3. Handle Weekly Update (The "Real-Life" Setter)
+  // 3. Handle Weekly Update
   const handleUpdateWeek = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -123,18 +136,21 @@ const AdminDashboard = () => {
         weekRef,
         {
           ...weekData,
-          startDate: new Date(weekData.startDate),
-          endDate: new Date(weekData.endDate),
+          // Store as native JS Dates for Firestore Timestamp conversion
+          startDate: weekData.startDate ? new Date(weekData.startDate) : null,
+          endDate: weekData.endDate ? new Date(weekData.endDate) : null,
           updatedAt: serverTimestamp(),
           weekNumber: selectedWeek,
         },
         { merge: true },
       );
 
-      alert(`System Updated: Week ${selectedWeek} is now live.`);
+      alert(
+        `System Updated: Week ${selectedWeek} configuration is now synchronized.`,
+      );
     } catch (error) {
       console.error(error);
-      alert("Critical Error: Update Failed");
+      alert("CRITICAL_SYNC_FAILURE: Database connection interrupted.");
     } finally {
       setLoading(false);
     }
@@ -151,11 +167,25 @@ const AdminDashboard = () => {
         status: "resolved",
       });
       setReplyText({ ...replyText, [threadId]: "" });
-      alert("Reply Dispatched to Student Dashboard");
+      alert(
+        "AUTHORITY_RESPONSE: Reply successfully injected into student feed.",
+      );
     } catch (err) {
-      alert("Transmission Failed");
+      alert("TRANSMISSION_FAILED");
     }
   };
+
+  // PREVENT BLANK SCREEN: Show Loader if first sync isn't done
+  if (initialSync) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600 mb-4" size={48} />
+        <p className="text-blue-500 font-black uppercase tracking-[0.4em] text-xs">
+          Decrypting Terminal Data...
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -163,7 +193,7 @@ const AdminDashboard = () => {
     >
       {/* SIDEBAR */}
       <aside
-        className={`w-72 border-r p-8 flex flex-col ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-200"}`}
+        className={`w-72 border-r p-8 flex flex-col sticky top-0 h-screen ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-200"}`}
       >
         <div className="mb-12">
           <h2 className="text-2xl font-black italic tracking-tighter text-blue-600">
@@ -172,33 +202,29 @@ const AdminDashboard = () => {
               ADMIN
             </span>
           </h2>
-          <p className="text-[10px] font-black opacity-50 tracking-[0.3em] uppercase mt-2">
-            Command Center v3.0
+          <p className="text-[10px] font-black opacity-50 tracking-[0.3em] uppercase mt-2 text-blue-400">
+            Secure Command v3.0
           </p>
         </div>
 
         <nav className="space-y-3 flex-1">
           {[
-            {
-              id: "lms",
-              label: "Course Manager",
-              icon: <BookOpen size={18} />,
-            },
+            { id: "lms", label: "LMS Manager", icon: <BookOpen size={18} /> },
             {
               id: "forum",
-              label: "Forum Support",
+              label: "Forum Patrol",
               icon: <MessageSquare size={18} />,
             },
             {
               id: "inquiries",
-              label: "Inbound Leads",
+              label: "Lead Registry",
               icon: <Mail size={18} />,
             },
           ].map((btn) => (
             <button
               key={btn.id}
               onClick={() => setActiveTab(btn.id)}
-              className={`w-full flex items-center gap-4 p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${activeTab === btn.id ? "bg-blue-600 text-white shadow-xl shadow-blue-900/20" : "opacity-50 hover:opacity-100"}`}
+              className={`w-full flex items-center gap-4 p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all ${activeTab === btn.id ? "bg-blue-600 text-white shadow-xl shadow-blue-900/40" : "opacity-50 hover:opacity-100"}`}
             >
               {btn.icon} {btn.label}
             </button>
@@ -210,53 +236,59 @@ const AdminDashboard = () => {
           className={`mt-auto flex items-center justify-center gap-3 p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest ${darkMode ? "bg-slate-800 text-yellow-400" : "bg-gray-200 text-slate-600"}`}
         >
           {darkMode ? <Sun size={18} /> : <Moon size={18} />}{" "}
-          {darkMode ? "Switch to Light" : "Switch to Dark"}
+          {darkMode ? "Light Protocol" : "Dark Protocol"}
         </button>
       </aside>
 
       {/* MAIN CONTENT */}
       <main className="flex-1 p-12 overflow-y-auto">
         <header className="flex justify-between items-center mb-12">
-          <h1 className="text-4xl font-black italic uppercase tracking-tighter">
-            {activeTab} Terminal
+          <h1 className="text-5xl font-black italic uppercase tracking-tighter leading-none">
+            {activeTab}
+            <br />
+            <span className="text-blue-600 text-2xl">Terminal Control</span>
           </h1>
           <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-black text-[10px] uppercase">
+            <div className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 font-black text-[10px] uppercase tracking-widest">
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Network: encrypted
+              Node: Secured
             </div>
           </div>
         </header>
 
-        {/* 1. COURSE MANAGER (WEEKLY SETTINGS) */}
+        {/* 1. COURSE MANAGER */}
         {activeTab === "lms" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
             <div className="lg:col-span-2">
               <div
-                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"}`}
+                className={`p-10 rounded-[3.5rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white border-gray-100 shadow-xl"}`}
               >
-                <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-2xl font-black uppercase italic flex items-center gap-3">
-                    <PlusCircle className="text-blue-600" /> Configure Week{" "}
-                    {selectedWeek}
-                  </h2>
+                <div className="flex items-center justify-between mb-10">
+                  <div className="flex items-center gap-4">
+                    <div className="p-4 bg-blue-600 rounded-2xl text-white shadow-lg">
+                      <PlusCircle size={24} />
+                    </div>
+                    <h2 className="text-2xl font-black uppercase italic tracking-tight">
+                      Configuration: Week {selectedWeek}
+                    </h2>
+                  </div>
                   <select
                     value={selectedWeek}
                     onChange={(e) => setSelectedWeek(Number(e.target.value))}
-                    className={`p-3 rounded-xl font-black text-xs border ${darkMode ? "bg-slate-800 border-slate-700" : "bg-gray-50 border-gray-200"}`}
+                    className={`p-4 rounded-2xl font-black text-xs outline-none border ${darkMode ? "bg-slate-800 border-white/10" : "bg-gray-100 border-gray-200"}`}
                   >
                     {Array.from({ length: 24 }, (_, i) => i + 1).map((num) => (
                       <option key={num} value={num}>
-                        Select Week {num}
+                        Index Week {num}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <form onSubmit={handleUpdateWeek} className="space-y-6">
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="label">Access Start Date</label>
+                <form onSubmit={handleUpdateWeek} className="space-y-8">
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      <label className="label">Access Commencement</label>
                       <input
                         type="date"
                         className="admin-input"
@@ -270,8 +302,8 @@ const AdminDashboard = () => {
                         required
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="label">Access End Date</label>
+                    <div className="space-y-3">
+                      <label className="label">Access Expiration</label>
                       <input
                         type="date"
                         className="admin-input"
@@ -284,11 +316,11 @@ const AdminDashboard = () => {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="label">Lesson Title</label>
+                  <div className="space-y-3">
+                    <label className="label">Lesson Objective / Title</label>
                     <input
                       className="admin-input"
-                      placeholder="e.g. Advanced Cryptography Basics"
+                      placeholder="e.g. Advanced System Architecture Fundamentals"
                       value={weekData.title}
                       onChange={(e) =>
                         setWeekData({ ...weekData, title: e.target.value })
@@ -296,51 +328,40 @@ const AdminDashboard = () => {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="label">YouTube Video ID</label>
-                      <div className="relative">
-                        <Video
-                          size={16}
-                          className="absolute left-4 top-4 opacity-40"
-                        />
-                        <input
-                          className="admin-input pl-12"
-                          placeholder="dQw4w9WgXcQ"
-                          value={weekData.videoId}
-                          onChange={(e) =>
-                            setWeekData({
-                              ...weekData,
-                              videoId: e.target.value,
-                            })
-                          }
-                        />
-                      </div>
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-3">
+                      <label className="label">
+                        Video Payload (YouTube ID)
+                      </label>
+                      <input
+                        className="admin-input"
+                        placeholder="ID ONLY (e.g. dQw4w9WgXcQ)"
+                        value={weekData.videoId}
+                        onChange={(e) =>
+                          setWeekData({ ...weekData, videoId: e.target.value })
+                        }
+                      />
                     </div>
-                    <div className="space-y-2">
-                      <label className="label">PDF Documentation URL</label>
-                      <div className="relative">
-                        <FileText
-                          size={16}
-                          className="absolute left-4 top-4 opacity-40"
-                        />
-                        <input
-                          className="admin-input pl-12"
-                          placeholder="https://drive.google.com/..."
-                          value={weekData.pdfUrl}
-                          onChange={(e) =>
-                            setWeekData({ ...weekData, pdfUrl: e.target.value })
-                          }
-                        />
-                      </div>
+                    <div className="space-y-3">
+                      <label className="label">
+                        Asset Link (PDF Documentation)
+                      </label>
+                      <input
+                        className="admin-input"
+                        placeholder="Direct Cloud Link"
+                        value={weekData.pdfUrl}
+                        onChange={(e) =>
+                          setWeekData({ ...weekData, pdfUrl: e.target.value })
+                        }
+                      />
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <label className="label">Weekly Assignment Brief</label>
+                  <div className="space-y-3">
+                    <label className="label">Assignment Specification</label>
                     <textarea
-                      className="admin-input h-32 pt-4"
-                      placeholder="Describe the tasks for this week..."
+                      className="admin-input h-40 pt-5 resize-none"
+                      placeholder="Describe the technical requirements for this module..."
                       value={weekData.assignment}
                       onChange={(e) =>
                         setWeekData({ ...weekData, assignment: e.target.value })
@@ -351,39 +372,41 @@ const AdminDashboard = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-5 bg-blue-600 text-white rounded-[1.5rem] font-black uppercase text-xs tracking-[0.2em] hover:bg-blue-700 shadow-2xl shadow-blue-900/40 disabled:opacity-50"
+                    className="w-full py-6 bg-blue-600 text-white rounded-3xl font-black uppercase text-[11px] tracking-[0.3em] hover:bg-blue-700 shadow-2xl shadow-blue-500/20 disabled:opacity-50 transition-all active:scale-95"
                   >
                     {loading
-                      ? "Syncing with Database..."
-                      : "Publish to Student Portal"}
+                      ? "Establishing Database Handshake..."
+                      : "Push Configuration to Live Portal"}
                   </button>
                 </form>
               </div>
             </div>
 
-            <div className="space-y-6">
+            <div className="space-y-8">
               <div
-                className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-gray-100 shadow-sm"}`}
+                className={`p-8 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5 shadow-2xl" : "bg-white shadow-xl border-gray-100"}`}
               >
-                <h3 className="font-black uppercase text-[10px] tracking-widest text-blue-500 mb-6">
-                  Configuration Preview
+                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-500 mb-6 flex items-center gap-2">
+                  <ClipboardList size={14} /> Audit Preview
                 </h3>
-                <div className="space-y-4 opacity-60 italic text-sm">
-                  <div className="flex justify-between border-b border-white/5 pb-2">
-                    <span>Status</span>{" "}
-                    <span className="text-emerald-500">Auto-Unlock Active</span>
+                <div className="space-y-4 text-xs font-bold opacity-60 italic">
+                  <div className="flex justify-between border-b border-white/5 pb-3">
+                    <span>Global State</span>
+                    <span className="text-emerald-500">Encrypted</span>
                   </div>
-                  <div className="flex justify-between border-b border-white/5 pb-2">
-                    <span>Target</span> <span>All Registered Students</span>
+                  <div className="flex justify-between border-b border-white/5 pb-3">
+                    <span>Visibility</span>
+                    <span>All Authorized Students</span>
                   </div>
-                  <div className="flex justify-between border-b border-white/5 pb-2">
-                    <span>Week</span> <span>{selectedWeek} / 24</span>
+                  <div className="flex justify-between border-b border-white/5 pb-3">
+                    <span>Week Index</span>
+                    <span>{selectedWeek} / 24</span>
                   </div>
                 </div>
-                <div className="mt-8 p-4 bg-blue-600/10 border border-blue-600/20 rounded-2xl">
-                  <p className="text-[9px] font-black uppercase text-blue-500 leading-relaxed">
-                    Note: Setting the Start Date will automatically lock/unlock
-                    the content for students based on their local system time.
+                <div className="mt-8 p-6 bg-blue-600/10 border border-blue-600/20 rounded-3xl">
+                  <p className="text-[9px] font-black uppercase text-blue-500 leading-relaxed text-center">
+                    Caution: Any changes here bypass student approval and
+                    reflect instantly on the dashboard.
                   </p>
                 </div>
               </div>
@@ -391,61 +414,61 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* 2. FORUM SUPPORT & REPLIES */}
+        {/* 2. FORUM PATROL */}
         {activeTab === "forum" && (
-          <div className="space-y-6 max-w-5xl animate-in fade-in duration-500">
+          <div className="space-y-8 max-w-6xl animate-in slide-in-from-right-10 duration-700">
             {forumThreads.map((thread) => (
               <div
                 key={thread.id}
-                className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}
+                className={`p-10 rounded-[3.5rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white border-slate-100 shadow-xl"}`}
               >
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center font-black text-white">
+                <div className="flex justify-between items-start mb-8">
+                  <div className="flex items-center gap-5">
+                    <div className="w-16 h-16 bg-blue-600 rounded-3xl flex items-center justify-center font-black text-2xl text-white shadow-lg shadow-blue-500/20">
                       {thread.studentName?.charAt(0)}
                     </div>
                     <div>
-                      <h4 className="font-black uppercase text-sm tracking-tight">
+                      <h4 className="font-black uppercase text-lg tracking-tighter">
                         {thread.studentName}
                       </h4>
-                      <p className="text-[10px] font-bold opacity-40 uppercase">
-                        {thread.courseId} • {thread.studentType}
+                      <p className="text-[9px] font-black text-blue-500 uppercase tracking-widest">
+                        Node: {thread.courseId} • {thread.studentType}
                       </p>
                     </div>
                   </div>
-                  {thread.status === "resolved" ? (
-                    <span className="px-4 py-1 bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 rounded-full font-black text-[8px] uppercase">
-                      Resolved
-                    </span>
-                  ) : (
-                    <span className="px-4 py-1 bg-red-500/10 text-red-500 border border-red-500/20 rounded-full font-black text-[8px] uppercase flex items-center gap-2">
-                      <ShieldAlert size={10} /> Action Required
-                    </span>
-                  )}
+                  <span
+                    className={`px-5 py-2 rounded-full font-black text-[9px] uppercase tracking-widest border ${thread.status === "resolved" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-red-500/10 text-red-500 border-red-500/20 animate-pulse"}`}
+                  >
+                    {thread.status === "resolved"
+                      ? "Closed"
+                      : "Awaiting Authority"}
+                  </span>
                 </div>
 
-                <h3 className="text-xl font-black italic uppercase mb-2">
+                <h3 className="text-2xl font-black italic uppercase mb-3 tracking-tight">
                   "{thread.title}"
                 </h3>
                 <p
-                  className={`text-sm leading-relaxed mb-6 ${darkMode ? "text-gray-400" : "text-gray-600"}`}
+                  className={`text-sm font-medium leading-relaxed mb-8 opacity-70`}
                 >
                   {thread.content}
                 </p>
 
                 {thread.adminReply && (
-                  <div className="mb-6 p-6 bg-blue-600/5 border-l-4 border-blue-600 rounded-r-2xl italic text-sm">
-                    <span className="block font-black uppercase text-[8px] text-blue-600 mb-2">
-                      Previous Official Reply:
+                  <div className="mb-8 p-8 bg-blue-600/5 border-l-8 border-blue-600 rounded-[2rem] italic">
+                    <span className="block font-black uppercase text-[9px] text-blue-600 mb-2 tracking-widest">
+                      Administrator Reply Archive:
                     </span>
-                    "{thread.adminReply}"
+                    <p className="text-sm font-bold opacity-80">
+                      "{thread.adminReply}"
+                    </p>
                   </div>
                 )}
 
                 <div className="flex gap-4">
                   <input
-                    className="admin-input flex-1"
-                    placeholder="Type official response..."
+                    className="admin-input flex-1 !rounded-[2rem]"
+                    placeholder="Input official authority response..."
                     value={replyText[thread.id] || ""}
                     onChange={(e) =>
                       setReplyText({
@@ -456,9 +479,9 @@ const AdminDashboard = () => {
                   />
                   <button
                     onClick={() => handleForumReply(thread.id)}
-                    className="px-8 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] hover:bg-blue-700 transition-all flex items-center gap-2"
+                    className="px-10 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-[10px] tracking-widest hover:bg-blue-700 transition-all flex items-center gap-3 shadow-xl shadow-blue-500/20"
                   >
-                    <Reply size={14} /> Send
+                    <Reply size={16} /> Inject Response
                   </button>
                 </div>
               </div>
@@ -466,48 +489,48 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* 3. INBOUND INQUIRIES */}
+        {/* 3. LEADS REGISTRY */}
         {activeTab === "inquiries" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-in fade-in duration-500">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in zoom-in-95 duration-700">
             {inquiries.map((item) => (
               <div
                 key={item.id}
-                className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}
+                className={`p-10 rounded-[3.5rem] border transition-all hover:scale-[1.02] ${darkMode ? "bg-slate-900 border-white/5" : "bg-white border-slate-200 shadow-xl"}`}
               >
-                <div className="flex justify-between mb-4">
-                  <span className="text-[8px] font-black uppercase px-3 py-1 bg-blue-600 text-white rounded-full tracking-[0.2em]">
-                    {item.serviceTier}
+                <div className="flex justify-between mb-6">
+                  <span className="text-[9px] font-black uppercase px-4 py-1.5 bg-blue-600 text-white rounded-full tracking-widest">
+                    {item.serviceTier || "General"}
                   </span>
-                  <p className="text-[10px] font-bold opacity-40">
+                  <p className="text-[10px] font-black opacity-30">
                     {item.createdAt?.seconds
                       ? new Date(
                           item.createdAt.seconds * 1000,
                         ).toLocaleDateString()
-                      : "Pending"}
+                      : "SYNC..."}
                   </p>
                 </div>
-                <h4 className="text-xl font-black italic uppercase">
+                <h4 className="text-3xl font-black italic uppercase tracking-tighter leading-none mb-2">
                   {item.fullName}
                 </h4>
-                <p className="text-sm font-bold text-blue-500 mb-4">
-                  {item.email}
+                <p className="text-[10px] font-black text-blue-500 mb-8 tracking-wider">
+                  IDENT: {item.email}
                 </p>
                 <div
-                  className={`p-4 rounded-2xl border-2 border-dashed ${darkMode ? "bg-slate-950 border-slate-800" : "bg-gray-50 border-gray-200"}`}
+                  className={`p-6 rounded-[2rem] border-2 border-dashed ${darkMode ? "bg-slate-950 border-white/5" : "bg-gray-50 border-gray-200"}`}
                 >
-                  <p className="text-sm italic opacity-70 leading-relaxed">
+                  <p className="text-xs italic font-bold opacity-60 leading-relaxed">
                     "{item.message}"
                   </p>
                 </div>
-                <div className="flex gap-3 mt-6">
+                <div className="flex gap-3 mt-8">
                   <a
                     href={`mailto:${item.email}`}
-                    className="flex-1 py-3 bg-gray-900 text-white text-center rounded-xl font-black uppercase text-[10px] hover:bg-blue-600 transition-all"
+                    className="flex-1 py-4 bg-slate-800 text-white text-center rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition-all"
                   >
-                    Direct Email
+                    Reply via Email
                   </a>
-                  <button className="p-3 bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all">
-                    <Trash2 size={18} />
+                  <button className="p-4 bg-red-500/10 text-red-500 rounded-2xl hover:bg-red-500 hover:text-white transition-all">
+                    <Trash2 size={20} />
                   </button>
                 </div>
               </div>
@@ -517,31 +540,11 @@ const AdminDashboard = () => {
       </main>
 
       <style>{`
-        .admin-input {
-          width: 100%;
-          padding: 1rem 1.25rem;
-          background: ${darkMode ? "#0f172a" : "#f8fafc"};
-          border: 2px solid ${darkMode ? "#1e293b" : "#f1f5f9"};
-          border-radius: 1.25rem;
-          font-weight: 800;
-          font-size: 0.75rem;
-          color: ${darkMode ? "white" : "#1e293b"};
-          outline: none;
-          transition: 0.3s;
-        }
-        .admin-input:focus {
-          border-color: #2563eb;
-          background: ${darkMode ? "#1e293b" : "white"};
-        }
-        .label {
-          font-size: 0.65rem;
-          font-weight: 900;
-          text-transform: uppercase;
-          letter-spacing: 0.15em;
-          color: #64748b;
-          display: block;
-          margin-bottom: 0.5rem;
-        }
+        .admin-input { width: 100%; padding: 1.25rem 1.75rem; background: ${darkMode ? "rgba(255,255,255,0.03)" : "#f8fafc"}; border: 2px solid transparent; border-radius: 2rem; font-weight: 800; font-size: 0.8rem; color: inherit; outline: none; transition: 0.4s; }
+        .admin-input:focus { border-color: #2563eb; background: ${darkMode ? "rgba(255,255,255,0.08)" : "white"}; box-shadow: 0 0 40px -10px rgba(37, 99, 235, 0.2); }
+        .label { font-size: 0.7rem; font-weight: 950; text-transform: uppercase; letter-spacing: 0.2em; color: #64748b; display: block; margin-bottom: 0.75rem; margin-left: 0.5rem; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
       `}</style>
     </div>
   );

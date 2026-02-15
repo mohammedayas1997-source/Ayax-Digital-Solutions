@@ -1,7 +1,14 @@
 import React, { useState } from "react";
 import { db } from "../firebaseConfig";
 import { doc, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
-import { Trash2, Save, AlertCircle, RefreshCcw } from "lucide-react";
+import {
+  Trash2,
+  Save,
+  AlertCircle,
+  RefreshCcw,
+  Calendar,
+  Clock,
+} from "lucide-react";
 
 const AdminContentManager = () => {
   const [courseId, setCourseId] = useState("software_eng");
@@ -12,32 +19,38 @@ const AdminContentManager = () => {
     videoUrl: "",
     pdfUrl: "",
     assignment: "",
-    isLocked: false,
+    startDate: "", // Zai dauki Date da Time
   });
 
-  // Reference helper don rage maimaita code
+  // Reference helper
   const getDocRef = () =>
     doc(db, "courses", courseId, "weeks", `week_${weekNum}`);
 
   const handleCommit = async () => {
-    if (!content.title || !content.videoUrl) {
-      alert("SYSTEM ERROR: Title and Video URL are mandatory.");
+    if (!content.title || !content.videoUrl || !content.startDate) {
+      alert("SYSTEM ERROR: Title, Video URL, and Release Date are mandatory.");
       return;
     }
 
     setLoading(true);
     try {
+      // Muna maida string din date zuwa Firebase Timestamp
+      const releaseDate = new Date(content.startDate);
+
       await setDoc(
         getDocRef(),
         {
           ...content,
+          startDate: releaseDate, // Ana adanawa a matsayin Timestamp
           weekNumber: Number(weekNum),
           updatedAt: serverTimestamp(),
         },
         { merge: true },
       );
 
-      alert(`SUCCESS: Week ${weekNum} has been synchronized.`);
+      alert(
+        `SUCCESS: Week ${weekNum} has been synchronized and locked until ${content.startDate}`,
+      );
     } catch (error) {
       console.error("Sync Error:", error);
       alert("CRITICAL ERROR: Database connection failed.");
@@ -56,13 +69,12 @@ const AdminContentManager = () => {
       try {
         await deleteDoc(getDocRef());
         alert(`DELETED: Week ${weekNum} is no longer available.`);
-        // Reset form
         setContent({
           title: "",
           videoUrl: "",
           pdfUrl: "",
           assignment: "",
-          isLocked: false,
+          startDate: "",
         });
       } catch (error) {
         alert("DELETE ERROR: Could not remove document.");
@@ -101,7 +113,11 @@ const AdminContentManager = () => {
             >
               <option value="software_eng">Software Engineering</option>
               <option value="cyber_security">Cyber Security</option>
+              <option value="data_analytics">Data Analytics</option>
+              <option value="ai_tech">Artificial Intelligence</option>
+              <option value="blockchain">Blockchain Technology</option>
               <option value="web_dev">Web Development</option>
+              <option value="digital_marketing">Digital Marketing</option>
             </select>
           </div>
           <div className="space-y-2">
@@ -110,6 +126,8 @@ const AdminContentManager = () => {
             </label>
             <input
               type="number"
+              min="1"
+              max="24"
               value={weekNum}
               onChange={(e) => setWeekNum(e.target.value)}
               className="w-full bg-slate-800 border-2 border-slate-700 rounded-2xl p-4 font-bold outline-none focus:border-blue-600 transition-all text-yellow-500"
@@ -119,37 +137,63 @@ const AdminContentManager = () => {
 
         {/* Content Inputs */}
         <div className="space-y-5">
-          {[
-            {
-              label: "Module Title",
-              key: "title",
-              placeholder: "Intro to Algorithms",
-            },
-            {
-              label: "Video Payload (ID/URL)",
-              key: "videoUrl",
-              placeholder: "YouTube Link",
-            },
-            {
-              label: "PDF Asset Link",
-              key: "pdfUrl",
-              placeholder: "Cloud Storage Link",
-            },
-          ].map((field) => (
-            <div key={field.key} className="space-y-2">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-gray-500 ml-2">
+              Module Title
+            </label>
+            <input
+              value={content.title}
+              placeholder="e.g. Advanced React Architecture"
+              className="admin-input-style"
+              onChange={(e) =>
+                setContent({ ...content, title: e.target.value })
+              }
+            />
+          </div>
+
+          {/* RELEASE DATE & TIME - WANNAN SHINE GYARAN */}
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-blue-500 ml-2 flex items-center gap-2">
+              <Clock size={12} /> Scheduled Release (Date & Time)
+            </label>
+            <input
+              type="datetime-local"
+              value={content.startDate}
+              className="w-full bg-slate-800 p-4 rounded-2xl font-bold outline-none border-2 border-blue-600/30 focus:border-blue-500 transition-colors text-blue-400"
+              onChange={(e) =>
+                setContent({ ...content, startDate: e.target.value })
+              }
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
               <label className="text-[10px] font-black uppercase text-gray-500 ml-2">
-                {field.label}
+                Video Payload (ID)
               </label>
               <input
-                value={content[field.key]}
-                placeholder={field.placeholder}
-                className="w-full bg-slate-800 p-4 rounded-2xl font-bold outline-none border-2 border-transparent focus:border-blue-500 transition-colors"
+                value={content.videoUrl}
+                placeholder="YouTube Video ID"
+                className="admin-input-style"
                 onChange={(e) =>
-                  setContent({ ...content, [field.key]: e.target.value })
+                  setContent({ ...content, videoUrl: e.target.value })
                 }
               />
             </div>
-          ))}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-500 ml-2">
+                PDF Asset Link
+              </label>
+              <input
+                value={content.pdfUrl}
+                placeholder="Cloud URL"
+                className="admin-input-style"
+                onChange={(e) =>
+                  setContent({ ...content, pdfUrl: e.target.value })
+                }
+              />
+            </div>
+          </div>
 
           <div className="space-y-2">
             <label className="text-[10px] font-black uppercase text-gray-500 ml-2">
@@ -187,11 +231,27 @@ const AdminContentManager = () => {
         <div className="mt-6 flex items-center gap-2 text-orange-500 bg-orange-500/10 p-4 rounded-xl border border-orange-500/20">
           <AlertCircle size={16} />
           <p className="text-[10px] font-bold uppercase tracking-wider">
-            Live Override: Existing data for Week {weekNum} will be overwritten
-            on deploy.
+            Temporal Synchronization: Week {weekNum} will remain locked for
+            students until the specified time.
           </p>
         </div>
       </div>
+
+      <style>{`
+        .admin-input-style {
+          width: 100%;
+          background: #1e293b;
+          padding: 1rem;
+          border-radius: 1.25rem;
+          font-weight: 700;
+          outline: none;
+          border: 2px solid transparent;
+          transition: 0.3s;
+        }
+        .admin-input-style:focus {
+          border-color: #2563eb;
+        }
+      `}</style>
     </div>
   );
 };

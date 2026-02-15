@@ -27,7 +27,6 @@ const StaffLogin = () => {
       );
       const user = userCredential.user;
 
-      // Nemo bayanan matsayin (role) ma'aikaci daga Firestore
       const userRef = doc(db, "users", user.uid);
       const userDoc = await getDoc(userRef);
 
@@ -35,14 +34,16 @@ const StaffLogin = () => {
         const userData = userDoc.data();
         const userRole = userData.role;
 
-        // AUTH CHECK: Hierarchy validation (Mun hada dukkan matakai)
+        // AUTH CHECK: An kara 'content-manager' ko 'AdminContentManager' idan role ne
         const authorizedRoles = [
           "super-admin",
           "admin",
-          "malami",
           "instructor",
           "staff",
+          "supervisor",
+          "AdminContentManager", // AN KARA WANNAN A MATSAYIN ROLE
         ];
+
         const isAuthorized = authorizedRoles.includes(userRole);
 
         if (!isAuthorized) {
@@ -52,7 +53,6 @@ const StaffLogin = () => {
           return;
         }
 
-        // Duba idan an dakatar da ma'aikacin (Suspension Check)
         if (userData.status === "suspended" || userData.status === "inactive") {
           await signOut(auth);
           setError(
@@ -62,13 +62,16 @@ const StaffLogin = () => {
           return;
         }
 
-        // REDIRECTION LOGIC: Raba hanyar shiga dangane da girman matsayi
+        // REDIRECTION LOGIC: Tura kowa inda ya dace
         if (userRole === "super-admin") {
-          navigate("/super-dashboard"); // Shafi na musamman don Super Admin
+          navigate("/super-dashboard");
+        } else if (userRole === "supervisor") {
+          navigate("/supervisor-dashboard");
         } else if (
           userRole === "admin" ||
           userRole === "staff" ||
-          userRole === "malami"
+          userRole === "instructor" ||
+          userRole === "AdminContentManager" // TURA SHI ADMIN DASHBOARD KO DIRECTLY ZUWA MANAGER
         ) {
           navigate("/admin-dashboard"); // Inda AdminContentManager yake
         }
@@ -104,7 +107,7 @@ const StaffLogin = () => {
         </p>
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-[10px] font-black flex items-center gap-2 rounded-xl uppercase animate-shake">
+          <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-[10px] font-black flex items-center gap-2 rounded-xl uppercase">
             <ShieldAlert size={16} /> {error}
           </div>
         )}
@@ -116,7 +119,7 @@ const StaffLogin = () => {
             </label>
             <input
               type="email"
-              placeholder="admin@ayaxuni.com"
+              placeholder="staff@ayaxuni.com"
               required
               className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 transition-all text-gray-900 font-bold"
               value={email}

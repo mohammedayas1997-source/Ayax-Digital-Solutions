@@ -69,7 +69,15 @@ const getWeekTitle = (week) => {
 const formatDate = (timestamp) => {
   if (!timestamp) return "TBD";
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleDateString("en-GB");
+
+  // Zai nuna ranar da kuma lokacin (misali: 15/02/2026, 20:00)
+  return date.toLocaleString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 // ==========================================
@@ -224,16 +232,40 @@ const StudentPortal = () => {
 
   const isWeekLocked = (weekNumber) => {
     const weekSettings = weeksData[`week_${weekNumber}`];
-    if (!weekSettings || !weekSettings.startDate)
-      return weekNumber > currentWeek;
 
-    const startDate = weekSettings.startDate.toDate();
-    const today = new Date();
-    const isDateReached = today >= startDate;
+    // 1. Idan Admin bai saita komai ba ko bai saka Date ba, satin a kulle yake
+    if (!weekSettings || !weekSettings.startDate) return true;
+
+    // 2. Maida ranar da Admin ya saka zuwa tsarin lokaci na JavaScript
+    const releaseDate = weekSettings.startDate.toDate
+      ? weekSettings.startDate.toDate()
+      : new Date(weekSettings.startDate);
+
+    const now = new Date(); // Lokacin yanzu
+
+    // 3. Gwada gani: Shin lokacin yanzu ya kai ko ya wuce lokacin da Admin ya saka?
+    const isTimeReached = now >= releaseDate;
+
+    // 4. Tsarin Midterm: Idan sati ya wuce 12 kuma ba a ci Midterm ba, a kulle shi
     const isMidtermLocked = weekNumber > 12 && !hasPassedMidterm;
 
-    return !isDateReached || isMidtermLocked;
+    return !isTimeReached || isMidtermLocked;
   };
+
+  // Wannan zai rinka duba lokaci kowane sakan 60 domin bude weeks da kansu
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = new Date();
+      // Idan lokaci ya yi, muna tilasta ma portal din ya sake duba locking logic
+      // Ta hanyar canza wani state kadan ko kuma kawai refresh na view
+      console.log("Terminal Check: Synchronizing with global atomic clock...");
+
+      // Wannan zai sa React ya sake duba isWeekLocked() kowane minti daya
+      setCurrentWeek((prev) => prev);
+    }, 60000); // 60,000 milliseconds = 1 minute
+
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     if (
@@ -423,38 +455,40 @@ const StudentPortal = () => {
           </div>
           <div className="space-y-1 pb-10">
             {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => {
-              const isLocked = isWeekLocked(week);
+              const locked = isWeekLocked(week);
               const weekSet = weeksData[`week_${week}`];
               return (
                 <div
                   key={week}
-                  onClick={() => !isLocked && setCurrentWeek(week)}
-                  className={`flex flex-col px-4 py-2 md:py-3 rounded-xl transition-all ${isLocked ? "opacity-30 grayscale cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer group"}`}
+                  onClick={() => !locked && setCurrentWeek(week)} // Yanzu ba zai danna ba sai ya bude
+                  className={`flex flex-col px-4 py-3 rounded-xl transition-all ${locked ? "opacity-40 grayscale cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer"}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
-                        className={`w-5 h-5 md:w-6 md:h-6 rounded-lg flex items-center justify-center text-[8px] md:text-[9px] font-black ${isLocked ? "bg-gray-200 text-gray-400" : "bg-blue-100 text-blue-600"}`}
+                        className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${locked ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}
                       >
                         {week}
                       </div>
-                      <span className="text-[9px] md:text-[10px] font-black uppercase">
+                      <span className="text-[10px] font-black uppercase">
                         Week {week}
                       </span>
                     </div>
-                    {isLocked ? (
-                      <Lock size={10} />
+                    {locked ? (
+                      <Lock size={10} className="text-red-500" />
                     ) : (
-                      <ChevronRight
-                        size={10}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                      />
+                      <CheckCircle size={10} className="text-emerald-500" />
                     )}
                   </div>
-                  {!isLocked && weekSet?.startDate && (
-                    <div className="mt-1 ml-8 flex items-center gap-1 text-[7px] font-black text-blue-500/60 uppercase">
-                      <Calendar size={8} /> {formatDate(weekSet.startDate)} -{" "}
-                      {formatDate(weekSet.endDate)}
+
+                  {/* WANNAN SHINE ZAI NUNA RANAR DA ZAI BUDE */}
+                  {weekSet?.startDate && (
+                    <div
+                      className={`mt-1 ml-9 text-[7px] font-black uppercase ${locked ? "text-red-500/60" : "text-emerald-500/60"}`}
+                    >
+                      {locked
+                        ? `Opens: ${formatDate(weekSet.startDate)}`
+                        : "Authorized"}
                     </div>
                   )}
                 </div>
@@ -553,16 +587,43 @@ const StudentPortal = () => {
         {activeTab === "courses" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
             <div className="lg:col-span-2 space-y-6 md:space-y-8">
-              <div className="bg-black aspect-video rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border-2 md:border-4 border-white/5">
-                <iframe
-                  width="100%"
-                  height="100%"
-                  src={`https://www.youtube.com/embed/${weeksData[`week_${currentWeek}`]?.videoId || getWeekVideoId(currentWeek)}`}
-                  frameBorder="0"
-                  allowFullScreen
-                ></iframe>
+              {/* 1. VIDEO INTERFACE WITH TIME LOCK */}
+              <div className="bg-black aspect-video rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border-2 md:border-4 border-white/5 relative">
+                {isWeekLocked(currentWeek) ? (
+                  /* DISPLAY THIS IF LOCKED */
+                  <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-center p-8 backdrop-blur-md">
+                    <Lock
+                      size={64}
+                      className="text-red-500 mb-6 animate-bounce"
+                    />
+                    <h3 className="text-2xl md:text-3xl font-black uppercase italic mb-2 text-white">
+                      Temporal Lock Active
+                    </h3>
+                    <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest leading-relaxed">
+                      This module is scheduled to release on:
+                      <br />
+                      <span className="text-blue-500 text-lg mt-2 block">
+                        {weeksData[`week_${currentWeek}`]?.startDate
+                          ? formatDate(
+                              weeksData[`week_${currentWeek}`].startDate,
+                            )
+                          : "TBD by Admin"}
+                      </span>
+                    </p>
+                  </div>
+                ) : (
+                  /* DISPLAY IF UNLOCKED */
+                  <iframe
+                    width="100%"
+                    height="100%"
+                    src={`https://www.youtube.com/embed/${weeksData[`week_${currentWeek}`]?.videoId || getWeekVideoId(currentWeek)}`}
+                    frameBorder="0"
+                    allowFullScreen
+                  ></iframe>
+                )}
               </div>
 
+              {/* 2. CONTENT DETAILS SECTION */}
               <div
                 className={`p-6 md:p-10 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}
               >
@@ -571,6 +632,7 @@ const StudentPortal = () => {
                 </h3>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                  {/* PDF SECTION - ALSO HIDDEN IF LOCKED */}
                   <div className="p-5 bg-blue-600 rounded-3xl text-white">
                     <div className="flex items-center gap-3 mb-3">
                       <FileText size={20} />
@@ -578,7 +640,8 @@ const StudentPortal = () => {
                         Lecture Notes (PDF)
                       </h5>
                     </div>
-                    {weeksData[`week_${currentWeek}`]?.pdfUrl ? (
+                    {!isWeekLocked(currentWeek) &&
+                    weeksData[`week_${currentWeek}`]?.pdfUrl ? (
                       <a
                         href={weeksData[`week_${currentWeek}`].pdfUrl}
                         target="_blank"
@@ -588,63 +651,77 @@ const StudentPortal = () => {
                         <Download size={14} /> Download PDF
                       </a>
                     ) : (
-                      <div className="py-3 bg-white/10 rounded-xl text-center text-[9px] font-black uppercase opacity-50">
-                        No PDF Uploaded Yet
+                      <div className="py-3 bg-white/10 rounded-xl text-center text-[9px] font-black uppercase opacity-50 italic">
+                        {isWeekLocked(currentWeek)
+                          ? "Encrypted / Locked"
+                          : "No PDF Uploaded"}
                       </div>
                     )}
                   </div>
 
+                  {/* ASSIGNMENT SECTION */}
                   <div className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-3xl">
                     <h5 className="text-[8px] font-black text-blue-600 uppercase mb-2 tracking-[0.2em]">
                       Assignment
                     </h5>
                     <p className="text-[11px] md:text-sm font-bold opacity-80 leading-relaxed">
-                      {weeksData[`week_${currentWeek}`]?.assignment ||
-                        "Complete current module tasks."}
+                      {isWeekLocked(currentWeek)
+                        ? "This assignment will become available once the module unlocks."
+                        : weeksData[`week_${currentWeek}`]?.assignment ||
+                          "Complete current module tasks."}
                     </p>
                   </div>
                 </div>
 
-                <button
-                  onClick={() => markWeekAsCompleted(currentWeek)}
-                  className="w-full md:w-auto px-8 py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-3"
-                >
-                  <CheckCircle size={16} /> Mark Completed
-                </button>
+                {!isWeekLocked(currentWeek) && (
+                  <button
+                    onClick={() => markWeekAsCompleted(currentWeek)}
+                    className="w-full md:w-auto px-8 py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-3"
+                  >
+                    <CheckCircle size={16} /> Mark Completed
+                  </button>
+                )}
               </div>
             </div>
 
+            {/* 3. SIDEBAR NAVIGATION - UP NEXT */}
             <div className="space-y-3">
               <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2">
                 Up Next
               </h3>
-              {[currentWeek, currentWeek + 1, currentWeek + 2].map(
-                (w) =>
+              {[currentWeek, currentWeek + 1, currentWeek + 2].map((w) => {
+                const locked = isWeekLocked(w);
+                return (
                   w <= 24 && (
                     <div
                       key={w}
-                      className={`p-4 rounded-2xl border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} flex items-center gap-4`}
+                      onClick={() => !locked && setCurrentWeek(w)}
+                      className={`p-4 rounded-2xl border transition-all ${locked ? "opacity-50 grayscale cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer"} ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}
                     >
-                      <div className="w-8 h-8 bg-blue-50 dark:bg-blue-900/30 text-blue-600 rounded-lg flex items-center justify-center font-black text-[10px]">
-                        {w}
-                      </div>
-                      <div>
-                        <p className="text-[9px] font-black uppercase truncate">
-                          {getWeekTitle(w)}
-                        </p>
-                        <p className="text-[7px] font-bold text-gray-400">
-                          {weeksData[`week_${w}`]?.startDate
-                            ? formatDate(weeksData[`week_${w}`].startDate)
-                            : "Session Pending"}
-                        </p>
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] ${locked ? "bg-gray-200 text-gray-400" : "bg-blue-50 dark:bg-blue-900/30 text-blue-600"}`}
+                        >
+                          {locked ? <Lock size={12} /> : w}
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black uppercase truncate">
+                            {getWeekTitle(w)}
+                          </p>
+                          <p className="text-[7px] font-bold text-gray-400 uppercase">
+                            {locked
+                              ? `Opens: ${weeksData[`week_${w}`]?.startDate ? formatDate(weeksData[`week_${w}`].startDate) : "Pending"}`
+                              : "Access Authorized"}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  ),
-              )}
+                  )
+                );
+              })}
             </div>
           </div>
         )}
-
         {/* FORUM TAB */}
         {activeTab === "discussions" && (
           <div className="animate-in fade-in duration-700">

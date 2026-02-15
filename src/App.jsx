@@ -39,7 +39,7 @@ import AdminCourseList from "./pages/AdminCourseList";
 import AdminCourseDashboard from "./pages/AdminCourseDashboard";
 import AdminStudentsList from "./pages/AdminStudentsList";
 import ForumDetails from "./components/ForumDetails";
-import TeacherDashboard from "./pages/TeacherDashboard"; // <--- ADDED MALAMI DASHBOARD
+import SupervisorDashboard from "./pages/TeacherDashboard"; // <--- CHANGED TO SUPERVISOR
 
 // --- ADDED COURSE & PRICING COMPONENTS ---
 import CourseSection from "./components/CourseSection";
@@ -92,12 +92,14 @@ function App() {
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
 
-          {/* --- MALAMI / TEACHER SECURE INFRASTRUCTURE --- */}
+          {/* --- SUPERVISOR SECURE INFRASTRUCTURE --- */}
           <Route
-            path="/teacher-dashboard"
+            path="/supervisor-dashboard" // <--- CHANGED PATH
             element={
-              <ProtectedRoute requiredRole="malami">
-                <TeacherDashboard />
+              <ProtectedRoute requiredRole="supervisor">
+                {" "}
+                {/* <--- CHANGED ROLE */}
+                <SupervisorDashboard />
               </ProtectedRoute>
             }
           />
