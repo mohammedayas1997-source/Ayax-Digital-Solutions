@@ -38,12 +38,9 @@ const CertificatePreview = ({
             <div className="flex justify-center mb-4">
               {/* AN GYARA: An sa src ta gaske */}
               <img
-                src={logoUrl}
+                src={logoImg} // Maimakon logoUrl, yi amfani da variable din da muka yi import
                 alt="Academy Logo"
                 className="h-16 w-auto object-contain"
-                onError={(e) => {
-                  e.target.src = "https://via.placeholder.com/150?text=LOGO";
-                }}
               />
             </div>
             <h1 className="text-3xl font-black text-[#1e3a8a] tracking-[0.2em] uppercase italic">
@@ -80,7 +77,7 @@ const CertificatePreview = ({
               <div className="absolute top-[-50px] left-1/2 -translate-x-1/2 w-full flex justify-center pointer-events-none opacity-80">
                 {/* AN GYARA: An sa src ta gaske */}
                 <img
-                  src={signatureUrl}
+                  src={signatureImg}
                   alt="Director Signature"
                   className="h-14 w-auto object-contain mix-blend-multiply"
                 />
