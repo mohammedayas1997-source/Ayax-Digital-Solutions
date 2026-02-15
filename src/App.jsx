@@ -74,7 +74,11 @@ function App() {
           <Route path="/launch-project" element={<ProjectForm />} />
           <Route
             path="/admin-secret-portal"
-            element={<AdminContentManager />}
+            element={
+              <ProtectedRoute requiredRole="AdminContentManager">
+                <AdminContentManager />
+              </ProtectedRoute>
+            }
           />
           <Route path="/enroll" element={<CourseEnrollment />} />
           <Route
@@ -104,7 +108,8 @@ function App() {
             }
           />
 
-          {/* --- SUPER ADMIN SECURE INFRASTRUCTURE --- */}
+          {/* --- ADMIN & CONTENT MANAGER SECURE INFRASTRUCTURE --- */}
+          {/* Super Admin and AdminContentManager can access the main dashboards */}
           <Route
             path="/super-admin"
             element={
@@ -117,8 +122,8 @@ function App() {
           <Route
             path="/admin-dashboard"
             element={
-              <ProtectedRoute requiredRole="super-admin">
-                <SuperAdmin />
+              <ProtectedRoute requiredRole="admin">
+                <AdminDashboard />
               </ProtectedRoute>
             }
           />
@@ -126,7 +131,7 @@ function App() {
           <Route
             path="/admin/courses"
             element={
-              <ProtectedRoute requiredRole="super-admin">
+              <ProtectedRoute requiredRole="admin">
                 <AdminCourseList />
               </ProtectedRoute>
             }
@@ -135,7 +140,7 @@ function App() {
           <Route
             path="/admin/dashboard/:courseId"
             element={
-              <ProtectedRoute requiredRole="super-admin">
+              <ProtectedRoute requiredRole="admin">
                 <AdminCourseDashboard />
               </ProtectedRoute>
             }
@@ -144,7 +149,7 @@ function App() {
           <Route
             path="/admin/students/:courseId"
             element={
-              <ProtectedRoute requiredRole="super-admin">
+              <ProtectedRoute requiredRole="admin">
                 <AdminStudentsList />
               </ProtectedRoute>
             }
@@ -153,7 +158,7 @@ function App() {
           <Route
             path="/admin/grading"
             element={
-              <ProtectedRoute requiredRole="super-admin">
+              <ProtectedRoute requiredRole="admin">
                 <AdminGrading />
               </ProtectedRoute>
             }
@@ -162,7 +167,7 @@ function App() {
           <Route
             path="/admin/grading/:courseId"
             element={
-              <ProtectedRoute requiredRole="super-admin">
+              <ProtectedRoute requiredRole="admin">
                 <AdminGrading />
               </ProtectedRoute>
             }
@@ -171,7 +176,7 @@ function App() {
           <Route
             path="/admin/questions"
             element={
-              <ProtectedRoute requiredRole="super-admin">
+              <ProtectedRoute requiredRole="admin">
                 <AdminQuestionBank />
               </ProtectedRoute>
             }
@@ -180,7 +185,7 @@ function App() {
           <Route
             path="/admin/chat/:courseId"
             element={
-              <ProtectedRoute requiredRole="super-admin">
+              <ProtectedRoute requiredRole="admin">
                 <AdminChatManager />
               </ProtectedRoute>
             }

@@ -103,12 +103,11 @@ const ProtectedRoute = ({ children, requiredRole }) => {
       const redirectPath =
         role === "super-admin"
           ? "/super-dashboard"
-          : role === "admin"
+          : role === "AdminContentManager" || role === "admin" // GYARA A NAN
             ? "/admin-dashboard"
-            : role === "supervisor" // CHANGED FROM MALAMI
-              ? "/supervisor-dashboard" // CHANGED FROM TEACHER-DASHBOARD
+            : role === "supervisor"
+              ? "/supervisor-dashboard"
               : "/student-portal";
-
       return <Navigate to={redirectPath} replace />;
     }
   }
