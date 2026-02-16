@@ -19,18 +19,15 @@ import {
   LogOut,
   Sun,
   Moon,
-  Menu,
-  X,
   ShieldCheck,
   GraduationCap,
   Database,
-  Users,
+  Clock,
 } from "lucide-react";
 
 const AdminContentManager = () => {
   const navigate = useNavigate();
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [isMenuOpen, setIsMenuOpen] = useState(true); // Na maida shi true don ya nuna Sidebar nan take
   const [loading, setLoading] = useState(false);
 
   const [courseId, setCourseId] = useState("web_dev");
@@ -45,6 +42,73 @@ const AdminContentManager = () => {
 
   const getDocRef = () =>
     doc(db, "courses", courseId, "weeks", `week_${weekNum}`);
+
+  // 1. WANNAN SHINE ZAI DUBI ABINDA KE CIKI (FETCH LOGIC)
+  useEffect(() => {
+    const fetchCurrentContent = async () => {
+      setLoading(true);
+      try {
+        const snap = await getDoc(getDocRef());
+        if (snap.exists()) {
+          const data = snap.data();
+          // Muna maida Firebase Timestamp zuwa format din da input zai gane
+          setContent({
+            ...data,
+            startDate: data.startDate?.toDate
+              ? data.startDate.toDate().toISOString().slice(0, 16)
+              : data.startDate || "",
+          });
+        } else {
+          // Idan babu komai, mu share input din
+          setContent({
+            title: "",
+            videoUrl: "",
+            pdfUrl: "",
+            assignment: "",
+            startDate: "",
+          });
+        }
+      } catch (e) {
+        console.error("Fetch Error:", e);
+      }
+      setLoading(false);
+    };
+    fetchCurrentContent();
+  }, [courseId, weekNum]); // Zai sake tashi duk sanda aka canza Course ko Week
+
+  // 2. GYARAN DEPLOY (SAVE) LOGIC
+  const handleCommit = async (e) => {
+    e.preventDefault(); // MUHIMMI: Wannan ne zai hana shi mayar da kai Home!
+
+    if (!content.title || !content.videoUrl) {
+      alert("Please enter Title and Video ID!");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const releaseDate = content.startDate
+        ? new Date(content.startDate)
+        : new Date();
+
+      await setDoc(
+        getDocRef(),
+        {
+          ...content,
+          startDate: releaseDate,
+          weekNumber: Number(weekNum),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      alert(`SUCCESS: Week ${weekNum} has been updated!`);
+    } catch (error) {
+      alert("Error updating database.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleLogout = async (e) => {
     e.preventDefault();
@@ -65,7 +129,7 @@ const AdminContentManager = () => {
         color: isDarkMode ? "white" : "#0f172a",
       }}
     >
-      {/* --- SIDEBAR (Fixed and Forced Visibility) --- */}
+      {/* SIDEBAR */}
       <aside
         style={{
           width: "280px",
@@ -115,25 +179,13 @@ const AdminContentManager = () => {
             gap: "8px",
           }}
         >
-          <Link
-            to="/admin-dashboard"
-            className="nav-link active"
-            style={navStyle(true)}
-          >
+          <Link to="/admin-dashboard" style={navStyle(true)}>
             <LayoutDashboard size={18} /> Dashboard
           </Link>
-          <Link
-            to="/admin/grading"
-            className="nav-link"
-            style={navStyle(false, isDarkMode)}
-          >
+          <Link to="/admin/grading" style={navStyle(false, isDarkMode)}>
             <GraduationCap size={18} /> Grading
           </Link>
-          <Link
-            to="/admin/questions"
-            className="nav-link"
-            style={navStyle(false, isDarkMode)}
-          >
+          <Link to="/admin/questions" style={navStyle(false, isDarkMode)}>
             <Database size={18} /> Question Bank
           </Link>
         </nav>
@@ -146,7 +198,6 @@ const AdminContentManager = () => {
             gap: "12px",
           }}
         >
-          {/* DARK MODE TOGGLE */}
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
             style={{
@@ -173,8 +224,6 @@ const AdminContentManager = () => {
               </>
             )}
           </button>
-
-          {/* LOGOUT */}
           <button
             onClick={handleLogout}
             style={{
@@ -197,7 +246,7 @@ const AdminContentManager = () => {
         </div>
       </aside>
 
-      {/* --- MAIN AREA --- */}
+      {/* MAIN AREA */}
       <main style={{ flex: 1, padding: "40px", overflowY: "auto" }}>
         <div
           style={{
@@ -210,22 +259,56 @@ const AdminContentManager = () => {
             boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
           }}
         >
-          <h2
+          <div
             style={{
-              fontSize: "36px",
-              fontWeight: 900,
-              textTransform: "uppercase",
-              fontStyle: "italic",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
               marginBottom: "40px",
             }}
           >
-            Content <span style={{ color: "#2563eb" }}>Manager</span>
-          </h2>
+            <h2
+              style={{
+                fontSize: "36px",
+                fontWeight: 900,
+                textTransform: "uppercase",
+                fontStyle: "italic",
+              }}
+            >
+              Content <span style={{ color: "#2563eb" }}>Manager</span>
+            </h2>
+            {loading && <RefreshCcw className="animate-spin text-blue-500" />}
+          </div>
 
-          {/* Form Content dinka na baya yana nan (Video ID, PDF, etc.) */}
-          <div
+          <form
+            onSubmit={handleCommit}
             style={{ display: "flex", flexDirection: "column", gap: "24px" }}
           >
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "20px",
+              }}
+            >
+              <select
+                value={courseId}
+                onChange={(e) => setCourseId(e.target.value)}
+                style={inputStyle(isDarkMode)}
+              >
+                <option value="web_dev">Web Development</option>
+                <option value="software_eng">Software Engineering</option>
+                <option value="cyber_security">Cyber Security</option>
+              </select>
+              <input
+                type="number"
+                value={weekNum}
+                onChange={(e) => setWeekNum(e.target.value)}
+                style={inputStyle(isDarkMode)}
+                placeholder="Week Number"
+              />
+            </div>
+
             <input
               placeholder="Lesson Title"
               style={inputStyle(isDarkMode)}
@@ -234,24 +317,58 @@ const AdminContentManager = () => {
                 setContent({ ...content, title: e.target.value })
               }
             />
-            <input
-              placeholder="YouTube Video ID"
-              style={inputStyle(isDarkMode)}
-              value={content.videoUrl}
-              onChange={(e) =>
-                setContent({ ...content, videoUrl: e.target.value })
-              }
-            />
-            <input
-              placeholder="PDF Link"
-              style={inputStyle(isDarkMode)}
-              value={content.pdfUrl}
-              onChange={(e) =>
-                setContent({ ...content, pdfUrl: e.target.value })
-              }
-            />
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "20px",
+              }}
+            >
+              <input
+                placeholder="YouTube Video ID"
+                style={inputStyle(isDarkMode)}
+                value={content.videoUrl}
+                onChange={(e) =>
+                  setContent({ ...content, videoUrl: e.target.value })
+                }
+              />
+              <input
+                placeholder="PDF Link"
+                style={inputStyle(isDarkMode)}
+                value={content.pdfUrl}
+                onChange={(e) =>
+                  setContent({ ...content, pdfUrl: e.target.value })
+                }
+              />
+            </div>
+
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+            >
+              <label
+                style={{
+                  fontSize: "10px",
+                  fontWeight: "bold",
+                  textTransform: "uppercase",
+                  color: "#3b82f6",
+                }}
+              >
+                Scheduled Release Date
+              </label>
+              <input
+                type="datetime-local"
+                style={inputStyle(isDarkMode)}
+                value={content.startDate}
+                onChange={(e) =>
+                  setContent({ ...content, startDate: e.target.value })
+                }
+              />
+            </div>
 
             <button
+              type="submit"
+              disabled={loading}
               style={{
                 padding: "20px",
                 backgroundColor: "#2563eb",
@@ -261,18 +378,19 @@ const AdminContentManager = () => {
                 textTransform: "uppercase",
                 border: "none",
                 cursor: "pointer",
+                opacity: loading ? 0.5 : 1,
+                marginTop: "20px",
               }}
             >
-              <Save size={20} /> Deploy Module
+              {loading ? "Syncing..." : "Deploy Module"}
             </button>
-          </div>
+          </form>
         </div>
       </main>
     </div>
   );
 };
 
-// Styles for simplicity
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
@@ -286,7 +404,6 @@ const navStyle = (active, dark) => ({
   backgroundColor: active ? "#2563eb" : "transparent",
   color: active ? "white" : dark ? "#94a3b8" : "#64748b",
 });
-
 const inputStyle = (dark) => ({
   width: "100%",
   padding: "16px",
