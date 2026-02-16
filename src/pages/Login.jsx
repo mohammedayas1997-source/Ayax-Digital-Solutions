@@ -19,7 +19,6 @@ const StaffLogin = () => {
 
     try {
       const cleanEmail = email.trim().toLowerCase();
-
       const userCredential = await signInWithEmailAndPassword(
         auth,
         cleanEmail,
@@ -34,19 +33,16 @@ const StaffLogin = () => {
         const userData = userDoc.data();
         const userRole = userData.role;
 
-        // AUTH CHECK: An kara 'content-manager' ko 'AdminContentManager' idan role ne
         const authorizedRoles = [
           "super-admin",
           "admin",
           "instructor",
           "staff",
           "supervisor",
-          "AdminContentManager", // AN KARA WANNAN A MATSAYIN ROLE
+          "AdminContentManager",
         ];
 
-        const isAuthorized = authorizedRoles.includes(userRole);
-
-        if (!isAuthorized) {
+        if (!authorizedRoles.includes(userRole)) {
           await signOut(auth);
           setError("Access Denied: You do not have administrative clearance.");
           setLoading(false);
@@ -62,25 +58,20 @@ const StaffLogin = () => {
           return;
         }
 
-        // REDIRECTION LOGIC: Tura kowa inda ya dace
+        // REDIRECTION LOGIC
         if (userRole === "super-admin") {
-          navigate("/super-dashboard");
+          navigate("/super-admin");
         } else if (userRole === "supervisor") {
           navigate("/supervisor-dashboard");
-        } else if (
-          userRole === "admin" ||
-          userRole === "staff" ||
-          userRole === "instructor" ||
-          userRole === "AdminContentManager" // TURA SHI ADMIN DASHBOARD KO DIRECTLY ZUWA MANAGER
-        ) {
-          navigate("/admin-dashboard"); // Inda AdminContentManager yake
+        } else {
+          // Both 'admin' and 'AdminContentManager' go here
+          navigate("/admin-dashboard");
         }
       } else {
         await signOut(auth);
-        setError("Database Error: No staff profile found for this account.");
+        setError("Database Error: No staff profile found.");
       }
     } catch (err) {
-      console.error("Login Error:", err);
       setError("Authentication Failed: Invalid email or security key.");
     } finally {
       setLoading(false);
@@ -91,74 +82,48 @@ const StaffLogin = () => {
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-6 font-sans">
       <form
         onSubmit={handleLogin}
-        className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-md w-full border border-gray-100 transform transition-all"
+        className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-md w-full border border-gray-100"
       >
         <div className="flex justify-center mb-6">
           <div className="p-4 bg-red-50 text-red-600 rounded-3xl animate-bounce">
             <ShieldCheck size={40} />
           </div>
         </div>
-
         <h2 className="text-2xl font-black text-center mb-2 text-gray-900 uppercase tracking-tight">
           Staff Command Center
         </h2>
-        <p className="text-center text-gray-400 text-[10px] mb-8 font-black uppercase tracking-widest">
-          Authorized Personnel Only
-        </p>
-
         {error && (
           <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-[10px] font-black flex items-center gap-2 rounded-xl uppercase">
             <ShieldAlert size={16} /> {error}
           </div>
         )}
-
         <div className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-[9px] font-black uppercase text-gray-400 ml-3">
-              Institutional Email
-            </label>
-            <input
-              type="email"
-              placeholder="staff@ayaxuni.com"
-              required
-              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 transition-all text-gray-900 font-bold"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-1">
-            <label className="text-[9px] font-black uppercase text-gray-400 ml-3">
-              Security Key
-            </label>
-            <input
-              type="password"
-              placeholder="••••••••"
-              required
-              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 transition-all text-gray-900"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-
+          <input
+            type="email"
+            placeholder="Institutional Email"
+            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 font-bold"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+          />
+          <input
+            type="password"
+            placeholder="Security Key"
+            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
           <button
             disabled={loading}
-            className="w-full py-5 bg-red-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] flex items-center justify-center gap-2 hover:bg-red-700 shadow-xl shadow-red-200 disabled:opacity-50 transition-all mt-6"
+            className="w-full py-5 bg-red-600 text-white rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2"
           >
             {loading ? (
-              <Loader2 className="animate-spin" size={20} />
+              <Loader2 className="animate-spin" />
             ) : (
-              <>
-                Verify Credentials <LogIn size={18} />
-              </>
+              "Verify Credentials"
             )}
           </button>
-        </div>
-
-        <div className="mt-10 text-center border-t border-gray-100 pt-6">
-          <p className="text-[9px] text-gray-300 font-black uppercase tracking-widest">
-            Level 5 Security &copy; 2026 AYAX UNI
-          </p>
         </div>
       </form>
     </div>

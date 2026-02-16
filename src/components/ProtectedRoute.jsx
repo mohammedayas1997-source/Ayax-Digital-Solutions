@@ -4,6 +4,10 @@ import { doc, getDoc } from "firebase/firestore";
 import { Navigate, useLocation } from "react-router-dom";
 import { signOut } from "firebase/auth";
 
+/**
+ * SECURE GATEWAY: PROTECTED ROUTE INFRASTRUCTURE
+ * Logic: Handles Auth State, Firestore Role Verification, and Account Status.
+ */
 const ProtectedRoute = ({ children, requiredRole }) => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
@@ -15,14 +19,14 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       try {
         if (currentUser) {
-          // 1. Fetch data from Firestore
+          // 1. Fetch real-time security profile from Firestore
           const userRef = doc(db, "users", currentUser.uid);
           const userDoc = await getDoc(userRef);
 
           if (userDoc.exists()) {
             const userData = userDoc.data();
 
-            // 2. Status Check (Preserved)
+            // 2. Account Integrity Check
             if (
               userData.status === "suspended" ||
               userData.status === "inactive"
@@ -37,7 +41,10 @@ const ProtectedRoute = ({ children, requiredRole }) => {
               setUser(currentUser);
             }
           } else {
-            console.error("Security profile missing for UID:", currentUser.uid);
+            console.error(
+              "CRITICAL: Security profile missing for UID:",
+              currentUser.uid,
+            );
             setRole(null);
             setUser(currentUser);
           }
@@ -56,7 +63,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return () => unsubscribe();
   }, []);
 
-  // 1. Loading UI (Preserved Design)
+  // 1. Loading UI (High-Resolution Terminal Design)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
@@ -70,44 +77,45 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     );
   }
 
-  // 2. Handle Suspended Accounts
+  // 2. Handle Suspended Accounts (Instant Revocation)
   if (status === "suspended") {
     return (
       <Navigate to="/login" state={{ error: "Account Suspended" }} replace />
     );
   }
 
-  // 3. Handle Unauthenticated Users
+  // 3. Handle Unauthenticated Sessions
   if (!user) {
-    // If trying to access admin/super-admin/supervisor routes, send to authority gateway
     const isAuthorityRoute =
       location.pathname.includes("admin") ||
       location.pathname.includes("super") ||
-      location.pathname.includes("supervisor"); // CHANGED FROM TEACHER
+      location.pathname.includes("supervisor");
 
     const loginPath = isAuthorityRoute ? "/admin-gateway" : "/login";
     return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
-  // 4. Enhanced Role-Based Access Control (RBAC)
-  // Logic: Super Admin has "God Mode" (can access anything), others are restricted.
+  // 4. Enhanced Role-Based Access Control (RBAC) Logic
   if (requiredRole) {
+    // SECURITY ALIASING: AdminContentManager is treated as an 'admin' for gateway purposes.
     const hasAccess =
-      role === "super-admin" || // Super Admin bypasses all checks
+      role === "super-admin" ||
       role === requiredRole ||
-      (requiredRole === "admin" && role === "super-admin") ||
-      (requiredRole === "supervisor" && role === "super-admin"); // CHANGED FROM MALAMI
+      (requiredRole === "admin" &&
+        (role === "super-admin" || role === "AdminContentManager")) ||
+      (requiredRole === "supervisor" && role === "super-admin");
 
     if (!hasAccess) {
-      // Path normalization for unauthorized access
+      // Automatic Path Normalization for unauthorized attempts
       const redirectPath =
         role === "super-admin"
-          ? "/super-dashboard"
-          : role === "AdminContentManager" || role === "admin" // GYARA A NAN
+          ? "/super-admin"
+          : role === "AdminContentManager" || role === "admin"
             ? "/admin-dashboard"
             : role === "supervisor"
               ? "/supervisor-dashboard"
               : "/student-portal";
+
       return <Navigate to={redirectPath} replace />;
     }
   }
