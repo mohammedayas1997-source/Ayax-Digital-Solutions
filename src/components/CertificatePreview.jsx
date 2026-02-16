@@ -2,12 +2,11 @@ import React from "react";
 import { Award, ShieldCheck, Star, Bookmark } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 
-// MATAKI NA FARKO: Dole kayi import nasu anan idan suna cikin src/assets
-// Idan kuma suna cikin public folder ne, ka tabbatar sunansu ya dace da wanda ke kasa
+// Tabbatar wadannan hanyoyin (paths) sun yi daidai a project dinka
 import logoImg from "../assets/logo.png";
 import signatureImg from "../assets/signature.png";
+
 const CertificatePreview = ({
-  // Idan ba a sa komai ba, zai dauki wadannan imports din na sama
   logoUrl = logoImg,
   signatureUrl = signatureImg,
 }) => {
@@ -32,14 +31,21 @@ const CertificatePreview = ({
       {/* THE ACTUAL PROFESSIONAL PREVIEW */}
       <div className="relative group perspective-1000 scale-90 md:scale-100">
         <div className="relative w-[842px] h-[595px] bg-white border-[16px] border-double border-[#1e3a8a] p-12 flex flex-col items-center justify-between shadow-[0_50px_100px_-20px_rgba(0,0,0,0.15)] transition-transform duration-700 group-hover:rotate-1">
+          {/* WATERMARK "SAMPLE" OVERLAY */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
+            <h1 className="text-[140px] font-black uppercase text-slate-100/50 -rotate-45 tracking-[0.2em] select-none">
+              SAMPLE
+            </h1>
+          </div>
+
           {/* 1. ACADEMY BRANDING (LOGO) */}
           <div className="text-center z-10 w-full">
             <div className="flex justify-center mb-4">
-              {/* AN GYARA: An sa src ta gaske */}
               <img
-                src={logoImg} // Maimakon logoUrl, yi amfani da variable din da muka yi import
+                src={logoUrl}
                 alt="Academy Logo"
                 className="h-16 w-auto object-contain"
+                onError={(e) => (e.target.style.display = "none")}
               />
             </div>
             <h1 className="text-3xl font-black text-[#1e3a8a] tracking-[0.2em] uppercase italic">
@@ -74,11 +80,11 @@ const CertificatePreview = ({
             {/* DIRECTOR SIDE */}
             <div className="text-center w-48 relative">
               <div className="absolute top-[-50px] left-1/2 -translate-x-1/2 w-full flex justify-center pointer-events-none opacity-80">
-                {/* AN GYARA: An sa src ta gaske */}
                 <img
-                  src={signatureImg}
+                  src={signatureUrl}
                   alt="Director Signature"
                   className="h-14 w-auto object-contain mix-blend-multiply"
+                  onError={(e) => (e.target.style.display = "none")}
                 />
               </div>
               <p className="font-serif border-t-2 border-slate-200 pt-2 font-bold text-slate-800 italic">
