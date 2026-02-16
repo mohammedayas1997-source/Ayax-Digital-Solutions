@@ -4,9 +4,8 @@ import { QRCodeSVG } from "qrcode.react";
 
 // MATAKI NA FARKO: Dole kayi import nasu anan idan suna cikin src/assets
 // Idan kuma suna cikin public folder ne, ka tabbatar sunansu ya dace da wanda ke kasa
-import logoImg from "./assets/logo.png";
-import signatureImg from "./assets/signature.png";
-
+import logoImg from "../assets/logo.png";
+import signatureImg from "../assets/signature.png";
 const CertificatePreview = ({
   // Idan ba a sa komai ba, zai dauki wadannan imports din na sama
   logoUrl = logoImg,
