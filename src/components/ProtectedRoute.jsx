@@ -6,7 +6,7 @@ import { signOut } from "firebase/auth";
 
 /**
  * SECURE GATEWAY: PROTECTED ROUTE INFRASTRUCTURE
- * Logic: Handles Auth State, Firestore Role Verification, and Account Status.
+ * An gyara don amincewa da AdminContentManager a kowane matakin Admin.
  */
 const ProtectedRoute = ({ children, requiredRole }) => {
   const [user, setUser] = useState(null);
@@ -19,14 +19,13 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     const unsubscribe = auth.onAuthStateChanged(async (currentUser) => {
       try {
         if (currentUser) {
-          // 1. Fetch real-time security profile from Firestore
           const userRef = doc(db, "users", currentUser.uid);
           const userDoc = await getDoc(userRef);
 
           if (userDoc.exists()) {
             const userData = userDoc.data();
 
-            // 2. Account Integrity Check (Preserve Session only if Active)
+            // Integrity Check: Dakatar da suspended accounts
             if (
               userData.status === "suspended" ||
               userData.status === "inactive"
@@ -41,10 +40,6 @@ const ProtectedRoute = ({ children, requiredRole }) => {
               setUser(currentUser);
             }
           } else {
-            console.error(
-              "CRITICAL: Security profile missing for UID:",
-              currentUser.uid,
-            );
             setUser(currentUser);
             setRole(null);
           }
@@ -63,7 +58,6 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return () => unsubscribe();
   }, []);
 
-  // 1. Loading UI (High-Resolution Terminal Design)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
@@ -77,29 +71,24 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     );
   }
 
-  // 2. Handle Suspended Accounts (Instant Revocation)
   if (status === "suspended") {
     return (
       <Navigate to="/login" state={{ error: "Account Suspended" }} replace />
     );
   }
 
-  // 3. Handle Unauthenticated Sessions
   if (!user) {
     const isAuthorityRoute =
       location.pathname.includes("admin") ||
       location.pathname.includes("super") ||
       location.pathname.includes("supervisor");
-
     const loginPath = isAuthorityRoute ? "/admin-gateway" : "/login";
     return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
-  // 4. Enhanced Role-Based Access Control (RBAC) Logic
+  // --- MATAKIN IKO (RBAC LOGIC) ---
   if (requiredRole) {
-    // SECURITY MAPPING:
-    // AdminContentManager fulfills 'admin' requirements.
-    // Super Admin fulfills ALL requirements.
+    // MUN GYARA ANAN: Halatta AdminContentManager shiga duk inda 'admin' yake da bukata
     const hasAccess =
       role === "super-admin" ||
       role === requiredRole ||
@@ -109,7 +98,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
         (role === "supervisor" || role === "super-admin"));
 
     if (!hasAccess) {
-      // Path normalization to prevent unauthorized route hanging
+      // Tura kowa inda ya dace maimakon Home kawai
       const redirectPath =
         role === "super-admin"
           ? "/super-admin"
