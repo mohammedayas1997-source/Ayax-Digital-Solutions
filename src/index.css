@@ -1,14 +1,31 @@
+/* Idan Tailwind v4 kake amfani da shi, wannan kawai ya isa: */
 @import "tailwindcss";
+
+/* Idan kuma v3 kake amfani da shi, yi amfani da wannan tsarin: */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* --- GLOBAL STYLES --- */
 body {
   margin: 0;
-  font-family: "Inter", sans-serif;
+  font-family:
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
-  background-color: #f9fafb;
+  -moz-osx-font-smoothing: grayscale;
+  /* Cire background-color a nan idan kana son Dark Mode din mu ya yi aiki 100% */
 }
+
 html {
   scroll-behavior: smooth;
+}
+
+/* Kara wannan domin tabbatar da cewa Dark Mode yana canza launin body */
+.dark body {
+  background-color: #020617; /* Slate 950 */
 }
