@@ -26,7 +26,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
           if (userDoc.exists()) {
             const userData = userDoc.data();
 
-            // 2. Account Integrity Check
+            // 2. Account Integrity Check (Preserve Session only if Active)
             if (
               userData.status === "suspended" ||
               userData.status === "inactive"
@@ -45,8 +45,8 @@ const ProtectedRoute = ({ children, requiredRole }) => {
               "CRITICAL: Security profile missing for UID:",
               currentUser.uid,
             );
-            setRole(null);
             setUser(currentUser);
+            setRole(null);
           }
         } else {
           setUser(null);
@@ -97,16 +97,19 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
   // 4. Enhanced Role-Based Access Control (RBAC) Logic
   if (requiredRole) {
-    // SECURITY ALIASING: AdminContentManager is treated as an 'admin' for gateway purposes.
+    // SECURITY MAPPING:
+    // AdminContentManager fulfills 'admin' requirements.
+    // Super Admin fulfills ALL requirements.
     const hasAccess =
       role === "super-admin" ||
       role === requiredRole ||
       (requiredRole === "admin" &&
-        (role === "super-admin" || role === "AdminContentManager")) ||
-      (requiredRole === "supervisor" && role === "super-admin");
+        (role === "admin" || role === "AdminContentManager")) ||
+      (requiredRole === "supervisor" &&
+        (role === "supervisor" || role === "super-admin"));
 
     if (!hasAccess) {
-      // Automatic Path Normalization for unauthorized attempts
+      // Path normalization to prevent unauthorized route hanging
       const redirectPath =
         role === "super-admin"
           ? "/super-admin"

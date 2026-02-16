@@ -22,7 +22,6 @@ const AdminLogin = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // 1. Authenticate via Firebase Auth
       const userCredential = await signInWithEmailAndPassword(
         auth,
         email.trim(),
@@ -30,8 +29,6 @@ const AdminLogin = () => {
       );
       const user = userCredential.user;
 
-      // 2. Optimized Database Check
-      // Strategy: Try getting by UID first, then fallback to Email search if UID fails
       let userData = null;
       const userDocRef = doc(db, "users", user.uid);
       const userDocSnap = await getDoc(userDocRef);
@@ -39,24 +36,25 @@ const AdminLogin = () => {
       if (userDocSnap.exists()) {
         userData = userDocSnap.data();
       } else {
-        // Fallback: Search by email if the Document ID isn't the UID
         const q = query(
           collection(db, "users"),
           where("email", "==", email.toLowerCase().trim()),
         );
         const querySnapshot = await getDocs(q);
-        if (!querySnapshot.empty) {
-          userData = querySnapshot.docs[0].data();
-        }
+        if (!querySnapshot.empty) userData = querySnapshot.docs[0].data();
       }
 
-      // 3. Role Validation
       if (userData) {
         const role = userData.role;
-        if (role === "super-admin" || role === "admin") {
+
+        // CIKAKKEN GYARA: Mun halatta AdminContentManager a nan
+        const adminRoles = ["super-admin", "admin", "AdminContentManager"];
+        const supervisorRoles = ["supervisor", "malami", "teacher"];
+
+        if (adminRoles.includes(role)) {
           navigate("/admin-dashboard");
-        } else if (role === "malami" || role === "teacher") {
-          navigate("/teacher-portal");
+        } else if (supervisorRoles.includes(role)) {
+          navigate("/supervisor-dashboard");
         } else {
           await auth.signOut();
           alert(
@@ -65,13 +63,10 @@ const AdminLogin = () => {
         }
       } else {
         await auth.signOut();
-        alert(
-          "SYSTEM ERROR: User profile not found in database. Contact System Administrator.",
-        );
+        alert("SYSTEM ERROR: User profile not found.");
       }
     } catch (error) {
       alert(`CRITICAL: ${error.message}`);
-      console.error("Login Error:", error);
     } finally {
       setLoading(false);
     }
@@ -80,19 +75,16 @@ const AdminLogin = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#020617] px-6 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-red-600/5 rounded-full blur-[120px]"></div>
-      <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-blue-600/5 rounded-full blur-[100px]"></div>
-
       <div className="max-w-md w-full relative z-10">
         <form
           onSubmit={handleLogin}
-          className="bg-[#0a0a0a] p-12 rounded-[3.5rem] border border-white/5 shadow-[0_50px_100px_-20px_rgba(0,0,0,0.8)]"
+          className="bg-[#0a0a0a] p-12 rounded-[3.5rem] border border-white/5 shadow-2xl"
         >
           <div className="flex justify-center mb-10">
-            <div className="p-6 bg-red-600/10 rounded-3xl text-red-600 border border-red-600/20 shadow-[0_0_30px_-5px_rgba(220,38,38,0.3)]">
+            <div className="p-6 bg-red-600/10 rounded-3xl text-red-600 border border-red-600/20 shadow-lg">
               <ShieldAlert size={44} />
             </div>
           </div>
-
           <div className="text-center mb-12">
             <h2 className="text-3xl font-black text-white uppercase tracking-tighter leading-none">
               Security <br /> <span className="text-red-600">Gateway</span>
@@ -101,33 +93,27 @@ const AdminLogin = () => {
               <Key size={12} /> Root Access Protocol
             </p>
           </div>
-
           <div className="space-y-4">
             <input
               type="email"
               placeholder="IDENTIFIER (Email)"
-              required
-              className="w-full p-6 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-red-600 focus:bg-white/10 text-white font-bold text-[11px] tracking-[0.1em] transition-all placeholder:text-gray-700"
+              className="w-full p-6 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-red-600 text-white font-bold text-[11px] tracking-[0.1em]"
               onChange={(e) => setEmail(e.target.value)}
+              required
             />
-
             <input
               type="password"
               placeholder="SECURITY_KEY"
-              required
-              className="w-full p-6 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-red-600 focus:bg-white/10 text-white font-bold text-[10px] tracking-[0.2em] transition-all placeholder:text-gray-700"
+              className="w-full p-6 bg-white/5 border border-white/10 rounded-2xl outline-none focus:border-red-600 text-white font-bold text-[10px] tracking-[0.2em]"
               onChange={(e) => setPassword(e.target.value)}
+              required
             />
-
             <button
               disabled={loading}
-              className="w-full py-6 bg-red-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 hover:bg-red-700 transition-all shadow-2xl shadow-red-900/40 disabled:opacity-50 active:scale-95"
+              className="w-full py-6 bg-red-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-4 hover:bg-red-700 transition-all shadow-2xl disabled:opacity-50"
             >
               {loading ? (
-                <span className="flex items-center gap-3">
-                  <Loader2 className="animate-spin" size={18} />
-                  Authenticating...
-                </span>
+                <Loader2 className="animate-spin" size={18} />
               ) : (
                 <>
                   Verify Identity <Terminal size={18} />
@@ -135,18 +121,8 @@ const AdminLogin = () => {
               )}
             </button>
           </div>
-
-          <div className="mt-12 text-center">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full">
-              <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div>
-              <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">
-                Sys_Mainframe: Connected
-              </span>
-            </div>
-          </div>
         </form>
       </div>
-      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10 pointer-events-none"></div>
     </div>
   );
 };

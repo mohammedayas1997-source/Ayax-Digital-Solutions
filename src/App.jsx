@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -40,10 +40,10 @@ import AdminCourseDashboard from "./pages/AdminCourseDashboard";
 import AdminStudentsList from "./pages/AdminStudentsList";
 import ForumDetails from "./components/ForumDetails";
 
-// GYARAN YANA NAN: Mun sauya sunan fayil zuwa SupervisorDashboard
+// SUPERVISOR DASHBOARD
 import SupervisorDashboard from "./pages/SupervisorDashboard";
 
-// --- ADDED COURSE & PRICING COMPONENTS ---
+// --- COURSE & PRICING COMPONENTS ---
 import CourseSection from "./components/CourseSection";
 import PricingCard from "./components/PricingCard";
 
@@ -72,6 +72,8 @@ function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/launch-project" element={<ProjectForm />} />
+
+          {/* SECURE CONTENT MANAGER PORTAL */}
           <Route
             path="/admin-secret-portal"
             element={
@@ -80,6 +82,7 @@ function App() {
               </ProtectedRoute>
             }
           />
+
           <Route path="/enroll" element={<CourseEnrollment />} />
           <Route
             path="/verify/:certificateId"
@@ -108,8 +111,7 @@ function App() {
             }
           />
 
-          {/* --- ADMIN & CONTENT MANAGER SECURE INFRASTRUCTURE --- */}
-          {/* Super Admin and AdminContentManager can access the main dashboards */}
+          {/* --- SUPER ADMIN EXCLUSIVE --- */}
           <Route
             path="/super-admin"
             element={
@@ -119,6 +121,8 @@ function App() {
             }
           />
 
+          {/* --- SHARED ADMIN & CONTENT MANAGER ROUTES --- */}
+          {/* Tabbatar requiredRole="admin" domin duka roles din su samu damar shiga */}
           <Route
             path="/admin-dashboard"
             element={
@@ -157,15 +161,6 @@ function App() {
 
           <Route
             path="/admin/grading"
-            element={
-              <ProtectedRoute requiredRole="admin">
-                <AdminGrading />
-              </ProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/admin/grading/:courseId"
             element={
               <ProtectedRoute requiredRole="admin">
                 <AdminGrading />
@@ -248,19 +243,15 @@ function App() {
               <ProtectedRoute requiredRole="student">
                 <Certificate
                   studentName={auth.currentUser?.displayName || "Student"}
-                  courseName="Full Stack Web Development"
-                  dateCompleted={new Date().toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                  })}
+                  courseName="Software Engineering"
+                  dateCompleted={new Date().toLocaleDateString("en-GB")}
                   certificateId={`AYX-${Math.random().toString(36).substr(2, 9).toUpperCase()}`}
                 />
               </ProtectedRoute>
             }
           />
 
-          {/* --- SYSTEM CATCH-ALL --- */}
+          {/* CATCH-ALL REDIRECT */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
