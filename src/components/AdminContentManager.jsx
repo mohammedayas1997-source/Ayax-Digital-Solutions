@@ -1,12 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebaseConfig";
-import {
-  doc,
-  setDoc,
-  deleteDoc,
-  serverTimestamp,
-  getDoc,
-} from "firebase/firestore";
+import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useNavigate, Link } from "react-router-dom";
 import {
@@ -23,11 +17,13 @@ import {
   GraduationCap,
   Database,
   Clock,
+  Users,
+  MessageSquare,
 } from "lucide-react";
 
 const AdminContentManager = () => {
   const navigate = useNavigate();
-  const [isDarkMode, setIsDarkMode] = useState(true);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [courseId, setCourseId] = useState("web_dev");
@@ -43,6 +39,7 @@ const AdminContentManager = () => {
   const getDocRef = () =>
     doc(db, "courses", courseId, "weeks", `week_${weekNum}`);
 
+  // FETCH DATA LOGIC
   useEffect(() => {
     const fetchCurrentContent = async () => {
       setLoading(true);
@@ -66,7 +63,7 @@ const AdminContentManager = () => {
           });
         }
       } catch (e) {
-        console.error("Fetch Error:", e);
+        console.error(e);
       }
       setLoading(false);
     };
@@ -75,10 +72,6 @@ const AdminContentManager = () => {
 
   const handleCommit = async (e) => {
     e.preventDefault();
-    if (!content.title || !content.videoUrl) {
-      alert("Please enter Title and Video ID!");
-      return;
-    }
     setLoading(true);
     try {
       const releaseDate = content.startDate
@@ -94,76 +87,61 @@ const AdminContentManager = () => {
         },
         { merge: true },
       );
-      alert(`SUCCESS: Week ${weekNum} has been updated!`);
+      alert("Success: Content Deployed!");
     } catch (error) {
-      alert("Error updating database.");
+      alert("Error!");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = async (e) => {
-    e.preventDefault();
-    try {
-      await signOut(auth);
-      navigate("/admin-gateway");
-    } catch (error) {
-      console.error(error);
-    }
+  const handleLogout = async () => {
+    await signOut(auth);
+    navigate("/admin-gateway");
   };
-
-  // Icon Color Helper
-  const iconColor = isDarkMode ? "#ffffff" : "#0f172a";
 
   return (
     <div
       style={{
         display: "flex",
         minHeight: "100vh",
-        width: "100%",
         backgroundColor: isDarkMode ? "#020617" : "#f8fafc",
-        color: isDarkMode ? "#ffffff" : "#0f172a",
-        position: "relative",
-        zIndex: 1,
+        color: isDarkMode ? "white" : "#0f172a",
       }}
     >
-      {/* SIDEBAR - Forced Visibility */}
+      {/* SIDEBAR - forced Z-index and visibility */}
       <aside
         style={{
           width: "280px",
           backgroundColor: isDarkMode ? "#0f172a" : "#ffffff",
-          borderRight: `2px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+          borderRight: "1px solid #e2e8f0",
           display: "flex",
           flexDirection: "column",
           padding: "30px",
-          position: "sticky",
-          top: 0,
+          position: "fixed",
           height: "100vh",
-          zIndex: 9999, // Tilasta shi ya fito saman komai
+          zIndex: 1000,
         }}
       >
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "15px",
-            marginBottom: "50px",
+            gap: "10px",
+            marginBottom: "40px",
           }}
         >
           <div
             style={{
               padding: "10px",
               backgroundColor: "#2563eb",
-              borderRadius: "15px",
+              borderRadius: "12px",
+              color: "white",
             }}
           >
-            <ShieldCheck size={28} color="#ffffff" strokeWidth={3} />
+            <ShieldCheck size={24} />
           </div>
-          <h1
-            style={{ fontWeight: 900, fontSize: "20px", letterSpacing: "-1px" }}
-          >
-            AYAX ADMIN
-          </h1>
+          <h1 style={{ fontWeight: 900, fontSize: "18px" }}>AYAX ADMIN</h1>
         </div>
 
         <nav
@@ -174,26 +152,20 @@ const AdminContentManager = () => {
             gap: "10px",
           }}
         >
-          <Link to="/admin-dashboard" style={navStyle(true, isDarkMode)}>
-            <LayoutDashboard size={20} color="#ffffff" /> Dashboard
+          <Link to="/admin-dashboard" style={navStyle(true)}>
+            <LayoutDashboard size={18} /> Dashboard
           </Link>
-          <Link to="/admin/grading" style={navStyle(false, isDarkMode)}>
-            <GraduationCap
-              size={20}
-              color={isDarkMode ? "#94a3b8" : "#64748b"}
-            />{" "}
-            Grading
+          <Link to="/admin/grading" style={navStyle(false)}>
+            <GraduationCap size={18} /> Grading Queue
           </Link>
-          <Link to="/admin/questions" style={navStyle(false, isDarkMode)}>
-            <Database size={20} color={isDarkMode ? "#94a3b8" : "#64748b"} />{" "}
-            Questions
+          <Link to="/admin/questions" style={navStyle(false)}>
+            <Database size={18} /> Question Bank
           </Link>
         </nav>
 
-        {/* BOTTOM CONTROLS - Logout & Dark Mode */}
         <div
           style={{
-            paddingBottom: "20px",
+            marginTop: "auto",
             display: "flex",
             flexDirection: "column",
             gap: "15px",
@@ -203,212 +175,235 @@ const AdminContentManager = () => {
             onClick={() => setIsDarkMode(!isDarkMode)}
             style={{
               padding: "15px",
-              borderRadius: "18px",
-              border: `2px solid ${isDarkMode ? "#334155" : "#e2e8f0"}`,
+              borderRadius: "15px",
+              border: "1px solid #e2e8f0",
+              cursor: "pointer",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              gap: "12px",
-              fontWeight: "900",
-              cursor: "pointer",
-              backgroundColor: isDarkMode ? "#1e293b" : "#ffffff",
-              color: isDarkMode ? "#eab308" : "#475569",
-              transition: "0.3s",
+              gap: "10px",
+              fontWeight: "bold",
             }}
           >
             {isDarkMode ? (
-              <Sun size={22} color="#eab308" />
+              <Sun size={18} color="#eab308" />
             ) : (
-              <Moon size={22} color="#475569" />
-            )}
-            {isDarkMode ? "LIGHT MODE" : "DARK MODE"}
+              <Moon size={18} color="#475569" />
+            )}{" "}
+            {isDarkMode ? "Light" : "Dark"}
           </button>
-
           <button
             onClick={handleLogout}
             style={{
-              padding: "18px",
-              borderRadius: "20px",
-              backgroundColor: "#ef4444",
+              padding: "15px",
+              borderRadius: "15px",
+              backgroundColor: "#dc2626",
               color: "white",
               border: "none",
-              fontWeight: "900",
-              textTransform: "uppercase",
+              fontWeight: "bold",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
-              justifyContent: "center",
-              gap: "12px",
-              boxShadow: "0 10px 15px -3px rgba(239, 68, 68, 0.3)",
+              gap: "10px",
             }}
           >
-            <LogOut size={22} color="#ffffff" /> LOGOUT
+            <LogOut size={18} /> Logout
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main style={{ flex: 1, padding: "50px", overflowY: "auto" }}>
+      {/* MAIN CONTENT AREA */}
+      <main style={{ flex: 1, marginLeft: "280px", padding: "40px" }}>
+        {/* Header section from your screenshot */}
+        <div style={{ marginBottom: "40px" }}>
+          <p
+            style={{
+              fontSize: "10px",
+              fontWeight: 900,
+              color: "#2563eb",
+              letterSpacing: "2px",
+            }}
+          >
+            MANAGEMENT SUITE
+          </p>
+        </div>
+
+        {/* Top Cards Grid */}
         <div
           style={{
-            maxWidth: "1000px",
-            margin: "0 auto",
-            backgroundColor: isDarkMode ? "rgba(15, 23, 42, 0.6)" : "#ffffff",
-            padding: "50px",
-            borderRadius: "50px",
-            border: `1px solid ${isDarkMode ? "#1e293b" : "#f1f5f9"}`,
-            boxShadow: isDarkMode
-              ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
-              : "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: "25px",
+            marginBottom: "50px",
           }}
         >
           <div
             style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: "50px",
+              background: "linear-gradient(135deg, #2563eb, #3b82f6)",
+              padding: "35px",
+              borderRadius: "35px",
+              color: "white",
             }}
           >
-            <h2
+            <h3 style={{ fontSize: "14px" }}>Enrolled Students</h3>
+            <h2 style={{ fontSize: "36px", fontWeight: 900, margin: "15px 0" }}>
+              ---
+            </h2>
+            <Link
+              to="/admin/students/web_dev"
               style={{
-                fontSize: "40px",
-                fontWeight: "900",
-                textTransform: "uppercase",
-                fontStyle: "italic",
-                letterSpacing: "-2px",
+                padding: "10px 20px",
+                background: "rgba(255,255,255,0.2)",
+                borderRadius: "10px",
+                color: "white",
+                fontSize: "10px",
+                fontWeight: "bold",
+                textDecoration: "none",
               }}
             >
-              Content <span style={{ color: "#2563eb" }}>Manager</span>
-            </h2>
-            {loading && (
-              <RefreshCcw className="animate-spin text-blue-500" size={30} />
-            )}
+              VIEW ROSTER
+            </Link>
           </div>
 
+          <div
+            style={{
+              backgroundColor: "white",
+              padding: "35px",
+              borderRadius: "35px",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <h3 style={{ fontSize: "14px", color: "#64748b" }}>
+              Grading Queue
+            </h3>
+            <h2
+              style={{
+                fontSize: "36px",
+                fontWeight: 900,
+                margin: "15px 0",
+                color: "#0f172a",
+              }}
+            >
+              ---
+            </h2>
+            <Link
+              to="/admin/grading"
+              style={{
+                padding: "12px 25px",
+                backgroundColor: "#0f172a",
+                color: "white",
+                borderRadius: "12px",
+                fontSize: "10px",
+                fontWeight: "bold",
+                textDecoration: "none",
+              }}
+            >
+              START GRADING
+            </Link>
+          </div>
+        </div>
+
+        {/* Quick Actions (Icons in your screenshot) */}
+        <p
+          style={{
+            fontSize: "10px",
+            fontWeight: 900,
+            color: "#94a3b8",
+            letterSpacing: "2px",
+            marginBottom: "20px",
+          }}
+        >
+          QUICK ACTIONS
+        </p>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: "15px",
+            marginBottom: "50px",
+          }}
+        >
+          <Link to="/admin/questions" style={quickActionStyle()}>
+            <Database size={24} color="#2563eb" />
+            <span style={quickLabelStyle}>QUESTIONS BANK</span>
+          </Link>
+          <Link to="/admin/grading" style={quickActionStyle()}>
+            <GraduationCap size={24} color="#2563eb" />
+            <span style={quickLabelStyle}>STUDENT GRADING</span>
+          </Link>
+          <Link to="/admin/students/all" style={quickActionStyle()}>
+            <Users size={24} color="#2563eb" />
+            <span style={quickLabelStyle}>ENROLLED STUDENTS</span>
+          </Link>
+          <Link to="/admin/chat/web_dev" style={quickActionStyle()}>
+            <MessageSquare size={24} color="#2563eb" />
+            <span style={quickLabelStyle}>COURSE CHAT</span>
+          </Link>
+        </div>
+
+        {/* CONTENT MANAGER FORM */}
+        <div
+          style={{
+            backgroundColor: "white",
+            padding: "50px",
+            borderRadius: "50px",
+            border: "1px solid #e2e8f0",
+            boxShadow: "0 20px 40px rgba(0,0,0,0.05)",
+          }}
+        >
+          <h2
+            style={{ fontSize: "32px", fontWeight: 900, marginBottom: "40px" }}
+          >
+            CONTENT <span style={{ color: "#2563eb" }}>MANAGER</span>
+          </h2>
           <form
             onSubmit={handleCommit}
-            style={{ display: "flex", flexDirection: "column", gap: "30px" }}
+            style={{ display: "flex", flexDirection: "column", gap: "25px" }}
           >
+            <input
+              placeholder="Module Title"
+              style={inputStyle()}
+              value={content.title}
+              onChange={(e) =>
+                setContent({ ...content, title: e.target.value })
+              }
+            />
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
-                gap: "25px",
+                gap: "20px",
               }}
             >
-              <select
-                value={courseId}
-                onChange={(e) => setCourseId(e.target.value)}
-                style={inputStyle(isDarkMode)}
-              >
-                <option value="web_dev">Web Development</option>
-                <option value="software_eng">Software Engineering</option>
-                <option value="cyber_security">Cyber Security</option>
-              </select>
-              <div style={{ position: "relative" }}>
-                <input
-                  type="number"
-                  value={weekNum}
-                  onChange={(e) => setWeekNum(e.target.value)}
-                  style={inputStyle(isDarkMode)}
-                  placeholder="Week Number"
-                />
-              </div>
-            </div>
-
-            <div style={{ position: "relative" }}>
-              <label style={labelStyle}>Module Title</label>
               <input
-                placeholder="Enter title..."
-                style={inputStyle(isDarkMode)}
-                value={content.title}
+                placeholder="YouTube Video ID"
+                style={inputStyle()}
+                value={content.videoUrl}
                 onChange={(e) =>
-                  setContent({ ...content, title: e.target.value })
+                  setContent({ ...content, videoUrl: e.target.value })
+                }
+              />
+              <input
+                placeholder="PDF Asset URL"
+                style={inputStyle()}
+                value={content.pdfUrl}
+                onChange={(e) =>
+                  setContent({ ...content, pdfUrl: e.target.value })
                 }
               />
             </div>
-
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "25px",
-              }}
-            >
-              <div style={{ position: "relative" }}>
-                <label style={labelStyle}>
-                  <FileVideo size={12} /> YouTube ID
-                </label>
-                <input
-                  placeholder="e.g. dQw4w9WgXcQ"
-                  style={inputStyle(isDarkMode)}
-                  value={content.videoUrl}
-                  onChange={(e) =>
-                    setContent({ ...content, videoUrl: e.target.value })
-                  }
-                />
-              </div>
-              <div style={{ position: "relative" }}>
-                <label style={labelStyle}>
-                  <FileText size={12} /> Resource PDF
-                </label>
-                <input
-                  placeholder="URL Link"
-                  style={inputStyle(isDarkMode)}
-                  value={content.pdfUrl}
-                  onChange={(e) =>
-                    setContent({ ...content, pdfUrl: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
-            >
-              <label
-                style={{
-                  fontSize: "11px",
-                  fontWeight: "900",
-                  textTransform: "uppercase",
-                  color: "#2563eb",
-                  letterSpacing: "1px",
-                }}
-              >
-                <Clock size={14} style={{ marginRight: "5px" }} /> Scheduled
-                Auto-Release
-              </label>
-              <input
-                type="datetime-local"
-                style={inputStyle(isDarkMode)}
-                value={content.startDate}
-                onChange={(e) =>
-                  setContent({ ...content, startDate: e.target.value })
-                }
-              />
-            </div>
-
             <button
               type="submit"
-              disabled={loading}
               style={{
-                padding: "25px",
+                padding: "20px",
                 backgroundColor: "#2563eb",
                 color: "white",
-                borderRadius: "25px",
-                fontWeight: "900",
-                textTransform: "uppercase",
+                borderRadius: "20px",
+                fontWeight: 900,
                 border: "none",
                 cursor: "pointer",
-                fontSize: "14px",
-                letterSpacing: "2px",
-                opacity: loading ? 0.6 : 1,
-                marginTop: "20px",
-                transition: "0.3s",
               }}
             >
-              {loading ? "Synchronizing..." : "Deploy Content to Students"}
+              DEPLOY MODULE
             </button>
           </form>
         </div>
@@ -417,42 +412,47 @@ const AdminContentManager = () => {
   );
 };
 
-const navStyle = (active, dark) => ({
+// Helper Styles
+const navStyle = (active) => ({
   display: "flex",
   alignItems: "center",
-  gap: "15px",
-  padding: "20px",
-  borderRadius: "20px",
+  gap: "12px",
+  padding: "16px",
+  borderRadius: "16px",
   textDecoration: "none",
-  fontWeight: "900",
-  fontSize: "13px",
-  textTransform: "uppercase",
+  fontWeight: "bold",
+  fontSize: "12px",
   backgroundColor: active ? "#2563eb" : "transparent",
-  color: active ? "#ffffff" : dark ? "#94a3b8" : "#64748b",
-  transition: "0.2s",
+  color: active ? "white" : "#64748b",
 });
 
-const inputStyle = (dark) => ({
-  width: "100%",
-  padding: "20px",
-  borderRadius: "20px",
-  backgroundColor: dark ? "#0f172a" : "#f1f5f9",
-  border: `2px solid ${dark ? "#1e293b" : "#e2e8f0"}`,
-  color: dark ? "#ffffff" : "#0f172a",
-  outline: "none",
-  fontWeight: "700",
-  fontSize: "15px",
-});
-
-const labelStyle = {
-  fontSize: "10px",
-  fontWeight: "900",
-  textTransform: "uppercase",
-  opacity: 0.6,
-  marginBottom: "8px",
+const quickActionStyle = () => ({
+  backgroundColor: "white",
+  padding: "25px",
+  borderRadius: "25px",
+  border: "1px solid #e2e8f0",
   display: "flex",
+  flexDirection: "column",
   alignItems: "center",
-  gap: "5px",
+  justifyContent: "center",
+  textDecoration: "none",
+  gap: "10px",
+});
+
+const quickLabelStyle = {
+  fontSize: "8px",
+  fontWeight: "900",
+  color: "#0f172a",
+  textAlign: "center",
 };
+const inputStyle = () => ({
+  width: "100%",
+  padding: "18px",
+  borderRadius: "18px",
+  border: "2px solid #f1f5f9",
+  backgroundColor: "#f8fafc",
+  outline: "none",
+  fontWeight: "bold",
+});
 
 export default AdminContentManager;
