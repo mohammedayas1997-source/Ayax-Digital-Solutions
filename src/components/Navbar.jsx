@@ -111,7 +111,6 @@ const Navbar = () => {
               </a>
             ),
           )}
-          // Cikin Navbar.jsx
           <a
             href="#verify-section"
             className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-600 transition-all"
