@@ -19,11 +19,19 @@ import {
   Clock,
   Users,
   MessageSquare,
+  Menu,
+  X,
 } from "lucide-react";
 
 const AdminContentManager = () => {
   const navigate = useNavigate();
-  const [isDarkMode, setIsDarkMode] = useState(false);
+
+  // 1. Dark Mode State (Yana adana preference a localStorage)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem("ayax-admin-theme") === "dark";
+  });
+
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const [courseId, setCourseId] = useState("web_dev");
@@ -39,7 +47,14 @@ const AdminContentManager = () => {
   const getDocRef = () =>
     doc(db, "courses", courseId, "weeks", `week_${weekNum}`);
 
-  // FETCH DATA LOGIC
+  // Theme Toggler
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    localStorage.setItem("ayax-admin-theme", newTheme ? "dark" : "light");
+  };
+
+  // Fetch Data on Change
   useEffect(() => {
     const fetchCurrentContent = async () => {
       setLoading(true);
@@ -63,13 +78,14 @@ const AdminContentManager = () => {
           });
         }
       } catch (e) {
-        console.error(e);
+        console.error("Error fetching data:", e);
       }
       setLoading(false);
     };
     fetchCurrentContent();
   }, [courseId, weekNum]);
 
+  // Handle Deploy (Stop Home redirection)
   const handleCommit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -89,15 +105,17 @@ const AdminContentManager = () => {
       );
       alert("Success: Content Deployed!");
     } catch (error) {
-      alert("Error!");
+      alert("Deployment Error!");
     } finally {
       setLoading(false);
     }
   };
 
   const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/admin-gateway");
+    if (window.confirm("Are you sure you want to logout?")) {
+      await signOut(auth);
+      navigate("/admin-gateway");
+    }
   };
 
   return (
@@ -109,39 +127,58 @@ const AdminContentManager = () => {
         color: isDarkMode ? "white" : "#0f172a",
       }}
     >
-      {/* SIDEBAR - forced Z-index and visibility */}
+      {/* SIDEBAR - Mobile Responsive Logic */}
       <aside
         style={{
           width: "280px",
           backgroundColor: isDarkMode ? "#0f172a" : "#ffffff",
-          borderRight: "1px solid #e2e8f0",
+          borderRight: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
           display: "flex",
           flexDirection: "column",
           padding: "30px",
           position: "fixed",
           height: "100vh",
-          zIndex: 1000,
+          zIndex: 2000,
+          left: 0,
+          top: 0,
+          transform: isMenuOpen ? "translateX(0)" : "translateX(-100%)",
+          transition: "transform 0.3s ease-in-out",
         }}
+        className="sidebar-main"
       >
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "10px",
+            justifyContent: "space-between",
             marginBottom: "40px",
           }}
         >
-          <div
-            style={{
-              padding: "10px",
-              backgroundColor: "#2563eb",
-              borderRadius: "12px",
-              color: "white",
-            }}
-          >
-            <ShieldCheck size={24} />
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div
+              style={{
+                padding: "10px",
+                backgroundColor: "#2563eb",
+                borderRadius: "12px",
+                color: "white",
+              }}
+            >
+              <ShieldCheck size={24} />
+            </div>
+            <h1 style={{ fontWeight: 900, fontSize: "18px" }}>AYAX ADMIN</h1>
           </div>
-          <h1 style={{ fontWeight: 900, fontSize: "18px" }}>AYAX ADMIN</h1>
+          <button
+            onClick={() => setIsMenuOpen(false)}
+            style={{
+              border: "none",
+              background: "none",
+              cursor: "pointer",
+              color: isDarkMode ? "white" : "black",
+            }}
+            className="mobile-only"
+          >
+            <X size={24} />
+          </button>
         </div>
 
         <nav
@@ -152,13 +189,25 @@ const AdminContentManager = () => {
             gap: "10px",
           }}
         >
-          <Link to="/admin-dashboard" style={navStyle(true)}>
+          <Link
+            to="/admin-dashboard"
+            onClick={() => setIsMenuOpen(false)}
+            style={navStyle(true, isDarkMode)}
+          >
             <LayoutDashboard size={18} /> Dashboard
           </Link>
-          <Link to="/admin/grading" style={navStyle(false)}>
-            <GraduationCap size={18} /> Grading Queue
+          <Link
+            to="/admin/grading"
+            onClick={() => setIsMenuOpen(false)}
+            style={navStyle(false, isDarkMode)}
+          >
+            <GraduationCap size={18} /> Student Grading
           </Link>
-          <Link to="/admin/questions" style={navStyle(false)}>
+          <Link
+            to="/admin/questions"
+            onClick={() => setIsMenuOpen(false)}
+            style={navStyle(false, isDarkMode)}
+          >
             <Database size={18} /> Question Bank
           </Link>
         </nav>
@@ -171,197 +220,210 @@ const AdminContentManager = () => {
             gap: "15px",
           }}
         >
-          <button
-            onClick={() => setIsDarkMode(!isDarkMode)}
-            style={{
-              padding: "15px",
-              borderRadius: "15px",
-              border: "1px solid #e2e8f0",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
-              fontWeight: "bold",
-            }}
-          >
+          <button onClick={toggleTheme} style={bottomBtnStyle(isDarkMode)}>
             {isDarkMode ? (
               <Sun size={18} color="#eab308" />
             ) : (
               <Moon size={18} color="#475569" />
-            )}{" "}
-            {isDarkMode ? "Light" : "Dark"}
+            )}
+            {isDarkMode ? "LIGHT MODE" : "DARK MODE"}
           </button>
           <button
             onClick={handleLogout}
             style={{
-              padding: "15px",
-              borderRadius: "15px",
+              ...bottomBtnStyle(isDarkMode),
               backgroundColor: "#dc2626",
               color: "white",
               border: "none",
-              fontWeight: "bold",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: "10px",
             }}
           >
-            <LogOut size={18} /> Logout
+            <LogOut size={18} /> LOGOUT
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
-      <main style={{ flex: 1, marginLeft: "280px", padding: "40px" }}>
-        {/* Header section from your screenshot */}
-        <div style={{ marginBottom: "40px" }}>
-          <p
-            style={{
-              fontSize: "10px",
-              fontWeight: 900,
-              color: "#2563eb",
-              letterSpacing: "2px",
-            }}
-          >
-            MANAGEMENT SUITE
-          </p>
-        </div>
+      {/* OVERLAY FOR MOBILE */}
+      {isMenuOpen && (
+        <div
+          onClick={() => setIsMenuOpen(false)}
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            zIndex: 1500,
+          }}
+        ></div>
+      )}
 
-        {/* Top Cards Grid */}
+      {/* MAIN CONTENT AREA */}
+      <main
+        style={{
+          flex: 1,
+          marginLeft: "0", // Default mobile
+          padding: "20px",
+          transition: "margin 0.3s",
+        }}
+        className="content-area"
+      >
+        {/* MOBILE HEADER */}
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            marginBottom: "30px",
+          }}
+          className="mobile-header"
+        >
+          <button
+            onClick={() => setIsMenuOpen(true)}
+            style={{
+              padding: "12px",
+              backgroundColor: "#2563eb",
+              color: "white",
+              borderRadius: "12px",
+              border: "none",
+            }}
+          >
+            <Menu size={24} />
+          </button>
+          <h2 style={{ fontSize: "14px", fontWeight: 900 }}>
+            MANAGEMENT <span style={{ color: "#2563eb" }}>CORE</span>
+          </h2>
+        </div>
+
+        {/* TOP CARDS GRID */}
+        <div
+          className="grid-cards"
+          style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "25px",
-            marginBottom: "50px",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: "20px",
+            marginBottom: "40px",
           }}
         >
           <div
             style={{
               background: "linear-gradient(135deg, #2563eb, #3b82f6)",
-              padding: "35px",
-              borderRadius: "35px",
+              padding: "30px",
+              borderRadius: "30px",
               color: "white",
             }}
           >
             <h3 style={{ fontSize: "14px" }}>Enrolled Students</h3>
-            <h2 style={{ fontSize: "36px", fontWeight: 900, margin: "15px 0" }}>
+            <h2 style={{ fontSize: "32px", fontWeight: 900, margin: "10px 0" }}>
               ---
             </h2>
-            <Link
-              to="/admin/students/web_dev"
-              style={{
-                padding: "10px 20px",
-                background: "rgba(255,255,255,0.2)",
-                borderRadius: "10px",
-                color: "white",
-                fontSize: "10px",
-                fontWeight: "bold",
-                textDecoration: "none",
-              }}
-            >
+            <Link to="/admin/students/all" style={cardBtnStyle}>
               VIEW ROSTER
             </Link>
           </div>
-
           <div
             style={{
-              backgroundColor: "white",
-              padding: "35px",
-              borderRadius: "35px",
-              border: "1px solid #e2e8f0",
+              backgroundColor: isDarkMode ? "#1e293b" : "white",
+              padding: "30px",
+              borderRadius: "30px",
+              border: `1px solid ${isDarkMode ? "#334155" : "#e2e8f0"}`,
             }}
           >
-            <h3 style={{ fontSize: "14px", color: "#64748b" }}>
+            <h3
+              style={{
+                fontSize: "14px",
+                color: isDarkMode ? "#94a3b8" : "#64748b",
+              }}
+            >
               Grading Queue
             </h3>
             <h2
               style={{
-                fontSize: "36px",
+                fontSize: "32px",
                 fontWeight: 900,
-                margin: "15px 0",
-                color: "#0f172a",
+                margin: "10px 0",
+                color: isDarkMode ? "white" : "#0f172a",
               }}
             >
               ---
             </h2>
             <Link
               to="/admin/grading"
-              style={{
-                padding: "12px 25px",
-                backgroundColor: "#0f172a",
-                color: "white",
-                borderRadius: "12px",
-                fontSize: "10px",
-                fontWeight: "bold",
-                textDecoration: "none",
-              }}
+              style={{ ...cardBtnStyle, backgroundColor: "#0f172a" }}
             >
               START GRADING
             </Link>
           </div>
         </div>
 
-        {/* Quick Actions (Icons in your screenshot) */}
+        {/* QUICK ACTIONS */}
         <p
           style={{
             fontSize: "10px",
             fontWeight: 900,
             color: "#94a3b8",
             letterSpacing: "2px",
-            marginBottom: "20px",
+            marginBottom: "15px",
           }}
         >
           QUICK ACTIONS
         </p>
         <div
+          className="quick-actions-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
+            gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
             gap: "15px",
-            marginBottom: "50px",
+            marginBottom: "40px",
           }}
         >
-          <Link to="/admin/questions" style={quickActionStyle()}>
+          <Link to="/admin/questions" style={quickActionStyle(isDarkMode)}>
             <Database size={24} color="#2563eb" />
-            <span style={quickLabelStyle}>QUESTIONS BANK</span>
+            <span style={quickLabelStyle(isDarkMode)}>QUESTIONS</span>
           </Link>
-          <Link to="/admin/grading" style={quickActionStyle()}>
+          <Link to="/admin/grading" style={quickActionStyle(isDarkMode)}>
             <GraduationCap size={24} color="#2563eb" />
-            <span style={quickLabelStyle}>STUDENT GRADING</span>
+            <span style={quickLabelStyle(isDarkMode)}>GRADING</span>
           </Link>
-          <Link to="/admin/students/all" style={quickActionStyle()}>
+          <Link to="/admin/students/all" style={quickActionStyle(isDarkMode)}>
             <Users size={24} color="#2563eb" />
-            <span style={quickLabelStyle}>ENROLLED STUDENTS</span>
+            <span style={quickLabelStyle(isDarkMode)}>STUDENTS</span>
           </Link>
-          <Link to="/admin/chat/web_dev" style={quickActionStyle()}>
+          <Link to="/admin/chat/all" style={quickActionStyle(isDarkMode)}>
             <MessageSquare size={24} color="#2563eb" />
-            <span style={quickLabelStyle}>COURSE CHAT</span>
+            <span style={quickLabelStyle(isDarkMode)}>CHAT</span>
           </Link>
         </div>
 
-        {/* CONTENT MANAGER FORM */}
+        {/* CONTENT FORM */}
         <div
           style={{
-            backgroundColor: "white",
-            padding: "50px",
-            borderRadius: "50px",
-            border: "1px solid #e2e8f0",
+            backgroundColor: isDarkMode ? "#0f172a" : "white",
+            padding: "30px",
+            borderRadius: "40px",
+            border: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
             boxShadow: "0 20px 40px rgba(0,0,0,0.05)",
           }}
         >
-          <h2
-            style={{ fontSize: "32px", fontWeight: 900, marginBottom: "40px" }}
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: "30px",
+            }}
           >
-            CONTENT <span style={{ color: "#2563eb" }}>MANAGER</span>
-          </h2>
+            <h2 style={{ fontSize: "24px", fontWeight: 900 }}>
+              CONTENT <span style={{ color: "#2563eb" }}>MANAGER</span>
+            </h2>
+            {loading && (
+              <RefreshCcw size={20} className="animate-spin text-blue-600" />
+            )}
+          </div>
           <form
             onSubmit={handleCommit}
-            style={{ display: "flex", flexDirection: "column", gap: "25px" }}
+            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
           >
             <input
               placeholder="Module Title"
-              style={inputStyle()}
+              style={inputStyle(isDarkMode)}
               value={content.title}
               onChange={(e) =>
                 setContent({ ...content, title: e.target.value })
@@ -370,13 +432,13 @@ const AdminContentManager = () => {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "1fr 1fr",
-                gap: "20px",
+                gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                gap: "15px",
               }}
             >
               <input
                 placeholder="YouTube Video ID"
-                style={inputStyle()}
+                style={inputStyle(isDarkMode)}
                 value={content.videoUrl}
                 onChange={(e) =>
                   setContent({ ...content, videoUrl: e.target.value })
@@ -384,7 +446,7 @@ const AdminContentManager = () => {
               />
               <input
                 placeholder="PDF Asset URL"
-                style={inputStyle()}
+                style={inputStyle(isDarkMode)}
                 value={content.pdfUrl}
                 onChange={(e) =>
                   setContent({ ...content, pdfUrl: e.target.value })
@@ -393,6 +455,7 @@ const AdminContentManager = () => {
             </div>
             <button
               type="submit"
+              disabled={loading}
               style={{
                 padding: "20px",
                 backgroundColor: "#2563eb",
@@ -401,19 +464,34 @@ const AdminContentManager = () => {
                 fontWeight: 900,
                 border: "none",
                 cursor: "pointer",
+                opacity: loading ? 0.7 : 1,
               }}
             >
-              DEPLOY MODULE
+              {loading ? "SAVING..." : "DEPLOY MODULE"}
             </button>
           </form>
         </div>
       </main>
+
+      {/* Responsive Styles Injection */}
+      <style>{`
+        @media (min-width: 769px) {
+          .sidebar-main { transform: translateX(0) !important; }
+          .content-area { margin-left: 280px !important; }
+          .mobile-header { display: none !important; }
+          .mobile-only { display: none !important; }
+        }
+        @media (max-width: 768px) {
+          .content-area { margin-left: 0 !important; padding: 15px !important; }
+          .grid-cards { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
     </div>
   );
 };
 
-// Helper Styles
-const navStyle = (active) => ({
+// --- STYLING HELPERS ---
+const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
   gap: "12px",
@@ -423,36 +501,56 @@ const navStyle = (active) => ({
   fontWeight: "bold",
   fontSize: "12px",
   backgroundColor: active ? "#2563eb" : "transparent",
-  color: active ? "white" : "#64748b",
+  color: active ? "white" : dark ? "#94a3b8" : "#64748b",
 });
 
-const quickActionStyle = () => ({
-  backgroundColor: "white",
+const quickActionStyle = (dark) => ({
+  backgroundColor: dark ? "#1e293b" : "white",
   padding: "25px",
   borderRadius: "25px",
-  border: "1px solid #e2e8f0",
+  border: `1px solid ${dark ? "#334155" : "#e2e8f0"}`,
   display: "flex",
   flexDirection: "column",
   alignItems: "center",
-  justifyContent: "center",
-  textDecoration: "none",
   gap: "10px",
+  textDecoration: "none",
 });
 
-const quickLabelStyle = {
+const quickLabelStyle = (dark) => ({
   fontSize: "8px",
   fontWeight: "900",
-  color: "#0f172a",
-  textAlign: "center",
-};
-const inputStyle = () => ({
+  color: dark ? "white" : "#0f172a",
+});
+const inputStyle = (dark) => ({
   width: "100%",
   padding: "18px",
   borderRadius: "18px",
-  border: "2px solid #f1f5f9",
-  backgroundColor: "#f8fafc",
+  border: `2px solid ${dark ? "#1e293b" : "#f1f5f9"}`,
+  backgroundColor: dark ? "#020617" : "#f8fafc",
+  color: dark ? "white" : "black",
   outline: "none",
   fontWeight: "bold",
 });
+const bottomBtnStyle = (dark) => ({
+  padding: "15px",
+  borderRadius: "15px",
+  border: `1px solid ${dark ? "#334155" : "#e2e8f0"}`,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "10px",
+  fontWeight: "bold",
+  backgroundColor: dark ? "#1e293b" : "white",
+  color: dark ? "white" : "#475569",
+});
+const cardBtnStyle = {
+  padding: "8px 15px",
+  background: "rgba(255,255,255,0.2)",
+  borderRadius: "10px",
+  color: "white",
+  fontSize: "10px",
+  fontWeight: "bold",
+  textDecoration: "none",
+};
 
 export default AdminContentManager;
