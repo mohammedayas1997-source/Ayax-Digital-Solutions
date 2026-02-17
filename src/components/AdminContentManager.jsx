@@ -43,7 +43,6 @@ const AdminContentManager = () => {
   const getDocRef = () =>
     doc(db, "courses", courseId, "weeks", `week_${weekNum}`);
 
-  // 1. WANNAN SHINE ZAI DUBI ABINDA KE CIKI (FETCH LOGIC)
   useEffect(() => {
     const fetchCurrentContent = async () => {
       setLoading(true);
@@ -51,7 +50,6 @@ const AdminContentManager = () => {
         const snap = await getDoc(getDocRef());
         if (snap.exists()) {
           const data = snap.data();
-          // Muna maida Firebase Timestamp zuwa format din da input zai gane
           setContent({
             ...data,
             startDate: data.startDate?.toDate
@@ -59,7 +57,6 @@ const AdminContentManager = () => {
               : data.startDate || "",
           });
         } else {
-          // Idan babu komai, mu share input din
           setContent({
             title: "",
             videoUrl: "",
@@ -74,23 +71,19 @@ const AdminContentManager = () => {
       setLoading(false);
     };
     fetchCurrentContent();
-  }, [courseId, weekNum]); // Zai sake tashi duk sanda aka canza Course ko Week
+  }, [courseId, weekNum]);
 
-  // 2. GYARAN DEPLOY (SAVE) LOGIC
   const handleCommit = async (e) => {
-    e.preventDefault(); // MUHIMMI: Wannan ne zai hana shi mayar da kai Home!
-
+    e.preventDefault();
     if (!content.title || !content.videoUrl) {
       alert("Please enter Title and Video ID!");
       return;
     }
-
     setLoading(true);
     try {
       const releaseDate = content.startDate
         ? new Date(content.startDate)
         : new Date();
-
       await setDoc(
         getDocRef(),
         {
@@ -101,7 +94,6 @@ const AdminContentManager = () => {
         },
         { merge: true },
       );
-
       alert(`SUCCESS: Week ${weekNum} has been updated!`);
     } catch (error) {
       alert("Error updating database.");
@@ -120,54 +112,57 @@ const AdminContentManager = () => {
     }
   };
 
+  // Icon Color Helper
+  const iconColor = isDarkMode ? "#ffffff" : "#0f172a";
+
   return (
     <div
       style={{
         display: "flex",
         minHeight: "100vh",
+        width: "100%",
         backgroundColor: isDarkMode ? "#020617" : "#f8fafc",
-        color: isDarkMode ? "white" : "#0f172a",
+        color: isDarkMode ? "#ffffff" : "#0f172a",
+        position: "relative",
+        zIndex: 1,
       }}
     >
-      {/* SIDEBAR */}
+      {/* SIDEBAR - Forced Visibility */}
       <aside
         style={{
           width: "280px",
           backgroundColor: isDarkMode ? "#0f172a" : "#ffffff",
-          borderRight: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+          borderRight: `2px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
           display: "flex",
           flexDirection: "column",
-          padding: "24px",
-          position: "relative",
-          zIndex: 100,
+          padding: "30px",
+          position: "sticky",
+          top: 0,
+          height: "100vh",
+          zIndex: 9999, // Tilasta shi ya fito saman komai
         }}
       >
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "12px",
-            marginBottom: "40px",
+            gap: "15px",
+            marginBottom: "50px",
           }}
         >
           <div
             style={{
-              padding: "8px",
+              padding: "10px",
               backgroundColor: "#2563eb",
-              borderRadius: "12px",
-              color: "white",
+              borderRadius: "15px",
             }}
           >
-            <ShieldCheck size={24} />
+            <ShieldCheck size={28} color="#ffffff" strokeWidth={3} />
           </div>
           <h1
-            style={{
-              fontWeight: 900,
-              textTransform: "uppercase",
-              fontStyle: "italic",
-            }}
+            style={{ fontWeight: 900, fontSize: "20px", letterSpacing: "-1px" }}
           >
-            AYAX Admin
+            AYAX ADMIN
           </h1>
         </div>
 
@@ -176,87 +171,95 @@ const AdminContentManager = () => {
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            gap: "8px",
+            gap: "10px",
           }}
         >
-          <Link to="/admin-dashboard" style={navStyle(true)}>
-            <LayoutDashboard size={18} /> Dashboard
+          <Link to="/admin-dashboard" style={navStyle(true, isDarkMode)}>
+            <LayoutDashboard size={20} color="#ffffff" /> Dashboard
           </Link>
           <Link to="/admin/grading" style={navStyle(false, isDarkMode)}>
-            <GraduationCap size={18} /> Grading
+            <GraduationCap
+              size={20}
+              color={isDarkMode ? "#94a3b8" : "#64748b"}
+            />{" "}
+            Grading
           </Link>
           <Link to="/admin/questions" style={navStyle(false, isDarkMode)}>
-            <Database size={18} /> Question Bank
+            <Database size={20} color={isDarkMode ? "#94a3b8" : "#64748b"} />{" "}
+            Questions
           </Link>
         </nav>
 
+        {/* BOTTOM CONTROLS - Logout & Dark Mode */}
         <div
           style={{
-            marginTop: "auto",
+            paddingBottom: "20px",
             display: "flex",
             flexDirection: "column",
-            gap: "12px",
+            gap: "15px",
           }}
         >
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
             style={{
-              padding: "12px",
-              borderRadius: "12px",
-              border: "1px solid #334155",
+              padding: "15px",
+              borderRadius: "18px",
+              border: `2px solid ${isDarkMode ? "#334155" : "#e2e8f0"}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "10px",
-              fontWeight: "bold",
+              gap: "12px",
+              fontWeight: "900",
               cursor: "pointer",
-              backgroundColor: "transparent",
+              backgroundColor: isDarkMode ? "#1e293b" : "#ffffff",
               color: isDarkMode ? "#eab308" : "#475569",
+              transition: "0.3s",
             }}
           >
             {isDarkMode ? (
-              <>
-                <Sun size={18} /> Light
-              </>
+              <Sun size={22} color="#eab308" />
             ) : (
-              <>
-                <Moon size={18} /> Dark
-              </>
+              <Moon size={22} color="#475569" />
             )}
+            {isDarkMode ? "LIGHT MODE" : "DARK MODE"}
           </button>
+
           <button
             onClick={handleLogout}
             style={{
-              padding: "16px",
-              borderRadius: "16px",
-              backgroundColor: "#dc2626",
+              padding: "18px",
+              borderRadius: "20px",
+              backgroundColor: "#ef4444",
               color: "white",
               border: "none",
-              fontWeight: 900,
+              fontWeight: "900",
               textTransform: "uppercase",
               cursor: "pointer",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              gap: "10px",
+              gap: "12px",
+              boxShadow: "0 10px 15px -3px rgba(239, 68, 68, 0.3)",
             }}
           >
-            <LogOut size={18} /> Logout
+            <LogOut size={22} color="#ffffff" /> LOGOUT
           </button>
         </div>
       </aside>
 
-      {/* MAIN AREA */}
-      <main style={{ flex: 1, padding: "40px", overflowY: "auto" }}>
+      {/* MAIN CONTENT */}
+      <main style={{ flex: 1, padding: "50px", overflowY: "auto" }}>
         <div
           style={{
-            maxWidth: "900px",
+            maxWidth: "1000px",
             margin: "0 auto",
-            backgroundColor: isDarkMode ? "rgba(30, 41, 59, 0.4)" : "#ffffff",
-            padding: "48px",
-            borderRadius: "40px",
+            backgroundColor: isDarkMode ? "rgba(15, 23, 42, 0.6)" : "#ffffff",
+            padding: "50px",
+            borderRadius: "50px",
             border: `1px solid ${isDarkMode ? "#1e293b" : "#f1f5f9"}`,
-            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)",
+            boxShadow: isDarkMode
+              ? "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
+              : "0 20px 25px -5px rgba(0, 0, 0, 0.1)",
           }}
         >
           <div
@@ -264,31 +267,34 @@ const AdminContentManager = () => {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
-              marginBottom: "40px",
+              marginBottom: "50px",
             }}
           >
             <h2
               style={{
-                fontSize: "36px",
-                fontWeight: 900,
+                fontSize: "40px",
+                fontWeight: "900",
                 textTransform: "uppercase",
                 fontStyle: "italic",
+                letterSpacing: "-2px",
               }}
             >
               Content <span style={{ color: "#2563eb" }}>Manager</span>
             </h2>
-            {loading && <RefreshCcw className="animate-spin text-blue-500" />}
+            {loading && (
+              <RefreshCcw className="animate-spin text-blue-500" size={30} />
+            )}
           </div>
 
           <form
             onSubmit={handleCommit}
-            style={{ display: "flex", flexDirection: "column", gap: "24px" }}
+            style={{ display: "flex", flexDirection: "column", gap: "30px" }}
           >
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
-                gap: "20px",
+                gap: "25px",
               }}
             >
               <select
@@ -300,61 +306,78 @@ const AdminContentManager = () => {
                 <option value="software_eng">Software Engineering</option>
                 <option value="cyber_security">Cyber Security</option>
               </select>
-              <input
-                type="number"
-                value={weekNum}
-                onChange={(e) => setWeekNum(e.target.value)}
-                style={inputStyle(isDarkMode)}
-                placeholder="Week Number"
-              />
+              <div style={{ position: "relative" }}>
+                <input
+                  type="number"
+                  value={weekNum}
+                  onChange={(e) => setWeekNum(e.target.value)}
+                  style={inputStyle(isDarkMode)}
+                  placeholder="Week Number"
+                />
+              </div>
             </div>
 
-            <input
-              placeholder="Lesson Title"
-              style={inputStyle(isDarkMode)}
-              value={content.title}
-              onChange={(e) =>
-                setContent({ ...content, title: e.target.value })
-              }
-            />
+            <div style={{ position: "relative" }}>
+              <label style={labelStyle}>Module Title</label>
+              <input
+                placeholder="Enter title..."
+                style={inputStyle(isDarkMode)}
+                value={content.title}
+                onChange={(e) =>
+                  setContent({ ...content, title: e.target.value })
+                }
+              />
+            </div>
 
             <div
               style={{
                 display: "grid",
                 gridTemplateColumns: "1fr 1fr",
-                gap: "20px",
+                gap: "25px",
               }}
             >
-              <input
-                placeholder="YouTube Video ID"
-                style={inputStyle(isDarkMode)}
-                value={content.videoUrl}
-                onChange={(e) =>
-                  setContent({ ...content, videoUrl: e.target.value })
-                }
-              />
-              <input
-                placeholder="PDF Link"
-                style={inputStyle(isDarkMode)}
-                value={content.pdfUrl}
-                onChange={(e) =>
-                  setContent({ ...content, pdfUrl: e.target.value })
-                }
-              />
+              <div style={{ position: "relative" }}>
+                <label style={labelStyle}>
+                  <FileVideo size={12} /> YouTube ID
+                </label>
+                <input
+                  placeholder="e.g. dQw4w9WgXcQ"
+                  style={inputStyle(isDarkMode)}
+                  value={content.videoUrl}
+                  onChange={(e) =>
+                    setContent({ ...content, videoUrl: e.target.value })
+                  }
+                />
+              </div>
+              <div style={{ position: "relative" }}>
+                <label style={labelStyle}>
+                  <FileText size={12} /> Resource PDF
+                </label>
+                <input
+                  placeholder="URL Link"
+                  style={inputStyle(isDarkMode)}
+                  value={content.pdfUrl}
+                  onChange={(e) =>
+                    setContent({ ...content, pdfUrl: e.target.value })
+                  }
+                />
+              </div>
             </div>
 
             <div
-              style={{ display: "flex", flexDirection: "column", gap: "8px" }}
+              style={{ display: "flex", flexDirection: "column", gap: "10px" }}
             >
               <label
                 style={{
-                  fontSize: "10px",
-                  fontWeight: "bold",
+                  fontSize: "11px",
+                  fontWeight: "900",
                   textTransform: "uppercase",
-                  color: "#3b82f6",
+                  color: "#2563eb",
+                  letterSpacing: "1px",
                 }}
               >
-                Scheduled Release Date
+                <Clock size={14} style={{ marginRight: "5px" }} /> Scheduled
+                Auto-Release
               </label>
               <input
                 type="datetime-local"
@@ -370,19 +393,22 @@ const AdminContentManager = () => {
               type="submit"
               disabled={loading}
               style={{
-                padding: "20px",
+                padding: "25px",
                 backgroundColor: "#2563eb",
                 color: "white",
-                borderRadius: "20px",
-                fontWeight: 900,
+                borderRadius: "25px",
+                fontWeight: "900",
                 textTransform: "uppercase",
                 border: "none",
                 cursor: "pointer",
-                opacity: loading ? 0.5 : 1,
+                fontSize: "14px",
+                letterSpacing: "2px",
+                opacity: loading ? 0.6 : 1,
                 marginTop: "20px",
+                transition: "0.3s",
               }}
             >
-              {loading ? "Syncing..." : "Deploy Module"}
+              {loading ? "Synchronizing..." : "Deploy Content to Students"}
             </button>
           </form>
         </div>
@@ -394,24 +420,39 @@ const AdminContentManager = () => {
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
-  gap: "12px",
-  padding: "16px",
-  borderRadius: "16px",
+  gap: "15px",
+  padding: "20px",
+  borderRadius: "20px",
   textDecoration: "none",
-  fontWeight: 800,
-  fontSize: "12px",
+  fontWeight: "900",
+  fontSize: "13px",
   textTransform: "uppercase",
   backgroundColor: active ? "#2563eb" : "transparent",
-  color: active ? "white" : dark ? "#94a3b8" : "#64748b",
+  color: active ? "#ffffff" : dark ? "#94a3b8" : "#64748b",
+  transition: "0.2s",
 });
+
 const inputStyle = (dark) => ({
   width: "100%",
-  padding: "16px",
-  borderRadius: "16px",
-  backgroundColor: dark ? "#1e293b" : "#f8fafc",
-  border: `1px solid ${dark ? "#334155" : "#e2e8f0"}`,
-  color: dark ? "white" : "black",
+  padding: "20px",
+  borderRadius: "20px",
+  backgroundColor: dark ? "#0f172a" : "#f1f5f9",
+  border: `2px solid ${dark ? "#1e293b" : "#e2e8f0"}`,
+  color: dark ? "#ffffff" : "#0f172a",
   outline: "none",
+  fontWeight: "700",
+  fontSize: "15px",
 });
+
+const labelStyle = {
+  fontSize: "10px",
+  fontWeight: "900",
+  textTransform: "uppercase",
+  opacity: 0.6,
+  marginBottom: "8px",
+  display: "flex",
+  alignItems: "center",
+  gap: "5px",
+};
 
 export default AdminContentManager;
