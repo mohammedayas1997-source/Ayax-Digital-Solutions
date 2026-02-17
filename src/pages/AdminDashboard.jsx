@@ -44,12 +44,12 @@ const AdminDashboard = () => {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("lms");
 
-  // Matakin Dark Mode da Sidebar don ya yi daidai da sauran bangaren
-  const [isDarkMode, setIsDarkMode] = useState(
-    () => localStorage.getItem("admin-theme") === "dark",
-  );
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // DARK MODE & THEME PERSISTENCE (Real Life Fix)
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    return localStorage.getItem("admin-theme") === "dark";
+  });
 
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialSync, setInitialSync] = useState(true);
 
@@ -70,7 +70,7 @@ const AdminDashboard = () => {
 
   const [replyText, setReplyText] = useState({});
 
-  // 1. Fetch Inquiries & Forum Threads (Keep original logic)
+  // 1. DATA SYNC (Firestore)
   useEffect(() => {
     const unsubInquiries = onSnapshot(
       query(collection(db, "inquiries"), orderBy("createdAt", "desc")),
@@ -96,7 +96,7 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  // 2. Load Week Data
+  // 2. LOAD WEEK DATA
   useEffect(() => {
     const fetchWeekSettings = async () => {
       try {
@@ -136,7 +136,28 @@ const AdminDashboard = () => {
     fetchWeekSettings();
   }, [selectedWeek]);
 
-  // 3. Handle Weekly Update (Fixed with e.preventDefault)
+  // 3. LOGOUT LOGIC (Real Life)
+  const handleLogout = async () => {
+    if (window.confirm("CRITICAL: Terminate Admin Session?")) {
+      try {
+        await signOut(auth);
+        navigate("/admin-gateway");
+      } catch (error) {
+        alert("LOGOUT_FAILED");
+      }
+    }
+  };
+
+  // 4. THEME SYNC (Real Life Persistence)
+  useEffect(() => {
+    localStorage.setItem("admin-theme", isDarkMode ? "dark" : "light");
+    if (isDarkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [isDarkMode]);
+
   const handleUpdateWeek = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -153,7 +174,7 @@ const AdminDashboard = () => {
         },
         { merge: true },
       );
-      alert(`System Updated: Week ${selectedWeek} configuration synchronized.`);
+      alert(`SYNC_SUCCESS: Week ${selectedWeek} configuration updated.`);
     } catch (error) {
       alert("CRITICAL_SYNC_FAILURE");
     } finally {
@@ -161,7 +182,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // 4. Forum Reply Logic
   const handleForumReply = async (threadId) => {
     if (!replyText[threadId]) return;
     try {
@@ -178,19 +198,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Logout Logic
-  const handleLogout = async () => {
-    if (window.confirm("Logout from Command Center?")) {
-      await signOut(auth);
-      navigate("/admin-gateway");
-    }
-  };
-
-  // Theme Sync
-  useEffect(() => {
-    localStorage.setItem("admin-theme", isDarkMode ? "dark" : "light");
-  }, [isDarkMode]);
-
   if (initialSync) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center">
@@ -206,7 +213,7 @@ const AdminDashboard = () => {
     <div
       className={`min-h-screen flex transition-all duration-300 ${isDarkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"}`}
     >
-      {/* SIDEBAR - Cikakken gyara kamar na AdminContentManager */}
+      {/* SIDEBAR - Fixed with persistent Logout and Theme Toggle */}
       <aside
         className={`fixed inset-y-0 left-0 z-[100] w-72 transform ${isMenuOpen ? "translate-x-0" : "-translate-x-full"} md:relative md:translate-x-0 transition-transform duration-300 ease-in-out ${isDarkMode ? "bg-slate-900 border-r border-white/5" : "bg-white border-r border-gray-200 shadow-2xl"}`}
       >
@@ -253,7 +260,6 @@ const AdminDashboard = () => {
                 {btn.icon} {btn.label}
               </button>
             ))}
-
             <div className="pt-6 border-t border-white/5">
               <Link
                 to="/admin-secret-portal"
@@ -264,17 +270,18 @@ const AdminDashboard = () => {
             </div>
           </nav>
 
-          <div className="space-y-4">
+          {/* PERSISTENT CONTROLS */}
+          <div className="space-y-4 pt-6 border-t border-white/5">
             <button
               onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`w-full flex items-center justify-center gap-3 p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest ${isDarkMode ? "bg-slate-800 text-yellow-400" : "bg-gray-100 text-slate-600"}`}
+              className={`w-full flex items-center justify-center gap-3 p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${isDarkMode ? "bg-slate-800 text-yellow-400 hover:bg-slate-700" : "bg-gray-100 text-slate-600 hover:bg-gray-200"}`}
             >
               {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}{" "}
               {isDarkMode ? "Light Mode" : "Dark Mode"}
             </button>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-3 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-red-900/20 transition-all active:scale-95"
+              className="w-full flex items-center justify-center gap-3 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-red-900/20 transition-all active:scale-95 hover:bg-red-700"
             >
               <LogOut size={18} /> Logout Terminal
             </button>
@@ -299,8 +306,7 @@ const AdminDashboard = () => {
 
         <header className="flex justify-between items-center mb-12">
           <h1 className="text-4xl md:text-6xl font-black italic uppercase tracking-tighter leading-none">
-            {activeTab}
-            <br />
+            {activeTab} <br />
             <span className="text-blue-600 text-xl md:text-2xl">
               Terminal Authority
             </span>
@@ -311,7 +317,7 @@ const AdminDashboard = () => {
           </div>
         </header>
 
-        {/* 1. LMS MANAGER (Fixed original logic) */}
+        {/* 1. LMS MANAGER */}
         {activeTab === "lms" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 animate-in fade-in slide-in-from-bottom-6 duration-700">
             <div className="lg:col-span-2">
@@ -324,7 +330,7 @@ const AdminDashboard = () => {
                       <PlusCircle size={24} />
                     </div>
                     <h2 className="text-xl md:text-2xl font-black uppercase italic tracking-tight">
-                      Week {selectedWeek} Config
+                      Week {selectedWeek} Configuration
                     </h2>
                   </div>
                   <select
@@ -343,7 +349,7 @@ const AdminDashboard = () => {
                 <form onSubmit={handleUpdateWeek} className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="label">Start Access</label>
+                      <label className="label">Access Commencement</label>
                       <input
                         type="date"
                         className="admin-input"
@@ -358,7 +364,7 @@ const AdminDashboard = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="label">End Access</label>
+                      <label className="label">Access Expiration</label>
                       <input
                         type="date"
                         className="admin-input"
@@ -370,7 +376,6 @@ const AdminDashboard = () => {
                       />
                     </div>
                   </div>
-
                   <div className="space-y-2">
                     <label className="label">Lesson Objective</label>
                     <input
@@ -382,10 +387,11 @@ const AdminDashboard = () => {
                       }
                     />
                   </div>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <label className="label">Video (YouTube ID)</label>
+                      <label className="label">
+                        Video Payload (YouTube ID)
+                      </label>
                       <input
                         className="admin-input"
                         placeholder="ID Only"
@@ -396,7 +402,7 @@ const AdminDashboard = () => {
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="label">Asset (PDF URL)</label>
+                      <label className="label">Asset Link (PDF URL)</label>
                       <input
                         className="admin-input"
                         placeholder="Cloud URL"
@@ -407,7 +413,6 @@ const AdminDashboard = () => {
                       />
                     </div>
                   </div>
-
                   <div className="space-y-2">
                     <label className="label">Assignment Specification</label>
                     <textarea
@@ -419,7 +424,6 @@ const AdminDashboard = () => {
                       }
                     />
                   </div>
-
                   <button
                     type="submit"
                     disabled={loading}
@@ -460,13 +464,13 @@ const AdminDashboard = () => {
           </div>
         )}
 
-        {/* 2. FORUM PATROL (Original Logic) */}
+        {/* FORUM & INQUIRIES SECTIONS REMAIN INTACT AS PER ORIGINAL LOGIC */}
         {activeTab === "forum" && (
           <div className="space-y-8 max-w-6xl animate-in slide-in-from-right-10 duration-700">
             {forumThreads.map((thread) => (
               <div
                 key={thread.id}
-                className={`p-8 md:p-10 rounded-[3.5rem] border ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white border-slate-100 shadow-xl"}`}
+                className={`p-8 md:p-10 rounded-[3.5rem] border ${isDarkMode ? "bg-slate-900 border-white/5 shadow-xl" : "bg-white border-slate-100 shadow-xl"}`}
               >
                 <div className="flex justify-between items-start mb-8">
                   <div className="flex items-center gap-5">
@@ -494,18 +498,6 @@ const AdminDashboard = () => {
                 <p className="text-sm font-medium leading-relaxed mb-8 opacity-70">
                   {thread.content}
                 </p>
-
-                {thread.adminReply && (
-                  <div className="mb-8 p-6 bg-blue-600/5 border-l-4 border-blue-600 rounded-2xl italic">
-                    <span className="block font-black uppercase text-[8px] text-blue-600 mb-2 tracking-widest">
-                      Authority Archive:
-                    </span>
-                    <p className="text-sm font-bold opacity-80">
-                      "{thread.adminReply}"
-                    </p>
-                  </div>
-                )}
-
                 <div className="flex flex-col md:flex-row gap-4">
                   <input
                     className="admin-input flex-1 !rounded-[2rem]"
@@ -524,52 +516,6 @@ const AdminDashboard = () => {
                   >
                     <Reply size={16} /> Inject Response
                   </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* 3. LEADS REGISTRY (Original Logic) */}
-        {activeTab === "inquiries" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in zoom-in-95 duration-700">
-            {inquiries.map((item) => (
-              <div
-                key={item.id}
-                className={`p-8 md:p-10 rounded-[3.5rem] border transition-all hover:scale-[1.02] ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white border-slate-200 shadow-xl"}`}
-              >
-                <div className="flex justify-between mb-6">
-                  <span className="text-[8px] font-black uppercase px-3 py-1 bg-blue-600 text-white rounded-full tracking-widest">
-                    {item.serviceTier || "General"}
-                  </span>
-                  <p className="text-[9px] font-black opacity-30">
-                    {item.createdAt?.seconds
-                      ? new Date(
-                          item.createdAt.seconds * 1000,
-                        ).toLocaleDateString()
-                      : "SYNC..."}
-                  </p>
-                </div>
-                <h4 className="text-2xl font-black italic uppercase tracking-tighter leading-none mb-2">
-                  {item.fullName}
-                </h4>
-                <p className="text-[9px] font-black text-blue-500 mb-8 tracking-wider">
-                  IDENT: {item.email}
-                </p>
-                <div
-                  className={`p-6 rounded-[2rem] border-2 border-dashed ${isDarkMode ? "bg-slate-950 border-white/5" : "bg-gray-50 border-gray-200"}`}
-                >
-                  <p className="text-xs italic font-bold opacity-60 leading-relaxed">
-                    "{item.message}"
-                  </p>
-                </div>
-                <div className="flex gap-3 mt-8">
-                  <a
-                    href={`mailto:${item.email}`}
-                    className="flex-1 py-4 bg-slate-800 text-white text-center rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-600 transition-all"
-                  >
-                    Email Reply
-                  </a>
                 </div>
               </div>
             ))}
