@@ -72,7 +72,10 @@ function App() {
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/launch-project" element={<ProjectForm />} />
-
+          <ProtectedRoute requiredRole="admin">
+            {" "}
+            <AdminDashboard />{" "}
+          </ProtectedRoute>
           {/* SECURE CONTENT MANAGER PORTAL */}
           <Route
             path="/admin-secret-portal"

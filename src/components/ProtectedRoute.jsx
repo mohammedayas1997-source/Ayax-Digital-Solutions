@@ -6,7 +6,7 @@ import { signOut } from "firebase/auth";
 
 /**
  * SECURE GATEWAY: PROTECTED ROUTE INFRASTRUCTURE
- * An gyara don amincewa da AdminContentManager a kowane matakin Admin.
+ * Cikakken gyara don magance Redirection Loop da tabbatar da amincewar Roles.
  */
 const ProtectedRoute = ({ children, requiredRole }) => {
   const [user, setUser] = useState(null);
@@ -25,7 +25,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
           if (userDoc.exists()) {
             const userData = userDoc.data();
 
-            // Integrity Check: Dakatar da suspended accounts
+            // INTEGRITY CHECK: Dakatar da suspended ko inactive accounts nan take
             if (
               userData.status === "suspended" ||
               userData.status === "inactive"
@@ -40,6 +40,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
               setUser(currentUser);
             }
           } else {
+            // Idan babu user doc, amma yana auth, mu bar shi ya gani amma ba role
             setUser(currentUser);
             setRole(null);
           }
@@ -58,12 +59,13 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return () => unsubscribe();
   }, []);
 
+  // 1. LOADING TERMINAL
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
         <div className="flex flex-col items-center gap-6 text-white">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-[10px] font-black uppercase tracking-[0.4em] animate-pulse">
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] animate-pulse text-blue-500">
             Verifying Security Credentials...
           </p>
         </div>
@@ -71,12 +73,14 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     );
   }
 
+  // 2. ACCOUNT SUSPENSION PROTOCOL
   if (status === "suspended") {
     return (
       <Navigate to="/login" state={{ error: "Account Suspended" }} replace />
     );
   }
 
+  // 3. AUTHENTICATION CHECK
   if (!user) {
     const isAuthorityRoute =
       location.pathname.includes("admin") ||
@@ -86,25 +90,28 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
-  // --- MATAKIN IKO (RBAC LOGIC) ---
+  // 4. ROLE-BASED ACCESS CONTROL (RBAC) LOGIC
   if (requiredRole) {
-    // MUN GYARA ANAN: Halatta AdminContentManager shiga duk inda 'admin' yake da bukata
-    // A cikin ProtectedRoute.jsx:
+    // Tabbatar da matsayin Super-Admin, Admin, ko AdminContentManager
+    const isSuperAdmin = role === "super-admin";
+    const isAdminGeneral = role === "admin" || role === "AdminContentManager";
+
+    // Logic na amincewa:
+    // a. Idan kai super-admin ne (kana da full access)
+    // b. Idan role dinka yayi daidai da requiredRole na shafin
+    // c. Idan shafin na "admin" ne, kuma matsayinka daya ne daga cikin admin roles
     const hasAccess =
-      role === "super-admin" ||
+      isSuperAdmin ||
       role === requiredRole ||
-      (requiredRole === "admin" &&
-        (role === "admin" || role === "AdminContentManager"));
+      (requiredRole === "admin" && isAdminGeneral);
+
     if (!hasAccess) {
-      // Tura kowa inda ya dace maimakon Home kawai
-      const redirectPath =
-        role === "super-admin"
-          ? "/super-admin"
-          : role === "AdminContentManager" || role === "admin"
-            ? "/admin-dashboard"
-            : role === "supervisor"
-              ? "/supervisor-dashboard"
-              : "/student-portal";
+      // DYNAMIC REDIRECTION: Maimakon tura kowa Home, mu tura su Dashboard dinsu na asali
+      let redirectPath = "/student-portal";
+
+      if (isSuperAdmin) redirectPath = "/super-admin";
+      else if (isAdminGeneral) redirectPath = "/admin-dashboard";
+      else if (role === "supervisor") redirectPath = "/supervisor-dashboard";
 
       return <Navigate to={redirectPath} replace />;
     }
