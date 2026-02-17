@@ -89,14 +89,12 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   // --- MATAKIN IKO (RBAC LOGIC) ---
   if (requiredRole) {
     // MUN GYARA ANAN: Halatta AdminContentManager shiga duk inda 'admin' yake da bukata
+    // A cikin ProtectedRoute.jsx:
     const hasAccess =
       role === "super-admin" ||
       role === requiredRole ||
       (requiredRole === "admin" &&
-        (role === "admin" || role === "AdminContentManager")) ||
-      (requiredRole === "supervisor" &&
-        (role === "supervisor" || role === "super-admin"));
-
+        (role === "admin" || role === "AdminContentManager"));
     if (!hasAccess) {
       // Tura kowa inda ya dace maimakon Home kawai
       const redirectPath =
