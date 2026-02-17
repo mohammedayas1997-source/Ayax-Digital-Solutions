@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebaseConfig";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import {
   collection,
   onSnapshot,
@@ -8,40 +8,37 @@ import {
   serverTimestamp,
   query,
   where,
-  deleteDoc,
   doc,
   orderBy,
   getDoc,
 } from "firebase/firestore";
+import { useNavigate } from "react-router-dom";
 import {
-  BookOpen,
-  Video,
   Users,
-  PlusCircle,
-  Trash2,
-  Clock,
-  Send,
-  CheckCircle,
   LayoutDashboard,
   LogOut,
   MessageSquare,
-  ChevronRight,
-  Search,
-  Filter,
-  User,
   Loader2,
+  Sun,
+  Moon,
+  ShieldCheck,
+  Send,
+  User,
+  Clock,
 } from "lucide-react";
 
-// SUNAN COMPONENT YA KOMA SUPERVISOR DASHBOARD
 const SupervisorDashboard = () => {
-  const [activeTab, setActiveTab] = useState("classroom");
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("forum"); // Mun mayar da Forum a matsayin default
   const [selectedCourse, setSelectedCourse] = useState(null);
-  const [lessons, setLessons] = useState([]);
   const [students, setStudents] = useState([]);
   const [forumThreads, setForumThreads] = useState([]);
   const [activeThread, setActiveThread] = useState(null);
+  const [replies, setReplies] = useState([]);
   const [reply, setReply] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => localStorage.getItem("super-theme") === "dark",
+  );
   const [supervisorName, setSupervisorName] = useState("Supervisor");
   const [authLoading, setAuthLoading] = useState(true);
 
@@ -55,45 +52,25 @@ const SupervisorDashboard = () => {
     "advanced Digital Marketing",
   ];
 
-  // Form State
-  const [newLesson, setNewLesson] = useState({
-    title: "",
-    videoLink: "",
-    description: "",
-  });
-
-  // 1. AUTH WATCHER - DON HANA BLANK SCREEN
+  // 1. AUTH & THEME SYNC
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        // Dauko sunan supervisor daga Firestore
         const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists()) {
+        if (userDoc.exists())
           setSupervisorName(userDoc.data().fullName || "Supervisor");
-        }
         setAuthLoading(false);
       } else {
-        // Idan ba a yi login ba, za a iya tura shi login page a nan
-        setAuthLoading(false);
+        navigate("/admin-gateway");
       }
     });
+    localStorage.setItem("super-theme", isDarkMode ? "dark" : "light");
     return () => unsubscribe();
-  }, []);
+  }, [isDarkMode, navigate]);
 
-  // 2. DATA SYNC LOGIC
+  // 2. DATA SYNC (Forum & Students Only)
   useEffect(() => {
     if (!selectedCourse) return;
-
-    const unsubLessons = onSnapshot(
-      query(
-        collection(db, "lessons"),
-        where("category", "==", selectedCourse),
-        orderBy("createdAt", "desc"),
-      ),
-      (snap) => {
-        setLessons(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      },
-    );
 
     const unsubStudents = onSnapshot(
       query(
@@ -101,9 +78,8 @@ const SupervisorDashboard = () => {
         where("status", "==", "Admitted"),
         where("course", "==", selectedCourse),
       ),
-      (snap) => {
-        setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      },
+      (snap) =>
+        setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))),
     );
 
     const unsubForum = onSnapshot(
@@ -112,19 +88,30 @@ const SupervisorDashboard = () => {
         where("course", "==", selectedCourse),
         orderBy("createdAt", "desc"),
       ),
-      (snap) => {
+      (snap) =>
         setForumThreads(
           snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-        );
-      },
+        ),
     );
 
     return () => {
-      unsubLessons();
       unsubStudents();
       unsubForum();
     };
   }, [selectedCourse]);
+
+  // 3. FETCH REPLIES FOR ACTIVE THREAD
+  useEffect(() => {
+    if (!activeThread) return;
+    const unsubReplies = onSnapshot(
+      query(
+        collection(db, `forum_threads/${activeThread.id}/replies`),
+        orderBy("createdAt", "asc"),
+      ),
+      (snap) => setReplies(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    );
+    return () => unsubReplies();
+  }, [activeThread]);
 
   const handleReply = async (e) => {
     e.preventDefault();
@@ -137,50 +124,23 @@ const SupervisorDashboard = () => {
         createdAt: serverTimestamp(),
       });
       setReply("");
-      alert("RESPONSE_DISPATCHED: Student has been notified.");
     } catch (err) {
       alert("ERROR: Failed to send reply.");
     }
   };
 
-  const handleUploadLesson = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await addDoc(collection(db, "lessons"), {
-        title: newLesson.title,
-        videoLink: newLesson.videoLink,
-        description: newLesson.description,
-        category: selectedCourse,
-        instructor: supervisorName,
-        createdAt: serverTimestamp(),
-      });
-
-      setNewLesson({ title: "", videoLink: "", description: "" });
-      setActiveTab("classroom");
-      alert("CONTENT_LIVE: Curriculum updated by Supervisor.");
-    } catch (err) {
-      alert("UPLOAD_FAILED: " + err.message);
-    } finally {
-      setLoading(false);
+  const handleLogout = async () => {
+    if (window.confirm("Logout from Supervisor Terminal?")) {
+      await signOut(auth);
+      navigate("/admin-gateway");
     }
   };
 
-  const deleteLesson = async (lessonId) => {
-    if (window.confirm("Are you sure you want to remove this lesson?")) {
-      try {
-        await deleteDoc(doc(db, "lessons", lessonId));
-        alert("REMOVED: Lesson deleted.");
-      } catch (err) {
-        alert("ERROR: Could not delete.");
-      }
-    }
-  };
-
-  // HANA BLANK SCREEN YAYIN DA AKE DUBA AUTH
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-[#0f172a] flex flex-col items-center justify-center text-blue-500">
+      <div
+        className={`min-h-screen flex flex-col items-center justify-center ${isDarkMode ? "bg-slate-950 text-blue-500" : "bg-white text-blue-600"}`}
+      >
         <Loader2 className="animate-spin mb-4" size={48} />
         <p className="font-black uppercase tracking-[0.3em] text-xs">
           Authenticating Supervisor...
@@ -189,33 +149,40 @@ const SupervisorDashboard = () => {
     );
   }
 
-  // COURSE SELECTION OVERLAY
   if (!selectedCourse) {
     return (
-      <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-6">
-        <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="text-white flex flex-col justify-center">
-            <h1 className="text-5xl font-black italic tracking-tighter mb-4 text-blue-500">
-              AYAX.OS
+      <div
+        className={`min-h-screen flex items-center justify-center p-6 ${isDarkMode ? "bg-slate-950" : "bg-slate-50"}`}
+      >
+        <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-12">
+          <div className="flex flex-col justify-center">
+            <h1 className="text-6xl font-black italic tracking-tighter mb-4 text-blue-600">
+              AYAX.SV
             </h1>
-            <p className="text-slate-400 font-bold uppercase tracking-widest text-xs">
-              Supervisor Initialization
+            <p
+              className={`font-black uppercase tracking-widest text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}
+            >
+              Terminal Access Granted
             </p>
-            <h2 className="text-2xl font-bold mt-6">
+            <h2
+              className={`text-3xl font-bold mt-8 ${isDarkMode ? "text-white" : "text-slate-900"}`}
+            >
               Welcome, {supervisorName}
             </h2>
-            <p className="text-slate-500 mt-2">
-              Select a department to monitor and manage resources.
+            <p className="text-slate-500 mt-4 leading-relaxed text-lg">
+              Select a department to oversee discussions and student progress.
             </p>
           </div>
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-4 max-h-[70vh] overflow-y-auto pr-2">
             {availableCourses.map((course) => (
               <button
                 key={course}
                 onClick={() => setSelectedCourse(course)}
-                className="bg-white/5 hover:bg-blue-600 border border-white/10 p-6 rounded-[2rem] text-left transition-all group"
+                className={`p-6 rounded-[2rem] text-left transition-all group border ${isDarkMode ? "bg-white/5 border-white/10 hover:bg-blue-600" : "bg-white border-slate-200 hover:bg-blue-600"}`}
               >
-                <p className="text-white font-black text-lg group-hover:translate-x-2 transition-transform">
+                <p
+                  className={`font-black text-lg group-hover:text-white transition-all ${isDarkMode ? "text-white" : "text-slate-900"}`}
+                >
                   {course}
                 </p>
               </button>
@@ -227,33 +194,31 @@ const SupervisorDashboard = () => {
   }
 
   return (
-    <div className="flex min-h-screen bg-[#f8fafc] font-sans">
+    <div
+      className={`flex min-h-screen font-sans transition-colors duration-300 ${isDarkMode ? "bg-slate-950 text-white" : "bg-[#f8fafc] text-slate-900"}`}
+    >
       {/* SIDEBAR */}
-      <div className="w-72 bg-white border-r border-slate-200 p-8 space-y-10 shrink-0 shadow-sm">
-        <h2
-          className="text-xl font-black italic text-blue-600 uppercase tracking-tighter cursor-pointer"
+      <aside
+        className={`w-72 border-r p-8 flex flex-col sticky top-0 h-screen ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
+      >
+        <div
+          className="flex items-center gap-3 mb-10 cursor-pointer"
           onClick={() => setSelectedCourse(null)}
         >
-          AYAX {selectedCourse.split(" ")[0]}
-        </h2>
-        <nav className="space-y-2">
-          <button
-            onClick={() => setActiveTab("classroom")}
-            className={`t-nav ${activeTab === "classroom" ? "t-active" : ""}`}
-          >
-            <LayoutDashboard size={18} /> Classroom
-          </button>
+          <div className="p-2 bg-blue-600 rounded-xl text-white">
+            <ShieldCheck size={24} />
+          </div>
+          <h2 className="text-xl font-black italic text-blue-600 uppercase tracking-tighter">
+            AYAX CORE
+          </h2>
+        </div>
+
+        <nav className="space-y-3 flex-1">
           <button
             onClick={() => setActiveTab("forum")}
             className={`t-nav ${activeTab === "forum" ? "t-active" : ""}`}
           >
             <MessageSquare size={18} /> Discussions
-          </button>
-          <button
-            onClick={() => setActiveTab("upload")}
-            className={`t-nav ${activeTab === "upload" ? "t-active" : ""}`}
-          >
-            <PlusCircle size={18} /> New Lesson
           </button>
           <button
             onClick={() => setActiveTab("students")}
@@ -262,45 +227,71 @@ const SupervisorDashboard = () => {
             <Users size={18} /> Student Roster
           </button>
         </nav>
-      </div>
 
-      <div className="flex-1 p-10 overflow-y-auto max-h-screen">
-        {/* HEADER */}
-        <div className="flex justify-between items-center mb-10">
-          <div>
-            <h1 className="text-3xl font-black italic uppercase text-slate-900">
-              {activeTab} Hub
-            </h1>
-            <p className="text-blue-600 text-xs font-black uppercase tracking-widest">
-              {selectedCourse} | Supervisor Mode
-            </p>
-          </div>
+        <div className="space-y-4 pt-10 border-t border-slate-800">
           <button
-            onClick={() => setSelectedCourse(null)}
-            className="px-6 py-3 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest"
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className={`w-full flex items-center justify-center gap-3 p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${isDarkMode ? "bg-slate-800 text-yellow-400" : "bg-slate-100 text-slate-600"}`}
           >
-            Switch Course
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}{" "}
+            {isDarkMode ? "Light Mode" : "Dark Mode"}
+          </button>
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-3 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-red-900/20 active:scale-95 transition-all"
+          >
+            <LogOut size={18} /> Logout Terminal
           </button>
         </div>
+      </aside>
 
-        {/* FORUM INTERFACE */}
+      {/* MAIN CONTENT */}
+      <main className="flex-1 p-10 overflow-y-auto max-h-screen">
+        <header className="flex justify-between items-center mb-10">
+          <div>
+            <h1 className="text-4xl font-black italic uppercase tracking-tighter">
+              {activeTab} Terminal
+            </h1>
+            <p className="text-blue-600 text-[10px] font-black uppercase tracking-[0.2em]">
+              {selectedCourse} | Monitor Mode
+            </p>
+          </div>
+          <div className="flex gap-4">
+            <div className="hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-blue-600/10 text-blue-600 font-black text-[10px] uppercase">
+              <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />{" "}
+              Supervisor Online
+            </div>
+            <button
+              onClick={() => setSelectedCourse(null)}
+              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest ${isDarkMode ? "bg-white text-slate-900" : "bg-slate-900 text-white"}`}
+            >
+              Switch Course
+            </button>
+          </div>
+        </header>
+
+        {/* REAL-LIFE FORUM HUB */}
         {activeTab === "forum" && (
-          <div className="flex gap-8 h-[70vh] animate-in fade-in duration-500">
-            <div className="w-1/3 bg-white rounded-[2.5rem] shadow-sm border border-slate-100 overflow-hidden flex flex-col">
-              <div className="p-6 border-b font-black uppercase text-[10px] text-slate-400">
-                Student Inquiries
+          <div className="flex gap-8 h-[75vh] animate-in fade-in duration-500">
+            <div
+              className={`w-1/3 rounded-[2.5rem] border overflow-hidden flex flex-col ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
+            >
+              <div className="p-6 border-b border-slate-800 font-black uppercase text-[10px] opacity-50">
+                Active Threads
               </div>
               <div className="overflow-y-auto flex-1">
                 {forumThreads.map((thread) => (
                   <div
                     key={thread.id}
                     onClick={() => setActiveThread(thread)}
-                    className={`p-6 border-b cursor-pointer transition-all ${activeThread?.id === thread.id ? "bg-blue-50 border-l-4 border-l-blue-600" : "hover:bg-slate-50"}`}
+                    className={`p-6 border-b border-slate-800 cursor-pointer transition-all ${activeThread?.id === thread.id ? "bg-blue-600 text-white" : isDarkMode ? "hover:bg-slate-800" : "hover:bg-slate-50"}`}
                   >
-                    <p className="font-black text-slate-900 text-sm line-clamp-1">
-                      {thread.title}
+                    <p className="font-black text-sm line-clamp-1 italic uppercase">
+                      "{thread.title}"
                     </p>
-                    <p className="text-[10px] text-slate-400 mt-1 font-bold italic">
+                    <p
+                      className={`text-[10px] mt-2 font-bold ${activeThread?.id === thread.id ? "text-blue-100" : "text-slate-400"}`}
+                    >
                       By {thread.studentName}
                     </p>
                   </div>
@@ -308,47 +299,57 @@ const SupervisorDashboard = () => {
               </div>
             </div>
 
-            <div className="flex-1 bg-white rounded-[2.5rem] shadow-xl border border-slate-100 flex flex-col overflow-hidden">
+            <div
+              className={`flex-1 rounded-[2.5rem] border flex flex-col overflow-hidden ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-xl"}`}
+            >
               {activeThread ? (
                 <>
-                  <div className="p-8 border-b bg-slate-50/50">
-                    <h3 className="font-black text-xl text-slate-900">
+                  <div
+                    className={`p-8 border-b ${isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50/50 border-slate-100"}`}
+                  >
+                    <h3 className="font-black text-2xl italic uppercase">
                       {activeThread.title}
                     </h3>
-                    <p className="text-slate-500 text-sm mt-2">
+                    <p className="opacity-60 text-sm mt-3 leading-relaxed">
                       {activeThread.content}
                     </p>
                   </div>
-                  <div className="flex-1 p-8 overflow-y-auto space-y-4">
-                    <div className="bg-blue-600 text-white p-4 rounded-2xl rounded-tr-none self-end max-w-[80%] ml-auto">
-                      <p className="text-xs font-bold italic mb-1 uppercase text-blue-200">
-                        Supervisor {supervisorName}
-                      </p>
-                      <p className="text-sm font-medium italic text-white/90">
-                        Awaiting your response to this student...
-                      </p>
-                    </div>
+                  <div className="flex-1 p-8 overflow-y-auto space-y-6 flex flex-col">
+                    {replies.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`max-w-[80%] p-4 rounded-3xl ${msg.role === "supervisor" ? "bg-blue-600 text-white self-end rounded-tr-none" : isDarkMode ? "bg-slate-800 text-white self-start rounded-tl-none border border-slate-700" : "bg-slate-100 text-slate-900 self-start rounded-tl-none"}`}
+                      >
+                        <p className="text-[9px] font-black uppercase mb-1 opacity-70">
+                          {msg.sender}{" "}
+                          {msg.role === "supervisor" && "• Supervisor"}
+                        </p>
+                        <p className="text-sm font-medium italic">
+                          "{msg.text}"
+                        </p>
+                      </div>
+                    ))}
                   </div>
                   <form
                     onSubmit={handleReply}
-                    className="p-6 border-t bg-white flex gap-4"
+                    className={`p-6 border-t flex gap-4 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}
                   >
                     <input
-                      className="t-input"
-                      placeholder="Type your expert response..."
+                      className={`flex-1 p-5 rounded-2xl outline-none font-bold text-sm transition-all ${isDarkMode ? "bg-slate-800 text-white focus:bg-slate-700" : "bg-slate-50 text-slate-900 focus:bg-white border border-transparent focus:border-blue-600"}`}
+                      placeholder="Type expert guidance..."
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
                     />
-                    <button className="p-5 bg-blue-600 text-white rounded-2xl hover:bg-slate-900 transition-all">
+                    <button className="p-5 bg-blue-600 text-white rounded-2xl hover:scale-105 transition-all shadow-lg shadow-blue-600/20">
                       <Send size={20} />
                     </button>
                   </form>
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-slate-300">
-                  <MessageSquare size={64} className="mb-4 opacity-20" />
-                  <p className="font-black uppercase text-xs tracking-[0.3em]">
-                    Select a thread to engage
+                <div className="flex-1 flex flex-col items-center justify-center opacity-20">
+                  <MessageSquare size={80} className="mb-4" />
+                  <p className="font-black uppercase text-xs tracking-[0.5em]">
+                    Select Thread
                   </p>
                 </div>
               )}
@@ -356,137 +357,40 @@ const SupervisorDashboard = () => {
           </div>
         )}
 
-        {/* UPLOAD TAB */}
-        {activeTab === "upload" && (
-          <div className="max-w-2xl bg-white p-12 rounded-[3.5rem] shadow-2xl border border-slate-50 animate-in slide-in-from-bottom-8 duration-700">
-            <h2 className="text-2xl font-black italic uppercase mb-8 flex items-center gap-3">
-              <Video className="text-blue-600" /> Deploy {selectedCourse}{" "}
-              Material
-            </h2>
-            <form onSubmit={handleUploadLesson} className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-4">
-                  Lesson Title
-                </label>
-                <input
-                  required
-                  className="t-input"
-                  placeholder="e.g. Introduction to React"
-                  value={newLesson.title}
-                  onChange={(e) =>
-                    setNewLesson({ ...newLesson, title: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-4">
-                  Video URL
-                </label>
-                <input
-                  required
-                  className="t-input"
-                  placeholder="https://youtube.com/watch?v=..."
-                  value={newLesson.videoLink}
-                  onChange={(e) =>
-                    setNewLesson({ ...newLesson, videoLink: e.target.value })
-                  }
-                />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-slate-400 uppercase ml-4">
-                  Description
-                </label>
-                <textarea
-                  required
-                  className="t-input h-32 pt-5"
-                  placeholder="Explain what this lesson covers..."
-                  value={newLesson.description}
-                  onChange={(e) =>
-                    setNewLesson({ ...newLesson, description: e.target.value })
-                  }
-                />
-              </div>
-              <button
-                disabled={loading}
-                className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.2em] shadow-xl hover:bg-slate-900 transition-all flex items-center justify-center gap-3"
-              >
-                {loading ? (
-                  <Loader2 className="animate-spin" />
-                ) : (
-                  <>
-                    <Send size={18} /> Publish to Curriculum
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-        )}
-
-        {/* CLASSROOM TAB */}
-        {activeTab === "classroom" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
-            {lessons.map((lesson) => (
-              <div
-                key={lesson.id}
-                className="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-sm group relative hover:shadow-md transition-all"
-              >
-                <div className="h-40 bg-slate-900 rounded-[2rem] mb-4 flex flex-col items-center justify-center text-blue-500 font-black italic overflow-hidden">
-                  <Video size={32} className="mb-2 opacity-50" />
-                  <span className="text-[10px] uppercase tracking-widest">
-                    Video Active
-                  </span>
-                </div>
-                <h3 className="font-black text-slate-900 mb-2 truncate pr-8">
-                  {lesson.title}
-                </h3>
-                <p className="text-slate-400 text-[10px] font-bold uppercase">
-                  {lesson.instructor} •{" "}
-                  {new Date(lesson.createdAt?.toDate()).toLocaleDateString()}
-                </p>
-                <button
-                  onClick={() => deleteLesson(lesson.id)}
-                  className="absolute top-4 right-4 p-3 bg-white/10 hover:bg-red-500 hover:text-white text-slate-400 rounded-full transition-all"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* STUDENT ROSTER */}
         {activeTab === "students" && (
-          <div className="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-slate-50">
-                <tr className="text-[10px] font-black uppercase text-slate-400 border-b">
-                  <th className="p-8">Student Name</th>
-                  <th className="p-8">Enrolled Course</th>
-                  <th className="p-8 text-center">Status</th>
+          <div
+            className={`rounded-[3rem] border overflow-hidden animate-in fade-in duration-500 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-sm"}`}
+          >
+            <table className="w-full text-left">
+              <thead>
+                <tr
+                  className={`text-[10px] font-black uppercase tracking-widest border-b ${isDarkMode ? "bg-slate-800/50 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-100 text-slate-500"}`}
+                >
+                  <th className="p-8">Student Identity</th>
+                  <th className="p-8">Course Track</th>
+                  <th className="p-8">Enrolled Date</th>
                 </tr>
               </thead>
-              <tbody className="divide-y">
+              <tbody className="divide-y divide-slate-800">
                 {students.map((std) => (
                   <tr
                     key={std.id}
-                    className="hover:bg-slate-50/50 transition-colors"
+                    className={`${isDarkMode ? "hover:bg-white/5" : "hover:bg-slate-50"} transition-colors`}
                   >
                     <td className="p-8 flex items-center gap-4">
-                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-black text-xs">
+                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-xs">
                         {std.studentName?.charAt(0)}
                       </div>
-                      <p className="font-black text-slate-900 text-sm">
+                      <p className="font-black text-sm uppercase">
                         {std.studentName}
                       </p>
                     </td>
-                    <td className="p-8 font-bold text-xs italic text-blue-600">
+                    <td className="p-8 text-xs font-bold text-blue-500 italic">
                       {std.course}
                     </td>
-                    <td className="p-8 text-center">
-                      <CheckCircle
-                        className="mx-auto text-emerald-500"
-                        size={18}
-                      />
+                    <td className="p-8 text-xs font-bold opacity-50">
+                      {std.enrolledDate || "Academic Level 1"}
                     </td>
                   </tr>
                 ))}
@@ -494,13 +398,13 @@ const SupervisorDashboard = () => {
             </table>
           </div>
         )}
-      </div>
+      </main>
 
       <style>{`
-        .t-nav { width: 100%; display: flex; align-items: center; gap: 12px; padding: 18px 25px; border-radius: 20px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #94a3b8; transition: 0.3s; letter-spacing: 0.05em; border:none; background:none; cursor:pointer;}
-        .t-active { background: #eff6ff; color: #2563eb; box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.1); }
-        .t-input { width: 100%; padding: 1.25rem; background: #f8fafc; border: 2px solid transparent; border-radius: 1.5rem; font-weight: 700; font-size: 0.8rem; outline: none; transition: 0.3s; }
-        .t-input:focus { border-color: #2563eb; background: white; box-shadow: 0 4px 12px rgba(0,0,0,0.03); }
+        .t-nav { width: 100%; display: flex; align-items: center; gap: 15px; padding: 18px 25px; border-radius: 20px; font-weight: 900; font-size: 11px; text-transform: uppercase; color: #64748b; transition: 0.3s; border:none; background:none; cursor:pointer; }
+        .t-active { background: #2563eb !important; color: white !important; box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4); }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
       `}</style>
     </div>
   );
