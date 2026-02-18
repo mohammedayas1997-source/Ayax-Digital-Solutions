@@ -1217,43 +1217,45 @@ const SuperAdmin = () => {
           </div>
 
           <div className="space-y-4">
-            {allStudents.map((student) => (
-              <div
-                key={student.uid}
-                className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-blue-200 transition-all"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-xs uppercase">
-                    {student.fullName?.charAt(0)}
+            {systemUsers
+              .filter((u) => u.role === "student")
+              .map((student) => (
+                <div
+                  key={student.id} // Tabbatar ka yi amfani da student.id maimakon student.uid
+                  className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-blue-200 transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-xs uppercase">
+                      {student.fullName?.charAt(0)}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-slate-900 text-sm uppercase italic">
+                        {student.fullName}
+                      </h4>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase">
+                        {student.email}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-black text-slate-900 text-sm uppercase italic">
-                      {student.fullName}
-                    </h4>
-                    <p className="text-[8px] font-bold text-slate-400 uppercase">
-                      {student.email}
-                    </p>
-                  </div>
-                </div>
 
-                {student.certificateId ? (
-                  <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                    <CheckCircle size={14} />
-                    <span className="text-[9px] font-black uppercase italic">
-                      Issued
-                    </span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => issueManualCertificate(student.uid)}
-                    disabled={loading}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg active:scale-95"
-                  >
-                    Issue Manually
-                  </button>
-                )}
-              </div>
-            ))}
+                  {student.certificateId ? (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                      <CheckCircle size={14} />
+                      <span className="text-[9px] font-black uppercase italic">
+                        Issued
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => issueManualCertificate(student.uid)}
+                      disabled={loading}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg active:scale-95"
+                    >
+                      Issue Manually
+                    </button>
+                  )}
+                </div>
+              ))}
           </div>
         </div>
 

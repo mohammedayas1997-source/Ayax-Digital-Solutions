@@ -41,6 +41,7 @@ import {
   FileText,
   Download,
   Calendar,
+  User,
 } from "lucide-react";
 
 // ==========================================
@@ -69,8 +70,6 @@ const getWeekTitle = (week) => {
 const formatDate = (timestamp) => {
   if (!timestamp) return "TBD";
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-
-  // Zai nuna ranar da kuma lokacin (misali: 15/02/2026, 20:00)
   return date.toLocaleString("en-GB", {
     day: "2-digit",
     month: "2-digit",
@@ -80,6 +79,55 @@ const formatDate = (timestamp) => {
   });
 };
 
+const libraryLinks = [
+  {
+    name: "O'Reilly Open Books",
+    url: "https://www.oreilly.com/library/view/open-books/",
+    cat: "Engineering",
+  },
+  { name: "MIT OpenCourseWare", url: "https://ocw.mit.edu/", cat: "CS" },
+  {
+    name: "Google Scholar Central",
+    url: "https://scholar.google.com/",
+    cat: "Research",
+  },
+  {
+    name: "GitHub Archive",
+    url: "https://archive.org/details/github",
+    cat: "Code",
+  },
+  {
+    name: "ArXiv.org AI Research",
+    url: "https://arxiv.org/list/cs.AI/recent",
+    cat: "AI/ML",
+  },
+  {
+    name: "Microsoft Academic Search",
+    url: "https://academic.microsoft.com/",
+    cat: "Multi",
+  },
+  {
+    name: "Project Gutenberg",
+    url: "https://www.gutenberg.org/",
+    cat: "Literature",
+  },
+  {
+    name: "Leanpub Free Shelf",
+    url: "https://leanpub.com/bookstore/type/book/sort/top_free",
+    cat: "Tech",
+  },
+  {
+    name: "Springboard Data Resources",
+    url: "https://www.springboard.com/blog/data-science/data-science-books/",
+    cat: "Data",
+  },
+  {
+    name: "Coursera Resource Hub",
+    url: "https://www.coursera.org/browse",
+    cat: "Courses",
+  },
+];
+
 // ==========================================
 // 2. MAIN COMPONENT
 // ==========================================
@@ -88,7 +136,9 @@ const StudentPortal = () => {
 
   // Interface States
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(
+    () => localStorage.getItem("stu-theme") === "dark",
+  );
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -96,10 +146,12 @@ const StudentPortal = () => {
   const [studentData, setStudentData] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [hasPassedMidterm, setHasPassedMidterm] = useState(false);
-  const [selectedCourseId, setSelectedCourseId] = useState(null); // TRACKING THE SELECTION
+  const [selectedCourseId, setSelectedCourseId] = useState(null);
   const totalWeeks = 24;
+  // Wannan zai rinka rike lokaci na yanzu
+  const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Admin Data State
+  // Admin Data State (Real-time Sync)
   const [weeksData, setWeeksData] = useState({});
 
   // Forum & Selection States
@@ -108,6 +160,10 @@ const StudentPortal = () => {
   const [selectedPath, setSelectedPath] = useState(null);
   const [forumThreads, setForumThreads] = useState([]);
   const [newPost, setNewPost] = useState({ title: "", content: "" });
+
+  // Private Chat States (Supervisor Direct)
+  const [privateMessages, setPrivateMessages] = useState([]);
+  const [newPrivateMsg, setNewPrivateMsg] = useState("");
 
   const availableCourses = [
     {
@@ -139,16 +195,22 @@ const StudentPortal = () => {
     },
   ];
 
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000); // 1000ms = 1 second
+
+    return () => clearInterval(timer); // Tabbatar ya tsaya idan an fita
+  }, []);
+
   // ==========================================
   // 3. CORE LOGIC & EFFECTS
   // ==========================================
 
+  // A. REAL-TIME CURRICULUM SYNC
   useEffect(() => {
-    if (!selectedCourseId) return;
-
-    // Fetch weeks specific to the selected course
     const unsubWeeks = onSnapshot(
-      collection(db, `courses/${selectedCourseId}/weeks`),
+      collection(db, "course_settings"),
       (snapshot) => {
         const data = {};
         snapshot.forEach((doc) => {
@@ -158,31 +220,25 @@ const StudentPortal = () => {
       },
     );
     return () => unsubWeeks();
-  }, [selectedCourseId]);
+  }, []);
 
+  // B. AUTH & PROFILE INITIALIZATION
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         navigate("/login");
         return;
       }
-
       try {
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
-
         if (userSnap.exists()) {
           const data = userSnap.data();
-          setStudentData(data);
-
-          // CHECK IF USER HAS ALREADY SELECTED A COURSE
-          if (data.selectedCourseId) {
-            setSelectedCourseId(data.selectedCourseId);
-          }
+          setStudentData({ id: user.uid, ...data });
+          if (data.selectedCourseId) setSelectedCourseId(data.selectedCourseId);
 
           const courseStartDate = new Date("2026-01-01");
-          const now = new Date();
-          const diffTime = now - courseStartDate;
+          const diffTime = new Date() - courseStartDate;
           const weekCount =
             Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
           setCurrentWeek(weekCount > 24 ? 24 : weekCount < 1 ? 1 : weekCount);
@@ -192,81 +248,35 @@ const StudentPortal = () => {
             status: "Active",
             currentActivity: "Browsing Portal",
           });
-        } else {
-          setStudentData({ fullName: user.displayName || "Elite Student" });
         }
-
         const examRef = doc(db, `students/${user.uid}/exams/midterm`);
         const examSnap = await getDoc(examRef);
-        if (examSnap.exists() && examSnap.data().status === "passed") {
+        if (examSnap.exists() && examSnap.data().status === "passed")
           setHasPassedMidterm(true);
-        }
       } catch (error) {
-        console.error("Portal Initialization Error:", error);
+        console.error("Portal Error:", error);
       } finally {
         setLoading(false);
       }
     });
-
     return () => unsubscribe();
   }, [navigate]);
 
-  const handleInitialCourseSelection = async (courseId) => {
-    const user = auth.currentUser;
-    if (!user) return;
-
-    setLoading(true);
-    try {
-      const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, {
-        selectedCourseId: courseId,
-        courseSelectionDate: serverTimestamp(),
-      });
-      setSelectedCourseId(courseId);
-    } catch (err) {
-      alert("Selection Error: Connection Interrupted.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const isWeekLocked = (weekNumber) => {
-    const weekSettings = weeksData[`week_${weekNumber}`];
-
-    // 1. Idan Admin bai saita komai ba ko bai saka Date ba, satin a kulle yake
-    if (!weekSettings || !weekSettings.startDate) return true;
-
-    // 2. Maida ranar da Admin ya saka zuwa tsarin lokaci na JavaScript
-    const releaseDate = weekSettings.startDate.toDate
-      ? weekSettings.startDate.toDate()
-      : new Date(weekSettings.startDate);
-
-    const now = new Date(); // Lokacin yanzu
-
-    // 3. Gwada gani: Shin lokacin yanzu ya kai ko ya wuce lokacin da Admin ya saka?
-    const isTimeReached = now >= releaseDate;
-
-    // 4. Tsarin Midterm: Idan sati ya wuce 12 kuma ba a ci Midterm ba, a kulle shi
-    const isMidtermLocked = weekNumber > 12 && !hasPassedMidterm;
-
-    return !isTimeReached || isMidtermLocked;
-  };
-
-  // Wannan zai rinka duba lokaci kowane sakan 60 domin bude weeks da kansu
+  // C. PRIVATE CHAT SYNC (SUPERVISOR)
   useEffect(() => {
-    const interval = setInterval(() => {
-      const now = new Date();
-      // Idan lokaci ya yi, muna tilasta ma portal din ya sake duba locking logic
-      // Ta hanyar canza wani state kadan ko kuma kawai refresh na view
-      console.log("Terminal Check: Synchronizing with global atomic clock...");
+    if (!studentData?.id) return;
+    const q = query(
+      collection(db, "private_chats"),
+      where("studentId", "==", studentData.id),
+      orderBy("createdAt", "asc"),
+    );
+    const unsubChat = onSnapshot(q, (snap) => {
+      setPrivateMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsubChat();
+  }, [studentData]);
 
-      // Wannan zai sa React ya sake duba isWeekLocked() kowane minti daya
-      setCurrentWeek((prev) => prev);
-    }, 60000); // 60,000 milliseconds = 1 minute
-
-    return () => clearInterval(interval);
-  }, []);
-
+  // D. FORUM THREAD SYNC
   useEffect(() => {
     if (
       activeTab === "discussions" &&
@@ -289,136 +299,156 @@ const StudentPortal = () => {
     }
   }, [activeTab, viewState, selectedCourse, selectedPath]);
 
-  const handleLogout = async () => {
-    await signOut(auth);
-    navigate("/login");
+  // E. THEME PERSISTENCE
+  useEffect(() => {
+    localStorage.setItem("stu-theme", darkMode ? "dark" : "light");
+    document.documentElement.classList.toggle("dark", darkMode);
+  }, [darkMode]);
+
+  // ==========================================
+  // 4. HANDLERS
+  // ==========================================
+
+  const handleInitialCourseSelection = async (courseId) => {
+    setLoading(true);
+    try {
+      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+        selectedCourseId: courseId,
+        courseSelectionDate: serverTimestamp(),
+      });
+      setSelectedCourseId(courseId);
+    } catch (err) {
+      alert("Selection Error");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const markWeekAsCompleted = async (weekNumber) => {
-    const user = auth.currentUser;
-    if (user) {
-      const userRef = doc(db, "users", user.uid);
-      await updateDoc(userRef, {
-        [`progress.${selectedCourseId}.week_${weekNumber}`]: {
-          completed: true,
-          completedAt: serverTimestamp(),
-        },
-      });
-      alert(`SUCCESS: Week ${weekNumber} verified.`);
-    }
+  const isWeekLocked = (weekNumber) => {
+    const weekSettings = weeksData[`week_${weekNumber}`];
+    if (!weekSettings || !weekSettings.startDate) return true;
+    const releaseDate = weekSettings.startDate.toDate
+      ? weekSettings.startDate.toDate()
+      : new Date(weekSettings.startDate);
+    const isMidtermLocked = weekNumber > 12 && !hasPassedMidterm;
+    return new Date() < releaseDate || isMidtermLocked;
+  };
+
+  const handleSendPrivateMsg = async (e) => {
+    e.preventDefault();
+    if (!newPrivateMsg.trim()) return;
+    await addDoc(collection(db, "private_chats"), {
+      text: newPrivateMsg,
+      sender: studentData.fullName,
+      senderRole: "student",
+      studentId: studentData.id,
+      createdAt: serverTimestamp(),
+    });
+    setNewPrivateMsg("");
   };
 
   const handlePostQuestion = async (e) => {
     e.preventDefault();
     if (!newPost.title || !newPost.content) return;
-    try {
-      await addDoc(collection(db, "forum_threads"), {
-        ...newPost,
-        studentName: studentData?.fullName || "Student",
-        studentId: auth.currentUser.uid,
-        courseId: selectedCourse.id,
-        studentType: selectedPath,
-        createdAt: serverTimestamp(),
-      });
-      setNewPost({ title: "", content: "" });
-    } catch (err) {
-      alert("Error: Transmission failed.");
-    }
+    await addDoc(collection(db, "forum_threads"), {
+      ...newPost,
+      studentName: studentData?.fullName || "Student",
+      studentId: auth.currentUser.uid,
+      courseId: selectedCourse.id,
+      studentType: selectedPath,
+      createdAt: serverTimestamp(),
+    });
+    setNewPost({ title: "", content: "" });
   };
 
-  if (loading) {
+  if (loading)
     return (
       <div className="min-h-screen flex flex-col items-center justify-center font-black text-blue-600 bg-slate-950">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-600 mb-4"></div>
+        <Loader2 className="animate-spin mb-4" size={48} />
         <p className="tracking-widest animate-pulse">INITIALIZING SYSTEMS...</p>
       </div>
     );
-  }
 
-  // ==========================================
-  // MANDATORY COURSE SELECTION SCREEN
-  // ==========================================
-  if (!selectedCourseId) {
+  // COURSE SELECTION OVERLAY
+  if (!selectedCourseId)
     return (
       <div
         className={`min-h-screen flex items-center justify-center p-6 ${darkMode ? "bg-slate-950" : "bg-gray-100"}`}
       >
         <div className="max-w-6xl w-full">
-          <div className="text-center mb-12">
-            <h2
-              className={`text-4xl md:text-6xl font-black italic uppercase tracking-tighter mb-4 ${darkMode ? "text-white" : "text-slate-900"}`}
-            >
-              Select Specialization
-            </h2>
-            <p className="text-blue-600 font-black tracking-widest text-[10px] uppercase">
-              Initialize Academic Career Path
-            </p>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {availableCourses.map((course) => (
+          <h2
+            className={`text-5xl font-black italic uppercase text-center mb-12 ${darkMode ? "text-white" : "text-slate-900"}`}
+          >
+            Select Specialization
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {availableCourses.map((c) => (
               <div
-                key={course.id}
-                onClick={() => handleInitialCourseSelection(course.id)}
-                className={`p-10 rounded-[3rem] border-2 cursor-pointer transition-all hover:scale-105 active:scale-95 group ${darkMode ? "bg-slate-900 border-slate-800 hover:border-blue-600" : "bg-white border-white hover:border-blue-600 shadow-xl"}`}
+                key={c.id}
+                onClick={() => handleInitialCourseSelection(c.id)}
+                className={`p-10 rounded-[3rem] border-2 cursor-pointer transition-all hover:scale-105 group ${darkMode ? "bg-slate-900 border-slate-800 hover:border-blue-600" : "bg-white border-white hover:border-blue-600 shadow-xl"}`}
               >
                 <div className="w-16 h-16 bg-blue-600/10 text-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                  {course.icon}
+                  {c.icon}
                 </div>
                 <h3
-                  className={`text-2xl font-black italic uppercase mb-2 ${darkMode ? "text-white" : "text-slate-900"}`}
+                  className={`text-2xl font-black uppercase italic ${darkMode ? "text-white" : "text-slate-900"}`}
                 >
-                  {course.name}
+                  {c.name}
                 </h3>
-                <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest">
-                  Access Full Curriculum & Repository
-                </p>
               </div>
             ))}
           </div>
         </div>
       </div>
     );
-  }
 
-  // ==========================================
-  // REGULAR DASHBOARD (ONLY IF COURSE SELECTED)
-  // ==========================================
   return (
     <div
-      className={`min-h-screen flex font-sans selection:bg-blue-600 selection:text-white ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"} transition-colors duration-300`}
+      className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"} transition-colors duration-300`}
     >
-      {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
-
       {/* SIDEBAR */}
       <aside
-        className={`fixed lg:sticky top-0 z-50 h-screen w-72 md:w-80 border-r flex flex-col transition-transform duration-300 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        className={`fixed lg:sticky top-0 z-50 h-screen w-80 border-r flex flex-col transition-transform ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
-        <div className="p-6 md:p-10 flex justify-between items-center">
+        <div className="p-10 flex justify-between items-center">
           <div>
-            <h1 className="text-xl md:text-2xl font-black text-blue-600 italic">
+            <h1 className="text-2xl font-black text-blue-600 italic">
               AYAX{" "}
               <span className={darkMode ? "text-white" : "text-gray-900"}>
                 UNI
               </span>
             </h1>
+
+            {/* DIGITAL CLOCK UI */}
+            <div className="mt-4 p-4 rounded-2xl bg-blue-600/10 border border-blue-600/20">
+              <div className="flex items-center gap-3 text-blue-500 mb-1">
+                <Clock size={14} className="animate-spin-slow" />
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  System Time
+                </span>
+              </div>
+              <h4 className="text-xl font-black font-mono tracking-tighter">
+                {currentTime.toLocaleTimeString("en-GB", { hour12: false })}
+              </h4>
+              <p className="text-[8px] font-bold opacity-50 uppercase">
+                {currentTime.toDateString()}
+              </p>
+            </div>
+
             <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mt-1">
-              LMS Terminal v3.0 | {selectedCourseId.replace("_", " ")}
+              LMS NODE: {selectedCourseId.toUpperCase()}
             </p>
           </div>
           <button
-            className="lg:hidden p-2"
+            className="lg:hidden"
             onClick={() => setMobileMenuOpen(false)}
           >
-            <X size={20} />
+            <X />
           </button>
         </div>
 
-        <nav className="px-4 md:px-6 space-y-1 md:space-y-2 flex-1 overflow-y-auto custom-scrollbar">
+        <nav className="flex-1 px-6 space-y-2 overflow-y-auto custom-scrollbar">
           {[
             {
               id: "dashboard",
@@ -431,11 +461,8 @@ const StudentPortal = () => {
               name: "Community Forum",
               icon: <MessageSquare size={18} />,
             },
-            {
-              id: "grades",
-              name: "Performance",
-              icon: <GraduationCap size={18} />,
-            },
+            { id: "library", name: "E-Library", icon: <BookOpen size={18} /> },
+            { id: "chat", name: "Supervisor Direct", icon: <User size={18} /> },
           ].map((item) => (
             <button
               key={item.id}
@@ -444,34 +471,34 @@ const StudentPortal = () => {
                 setViewState("list");
                 setMobileMenuOpen(false);
               }}
-              className={`w-full flex items-center gap-3 md:gap-4 px-4 md:px-6 py-3 md:py-4 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] uppercase tracking-widest transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-lg" : "text-gray-400 hover:bg-blue-50/10"}`}
+              className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-lg" : "text-gray-400 hover:bg-blue-50/10"}`}
             >
               {item.icon} {item.name}
             </button>
           ))}
 
-          <div className="mt-8 mb-2 px-4 text-[8px] font-black text-gray-400 uppercase tracking-[0.3em]">
-            {selectedCourseId.toUpperCase()} ROADMAP
+          <div className="pt-8 pb-4 text-[8px] font-black text-gray-500 uppercase tracking-widest">
+            Syllabus Progress
           </div>
           <div className="space-y-1 pb-10">
-            {Array.from({ length: totalWeeks }, (_, i) => i + 1).map((week) => {
-              const locked = isWeekLocked(week);
-              const weekSet = weeksData[`week_${week}`];
+            {Array.from({ length: 24 }, (_, i) => i + 1).map((w) => {
+              const locked = isWeekLocked(w);
+              const weekSet = weeksData[`week_${w}`];
               return (
                 <div
-                  key={week}
-                  onClick={() => !locked && setCurrentWeek(week)} // Yanzu ba zai danna ba sai ya bude
-                  className={`flex flex-col px-4 py-3 rounded-xl transition-all ${locked ? "opacity-40 grayscale cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer"}`}
+                  key={w}
+                  onClick={() => !locked && setCurrentWeek(w)}
+                  className={`px-4 py-3 rounded-xl flex flex-col transition-all ${locked ? "opacity-30 cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer"} ${currentWeek === w ? "bg-blue-600/10 border border-blue-600/20" : ""}`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div
                         className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${locked ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}
                       >
-                        {week}
+                        {w}
                       </div>
                       <span className="text-[10px] font-black uppercase">
-                        Week {week}
+                        Week {w}
                       </span>
                     </div>
                     {locked ? (
@@ -480,16 +507,10 @@ const StudentPortal = () => {
                       <CheckCircle size={10} className="text-emerald-500" />
                     )}
                   </div>
-
-                  {/* WANNAN SHINE ZAI NUNA RANAR DA ZAI BUDE */}
-                  {weekSet?.startDate && (
-                    <div
-                      className={`mt-1 ml-9 text-[7px] font-black uppercase ${locked ? "text-red-500/60" : "text-emerald-500/60"}`}
-                    >
-                      {locked
-                        ? `Opens: ${formatDate(weekSet.startDate)}`
-                        : "Authorized"}
-                    </div>
+                  {weekSet?.startDate && locked && (
+                    <span className="mt-1 ml-9 text-[7px] font-black text-red-400 uppercase">
+                      Opens: {formatDate(weekSet.startDate)}
+                    </span>
                   )}
                 </div>
               );
@@ -497,122 +518,129 @@ const StudentPortal = () => {
           </div>
         </nav>
 
-        <div className="p-4 md:p-6 border-t dark:border-slate-800 space-y-2">
+        <div className="p-6 border-t border-slate-800 space-y-2">
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest ${darkMode ? "bg-slate-800 text-yellow-400" : "bg-gray-100 text-slate-600"}`}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest bg-slate-800/50"
           >
-            {darkMode ? <Sun size={16} /> : <Moon size={16} />}{" "}
-            {darkMode ? "Light" : "Dark"}
+            {darkMode ? <Sun size={16} /> : <Moon size={16} />} Spectrum Shift
           </button>
           <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest bg-red-50 text-red-600 hover:bg-red-600 hover:text-white transition-all"
+            onClick={() => signOut(auth)}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-[9px] uppercase bg-red-600 text-white shadow-lg"
           >
-            <LogOut size={16} /> Log Out
+            <LogOut size={16} /> Terminal Exit
           </button>
         </div>
       </aside>
 
-      {/* MAIN PANEL */}
-      <main className="flex-1 p-4 md:p-10 lg:p-14 overflow-y-auto">
-        <header className="lg:hidden flex justify-between items-center mb-6">
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="p-2.5 bg-blue-600 text-white rounded-lg shadow-lg"
-          >
-            <Menu size={20} />
-          </button>
-          <h2 className="text-xs font-black italic tracking-tighter">
-            AYAX PORTAL
-          </h2>
-          <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-black">
-            {studentData?.fullName?.charAt(0) || "U"}
-          </div>
-        </header>
-
-        {/* DASHBOARD TAB */}
+      {/* MAIN CONTENT */}
+      <main className="flex-1 p-6 md:p-14 overflow-y-auto">
         {activeTab === "dashboard" && (
-          <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700">
-            <div className="bg-blue-600 p-8 md:p-16 rounded-[2.5rem] md:rounded-[4rem] text-white shadow-2xl relative overflow-hidden group">
-              <Award className="absolute -right-10 -bottom-10 w-40 h-40 md:w-64 md:h-64 opacity-10 -rotate-12 group-hover:rotate-0 transition-transform duration-1000" />
+          <div className="space-y-10 animate-in fade-in duration-700">
+            <div className="bg-blue-600 p-16 rounded-[4rem] text-white shadow-2xl relative overflow-hidden group">
+              <Award className="absolute -right-10 -bottom-10 w-64 h-64 opacity-10 rotate-12" />
               <div className="relative z-10">
-                <h2 className="text-2xl md:text-6xl font-black italic tracking-tighter mb-2 md:mb-4 uppercase">
+                <h2 className="text-6xl font-black italic tracking-tighter mb-4 uppercase">
                   {selectedCourseId.replace("_", " ")}
                 </h2>
-                <p className="text-[10px] md:text-lg font-bold opacity-80 max-w-xl leading-relaxed">
-                  Welcome, {studentData?.fullName || "Elite Student"}. Accessing
-                  specialized module data for Week {currentWeek}.
+                <p className="text-lg font-bold opacity-80 max-w-xl">
+                  Operationalizing specialized module data for Week{" "}
+                  {currentWeek}. Keep pushing,{" "}
+                  {studentData?.fullName?.split(" ")[0]}.
                 </p>
               </div>
             </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-8">
-              {[
-                {
-                  label: "Completion",
-                  val: `${Math.round((currentWeek / 24) * 100)}%`,
-                  color: "text-blue-600",
-                },
-                {
-                  label: "Current Week",
-                  val: `W-${currentWeek}`,
-                  color: "text-emerald-500",
-                },
-                {
-                  label: "Midterm",
-                  val: hasPassedMidterm ? "PASS" : "PEND",
-                  color: hasPassedMidterm ? "text-blue-500" : "text-orange-500",
-                },
-              ].map((stat, idx) => (
-                <div
-                  key={idx}
-                  className={`p-5 md:p-10 rounded-[2rem] md:rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"}`}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div
+                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+              >
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">
+                  Completion
+                </p>
+                <h4 className="text-4xl font-black italic text-blue-600">
+                  {Math.round((currentWeek / 24) * 100)}%
+                </h4>
+              </div>
+              <div
+                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+              >
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">
+                  Current Node
+                </p>
+                <h4 className="text-4xl font-black italic text-emerald-500">
+                  W-{currentWeek}
+                </h4>
+              </div>
+              <div
+                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+              >
+                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">
+                  Midterm Rank
+                </p>
+                <h4
+                  className={`text-4xl font-black italic ${hasPassedMidterm ? "text-blue-500" : "text-orange-500"}`}
                 >
-                  <p className="text-[7px] md:text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">
-                    {stat.label}
-                  </p>
-                  <h4
-                    className={`text-xl md:text-4xl font-black italic ${stat.color}`}
+                  {hasPassedMidterm ? "QUALIFIED" : "PENDING"}
+                </h4>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* E-LIBRARY TAB FOR STUDENTS */}
+        {activeTab === "library" && (
+          <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
+              {libraryLinks.map((lib, i) => (
+                <a
+                  key={i}
+                  href={lib.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`p-8 rounded-[2.5rem] border-2 transition-all hover:scale-105 hover:border-blue-600 group ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-white shadow-xl"}`}
+                >
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="p-3 bg-blue-600/10 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                      <BookOpen size={24} />
+                    </div>
+                    <span className="text-[10px] font-black uppercase text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">
+                      {lib.cat}
+                    </span>
+                  </div>
+                  <h3
+                    className={`text-xl font-black uppercase italic mb-4 ${darkMode ? "text-white" : "text-slate-900"}`}
                   >
-                    {stat.val}
-                  </h4>
-                </div>
+                    {lib.name}
+                  </h3>
+                  <div className="flex items-center gap-2 text-[10px] font-black uppercase text-gray-500 group-hover:text-blue-600 transition-colors">
+                    Open Repository <ChevronRight size={14} />
+                  </div>
+                </a>
               ))}
             </div>
           </div>
         )}
 
-        {/* CURRICULUM TAB */}
         {activeTab === "courses" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-10">
-            <div className="lg:col-span-2 space-y-6 md:space-y-8">
-              {/* 1. VIDEO INTERFACE WITH TIME LOCK */}
-              <div className="bg-black aspect-video rounded-[2rem] md:rounded-[3rem] overflow-hidden shadow-2xl border-2 md:border-4 border-white/5 relative">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+            <div className="lg:col-span-2 space-y-8">
+              <div className="bg-black aspect-video rounded-[3rem] overflow-hidden shadow-2xl relative border-4 border-white/5">
                 {isWeekLocked(currentWeek) ? (
-                  /* DISPLAY THIS IF LOCKED */
-                  <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-center p-8 backdrop-blur-md">
+                  <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center text-center p-10">
                     <Lock
                       size={64}
-                      className="text-red-500 mb-6 animate-bounce"
+                      className="text-red-600 mb-6 animate-pulse"
                     />
-                    <h3 className="text-2xl md:text-3xl font-black uppercase italic mb-2 text-white">
-                      Temporal Lock Active
+                    <h3 className="text-3xl font-black uppercase italic mb-2">
+                      Temporal Lock Engaged
                     </h3>
-                    <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest leading-relaxed">
-                      This module is scheduled to release on:
-                      <br />
-                      <span className="text-blue-500 text-lg mt-2 block">
-                        {weeksData[`week_${currentWeek}`]?.startDate
-                          ? formatDate(
-                              weeksData[`week_${currentWeek}`].startDate,
-                            )
-                          : "TBD by Admin"}
-                      </span>
+                    <p className="text-blue-500 font-black text-xs uppercase tracking-widest">
+                      Authorized Release:{" "}
+                      {formatDate(weeksData[`week_${currentWeek}`]?.startDate)}
                     </p>
                   </div>
                 ) : (
-                  /* DISPLAY IF UNLOCKED */
                   <iframe
                     width="100%"
                     height="100%"
@@ -622,266 +650,220 @@ const StudentPortal = () => {
                   ></iframe>
                 )}
               </div>
-
-              {/* 2. CONTENT DETAILS SECTION */}
               <div
-                className={`p-6 md:p-10 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}
+                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-xl"}`}
               >
-                <h3 className="text-xl md:text-3xl font-black uppercase italic mb-4 tracking-tighter">
-                  Week {currentWeek}: {getWeekTitle(currentWeek)}
+                <h3 className="text-3xl font-black uppercase italic mb-6">
+                  Week {currentWeek}:{" "}
+                  {weeksData[`week_${currentWeek}`]?.title ||
+                    getWeekTitle(currentWeek)}
                 </h3>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                  {/* PDF SECTION - ALSO HIDDEN IF LOCKED */}
-                  <div className="p-5 bg-blue-600 rounded-3xl text-white">
-                    <div className="flex items-center gap-3 mb-3">
-                      <FileText size={20} />
-                      <h5 className="text-[10px] font-black uppercase tracking-widest">
-                        Lecture Notes (PDF)
-                      </h5>
-                    </div>
-                    {!isWeekLocked(currentWeek) &&
-                    weeksData[`week_${currentWeek}`]?.pdfUrl ? (
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="p-8 bg-blue-600 rounded-[2.5rem] text-white">
+                    <h5 className="font-black text-[10px] uppercase mb-4 flex items-center gap-2">
+                      <FileText size={18} /> Academic Repository
+                    </h5>
+                    {weeksData[`week_${currentWeek}`]?.pdfUrl ? (
                       <a
                         href={weeksData[`week_${currentWeek}`].pdfUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center justify-center gap-2 w-full py-3 bg-white text-blue-600 rounded-xl font-black text-[9px] uppercase hover:scale-105 transition-transform"
+                        className="block w-full py-4 bg-white text-blue-600 rounded-2xl font-black text-center text-[10px] uppercase"
                       >
-                        <Download size={14} /> Download PDF
+                        Retrieve PDF Material
                       </a>
                     ) : (
-                      <div className="py-3 bg-white/10 rounded-xl text-center text-[9px] font-black uppercase opacity-50 italic">
-                        {isWeekLocked(currentWeek)
-                          ? "Encrypted / Locked"
-                          : "No PDF Uploaded"}
-                      </div>
+                      <p className="opacity-50 text-[10px] italic font-black uppercase text-center">
+                        No Data Injected
+                      </p>
                     )}
                   </div>
-
-                  {/* ASSIGNMENT SECTION */}
-                  <div className="p-5 bg-blue-50 dark:bg-blue-900/20 rounded-3xl">
-                    <h5 className="text-[8px] font-black text-blue-600 uppercase mb-2 tracking-[0.2em]">
-                      Assignment
+                  <div
+                    className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-white/5 border-white/5" : "bg-gray-50 border-gray-100"}`}
+                  >
+                    <h5 className="text-[10px] font-black text-blue-600 uppercase mb-4 flex items-center gap-2">
+                      <Clock size={18} /> Practical Node
                     </h5>
-                    <p className="text-[11px] md:text-sm font-bold opacity-80 leading-relaxed">
-                      {isWeekLocked(currentWeek)
-                        ? "This assignment will become available once the module unlocks."
-                        : weeksData[`week_${currentWeek}`]?.assignment ||
-                          "Complete current module tasks."}
+                    <p className="text-sm font-bold opacity-70 leading-relaxed">
+                      {weeksData[`week_${currentWeek}`]?.assignment ||
+                        "Initialize weekly module tasks."}
                     </p>
                   </div>
                 </div>
-
-                {!isWeekLocked(currentWeek) && (
-                  <button
-                    onClick={() => markWeekAsCompleted(currentWeek)}
-                    className="w-full md:w-auto px-8 py-4 bg-blue-600 text-white rounded-xl md:rounded-2xl font-black uppercase text-[9px] tracking-widest flex items-center justify-center gap-3"
-                  >
-                    <CheckCircle size={16} /> Mark Completed
-                  </button>
-                )}
               </div>
-            </div>
-
-            {/* 3. SIDEBAR NAVIGATION - UP NEXT */}
-            <div className="space-y-3">
-              <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest px-2">
-                Up Next
-              </h3>
-              {[currentWeek, currentWeek + 1, currentWeek + 2].map((w) => {
-                const locked = isWeekLocked(w);
-                return (
-                  w <= 24 && (
-                    <div
-                      key={w}
-                      onClick={() => !locked && setCurrentWeek(w)}
-                      className={`p-4 rounded-2xl border transition-all ${locked ? "opacity-50 grayscale cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer"} ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"}`}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div
-                          className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-[10px] ${locked ? "bg-gray-200 text-gray-400" : "bg-blue-50 dark:bg-blue-900/30 text-blue-600"}`}
-                        >
-                          {locked ? <Lock size={12} /> : w}
-                        </div>
-                        <div>
-                          <p className="text-[9px] font-black uppercase truncate">
-                            {getWeekTitle(w)}
-                          </p>
-                          <p className="text-[7px] font-bold text-gray-400 uppercase">
-                            {locked
-                              ? `Opens: ${weeksData[`week_${w}`]?.startDate ? formatDate(weeksData[`week_${w}`].startDate) : "Pending"}`
-                              : "Access Authorized"}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                );
-              })}
             </div>
           </div>
         )}
-        {/* FORUM TAB */}
+
         {activeTab === "discussions" && (
-          <div className="animate-in fade-in duration-700">
+          <div className="animate-in fade-in duration-500">
             {viewState === "list" && (
-              <div className="space-y-8">
-                <div className="text-center max-w-2xl mx-auto">
-                  <h2 className="text-2xl md:text-5xl font-black italic uppercase tracking-tighter mb-2">
-                    Repositories
-                  </h2>
-                  <p className="text-gray-400 font-bold uppercase text-[8px] tracking-widest">
-                    Select module to enter forum.
-                  </p>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-8">
-                  {availableCourses.map((course) => (
-                    <div
-                      key={course.id}
-                      onClick={() => {
-                        setSelectedCourse(course);
-                        setViewState("selection");
-                      }}
-                      className={`p-6 md:p-10 rounded-[2.5rem] border cursor-pointer group transition-all ${darkMode ? "bg-slate-900 border-slate-800 hover:border-blue-600" : "bg-white border-gray-100 hover:border-blue-600 shadow-sm"}`}
-                    >
-                      <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/40 text-blue-600 rounded-xl flex items-center justify-center mb-4">
-                        {course.icon}
-                      </div>
-                      <h4 className="text-lg md:text-2xl font-black uppercase italic tracking-tighter mb-1">
-                        {course.name}
-                      </h4>
-                      <div className="flex items-center gap-2 text-[8px] font-black text-blue-500 uppercase">
-                        Enter Repo <ChevronRight size={12} />
-                      </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {availableCourses.map((c) => (
+                  <div
+                    key={c.id}
+                    onClick={() => {
+                      setSelectedCourse(c);
+                      setViewState("selection");
+                    }}
+                    className={`p-10 rounded-[2.5rem] border cursor-pointer hover:border-blue-600 transition-all ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+                  >
+                    <div className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center mb-6 shadow-lg shadow-blue-500/30">
+                      {c.icon}
                     </div>
-                  ))}
-                </div>
+                    <h4 className="text-2xl font-black italic uppercase">
+                      {c.name}
+                    </h4>
+                    <div className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase mt-4">
+                      Access Repo <ChevronRight size={14} />
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
-
             {viewState === "selection" && (
-              <div className="max-w-4xl mx-auto py-10 md:py-20 text-center">
-                <h3 className="text-2xl md:text-4xl font-black uppercase italic mb-8">
-                  Registry Level
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-10">
-                  <div
-                    onClick={() => {
-                      setSelectedPath("Path 1");
-                      setViewState("forum");
-                    }}
-                    className="p-8 md:p-12 bg-blue-600 text-white rounded-[2.5rem] md:rounded-[4rem] cursor-pointer shadow-xl"
-                  >
-                    <Users size={32} className="mx-auto mb-4" />
-                    <h4 className="text-xl md:text-3xl font-black italic uppercase">
-                      Path 1
-                    </h4>
-                    <p className="text-[8px] font-black uppercase opacity-70 mt-1">
-                      New Students
-                    </p>
-                  </div>
-                  <div
-                    onClick={() => {
-                      setSelectedPath("Path 2");
-                      setViewState("forum");
-                    }}
-                    className={`p-8 md:p-12 rounded-[2.5rem] md:rounded-[4rem] border-2 border-dashed cursor-pointer ${darkMode ? "bg-slate-900 border-slate-700" : "bg-white border-gray-200"}`}
-                  >
-                    <ShieldCheck
-                      size={32}
-                      className="mx-auto mb-4 text-blue-600"
-                    />
-                    <h4 className="text-xl md:text-3xl font-black italic uppercase">
-                      Path 2
-                    </h4>
-                    <p className="text-[8px] font-black uppercase text-gray-400 mt-1">
-                      Returning
-                    </p>
-                  </div>
-                </div>
+              <div className="flex flex-col md:flex-row items-center justify-center gap-10 min-h-[50vh]">
+                <button
+                  onClick={() => {
+                    setSelectedPath("Path 1");
+                    setViewState("forum");
+                  }}
+                  className="p-16 bg-blue-600 text-white rounded-[4rem] font-black italic text-5xl uppercase shadow-2xl hover:scale-105 transition-all"
+                >
+                  Path 1
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedPath("Path 2");
+                    setViewState("forum");
+                  }}
+                  className="p-16 bg-slate-900 text-white rounded-[4rem] font-black italic text-5xl uppercase shadow-2xl hover:scale-105 transition-all"
+                >
+                  Path 2
+                </button>
               </div>
             )}
-
             {viewState === "forum" && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-12">
-                <div className="lg:col-span-1">
-                  <div
-                    className={`p-6 md:p-10 rounded-[2.5rem] border sticky top-4 ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-gray-100 shadow-xl"}`}
-                  >
-                    <h4 className="font-black uppercase text-[10px] text-blue-500 mb-6">
-                      New Inquiry
-                    </h4>
-                    <form onSubmit={handlePostQuestion} className="space-y-3">
-                      <input
-                        className="s-input dark:bg-slate-800"
-                        placeholder="SUBJECT"
-                        value={newPost.title}
-                        onChange={(e) =>
-                          setNewPost({ ...newPost, title: e.target.value })
-                        }
-                      />
-                      <textarea
-                        className="s-input dark:bg-slate-800 h-32 md:h-40 pt-4"
-                        placeholder="DETAILS..."
-                        value={newPost.content}
-                        onChange={(e) =>
-                          setNewPost({ ...newPost, content: e.target.value })
-                        }
-                      />
-                      <button className="w-full py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] shadow-lg flex items-center justify-center gap-2">
-                        <Send size={14} /> Dispatch
-                      </button>
-                    </form>
-                  </div>
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                <div
+                  className={`p-10 rounded-[3rem] border sticky top-0 h-fit ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+                >
+                  <h4 className="font-black uppercase text-[10px] text-blue-500 mb-6 tracking-widest">
+                    Inject Inquiry
+                  </h4>
+                  <form onSubmit={handlePostQuestion} className="space-y-4">
+                    <input
+                      className="s-input"
+                      placeholder="SUBJECT"
+                      value={newPost.title}
+                      onChange={(e) =>
+                        setNewPost({ ...newPost, title: e.target.value })
+                      }
+                    />
+                    <textarea
+                      className="s-input h-40 pt-4"
+                      placeholder="DETAILS..."
+                      value={newPost.content}
+                      onChange={(e) =>
+                        setNewPost({ ...newPost, content: e.target.value })
+                      }
+                    />
+                    <button className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl">
+                      Transmit Post
+                    </button>
+                  </form>
                 </div>
-                <div className="lg:col-span-2 space-y-4 md:space-y-8">
-                  {forumThreads.map((thread) => (
+                <div className="lg:col-span-2 space-y-6">
+                  {forumThreads.map((t) => (
                     <div
-                      key={thread.id}
-                      className={`p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-50 shadow-sm"}`}
+                      key={t.id}
+                      className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-sm"}`}
                     >
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-xs">
-                          {thread.studentName?.charAt(0)}
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-black">
+                          {t.studentName?.charAt(0)}
                         </div>
                         <div>
-                          <p className="text-[10px] font-black uppercase">
-                            {thread.studentName}
+                          <p className="font-black text-xs uppercase italic leading-none">
+                            {t.studentName}
                           </p>
-                          <p className="text-[8px] font-bold text-gray-400">
-                            {new Date(
-                              thread.createdAt?.seconds * 1000,
-                            ).toLocaleDateString()}
+                          <p className="text-[10px] text-gray-400 mt-1">
+                            {t.createdAt?.toDate().toLocaleDateString()}
                           </p>
                         </div>
                       </div>
-                      <h4 className="text-lg md:text-2xl font-black italic uppercase mb-3">
-                        {thread.title}
-                      </h4>
-                      <p className="text-[11px] md:text-sm text-gray-500 dark:text-gray-400 leading-relaxed mb-6 line-clamp-3">
-                        {thread.content}
+                      <h3 className="text-2xl font-black italic uppercase mb-4 tracking-tighter">
+                        "{t.title}"
+                      </h3>
+                      <p className="opacity-60 text-sm leading-relaxed mb-8">
+                        {t.content}
                       </p>
                       <button
-                        onClick={() => navigate(`/forum/thread/${thread.id}`)}
-                        className="text-[9px] font-black uppercase text-blue-600 flex items-center gap-2"
+                        onClick={() => navigate(`/forum/thread/${t.id}`)}
+                        className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-2"
                       >
-                        View Discussion <ChevronRight size={12} />
+                        Monitor Discussion <ChevronRight size={14} />
                       </button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* PRIVATE SUPERVISOR CHAT */}
+        {activeTab === "chat" && (
+          <div
+            className={`h-[80vh] flex flex-col rounded-[3.5rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-2xl"}`}
+          >
+            <div className="p-8 bg-blue-600 text-white flex justify-between items-center shadow-lg">
+              <div>
+                <h3 className="text-2xl font-black uppercase italic tracking-tighter">
+                  Private Secure Link
+                </h3>
+                <p className="text-[10px] font-black uppercase opacity-60">
+                  Supervisor Encrypted Channel
+                </p>
+              </div>
+              <ShieldCheck size={30} />
+            </div>
+            <div className="flex-1 p-8 overflow-y-auto space-y-4 flex flex-col custom-scrollbar">
+              {privateMessages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`max-w-[75%] p-5 rounded-[2rem] text-sm font-bold shadow-sm ${m.senderRole === "student" ? "bg-blue-600 text-white self-end rounded-tr-none" : "bg-slate-800 text-white self-start rounded-tl-none border border-white/5"}`}
+                >
+                  {m.text}
+                  <div className="text-[8px] opacity-40 mt-2 uppercase">
+                    {m.sender} •{" "}
+                    {m.createdAt ? formatDate(m.createdAt) : "Transmitting..."}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <form
+              onSubmit={handleSendPrivateMsg}
+              className="p-6 border-t border-white/5 flex gap-4 bg-slate-900/10"
+            >
+              <input
+                value={newPrivateMsg}
+                onChange={(e) => setNewPrivateMsg(e.target.value)}
+                className="flex-1 bg-transparent border-none outline-none font-black text-sm"
+                placeholder="Transmit direct message to supervisor..."
+              />
+              <button className="p-5 bg-blue-600 text-white rounded-2xl shadow-xl hover:scale-105 transition-all">
+                <Send size={20} />
+              </button>
+            </form>
           </div>
         )}
       </main>
 
       <style>{`
-        .s-input { width: 100%; padding: 1rem 1.25rem; background: #f8fafc; border: 2px solid transparent; border-radius: 1.25rem; font-weight: 800; font-size: 0.75rem; outline: none; transition: 0.3s; }
-        .s-input:focus { border-color: #2563eb; background: white; }
-        .dark .s-input { background: #1e293b; color: white; }
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; }
+        .s-input { width: 100%; padding: 1.25rem; background: ${darkMode ? "#1e293b" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.5rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
+        .s-input:focus { border-color: #2563eb; background: ${darkMode ? "#0f172a" : "white"}; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #2563eb33; border-radius: 10px; }
       `}</style>
     </div>
