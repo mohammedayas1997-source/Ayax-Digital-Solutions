@@ -82,7 +82,6 @@ function App() {
           <Route path="/admin-gateway" element={<AdminLogin />} />
 
           {/* --- PROTECTED ROUTES - ADMIN --- */}
-          {/* Mun gyara kuskuren nan: Dole ne ProtectedRoute ya zauna a cikin element prop */}
           <Route
             path="/admin-dashboard"
             element={
