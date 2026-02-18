@@ -6,7 +6,7 @@ import { signOut } from "firebase/auth";
 
 /**
  * SECURE GATEWAY: PROTECTED ROUTE INFRASTRUCTURE
- * Cikakken gyara don magance Redirection Loop da tabbatar da amincewar Roles.
+ * Optimized to prevent redirection loops and handle multi-tier administrative roles.
  */
 const ProtectedRoute = ({ children, requiredRole }) => {
   const [user, setUser] = useState(null);
@@ -25,7 +25,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
           if (userDoc.exists()) {
             const userData = userDoc.data();
 
-            // INTEGRITY CHECK: Dakatar da suspended ko inactive accounts nan take
+            // INTEGRITY CHECK: Immediately log out suspended or inactive accounts
             if (
               userData.status === "suspended" ||
               userData.status === "inactive"
@@ -40,7 +40,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
               setUser(currentUser);
             }
           } else {
-            // Idan babu user doc, amma yana auth, mu bar shi ya gani amma ba role
+            // User authenticated but no Firestore profile found
             setUser(currentUser);
             setRole(null);
           }
@@ -86,31 +86,36 @@ const ProtectedRoute = ({ children, requiredRole }) => {
       location.pathname.includes("admin") ||
       location.pathname.includes("super") ||
       location.pathname.includes("supervisor");
+
+    // Redirect staff to admin-gateway and students to login
     const loginPath = isAuthorityRoute ? "/admin-gateway" : "/login";
     return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
   // 4. ROLE-BASED ACCESS CONTROL (RBAC) LOGIC
   if (requiredRole) {
-    // Tabbatar da matsayin Super-Admin, Admin, ko AdminContentManager
     const isSuperAdmin = role === "super-admin";
     const isAdminGeneral = role === "admin" || role === "AdminContentManager";
 
-    // Logic na amincewa:
-    // a. Idan kai super-admin ne (kana da full access)
-    // b. Idan role dinka yayi daidai da requiredRole na shafin
-    // c. Idan shafin na "admin" ne, kuma matsayinka daya ne daga cikin admin roles
+    /**
+     * ACCESS GRANTED IF:
+     * 1. User is Super-Admin (Universal Access)
+     * 2. User role matches the requiredRole exactly
+     * 3. Page requires "admin" and user is either "admin" or "AdminContentManager"
+     */
     const hasAccess =
       isSuperAdmin ||
       role === requiredRole ||
       (requiredRole === "admin" && isAdminGeneral);
 
     if (!hasAccess) {
-      // DYNAMIC REDIRECTION: Maimakon tura kowa Home, mu tura su Dashboard dinsu na asali
+      // DYNAMIC REDIRECTION: Route users to their respective authorized dashboards
       let redirectPath = "/student-portal";
 
       if (isSuperAdmin) redirectPath = "/super-admin";
-      else if (isAdminGeneral) redirectPath = "/admin-dashboard";
+      else if (role === "AdminContentManager")
+        redirectPath = "/admin-secret-portal";
+      else if (role === "admin") redirectPath = "/admin-dashboard";
       else if (role === "supervisor") redirectPath = "/supervisor-dashboard";
 
       return <Navigate to={redirectPath} replace />;

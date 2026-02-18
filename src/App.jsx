@@ -7,7 +7,7 @@ import {
 } from "react-router-dom";
 import { auth } from "./firebaseConfig";
 
-// --- ALL IMPORTS (Kamar yadda kake dasu) ---
+// --- ALL IMPORTS ---
 import AboutUs from "./pages/AboutUs";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -59,7 +59,7 @@ function App() {
       <div className="App">
         <Navbar />
         <Routes>
-          {/* PUBLIC ROUTES */}
+          {/* --- PUBLIC ACCESS PROTOCOLS --- */}
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/terms" element={<Terms />} />
@@ -81,7 +81,8 @@ function App() {
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
 
-          {/* PROTECTED ROUTES - ADMIN */}
+          {/* --- PROTECTED ROUTES - ADMIN --- */}
+          {/* Mun gyara kuskuren nan: Dole ne ProtectedRoute ya zauna a cikin element prop */}
           <Route
             path="/admin-dashboard"
             element={
@@ -147,7 +148,7 @@ function App() {
             }
           />
 
-          {/* PROTECTED ROUTES - SUPERVISOR & SUPER ADMIN */}
+          {/* --- SUPERVISOR & SUPER ADMIN --- */}
           <Route
             path="/supervisor-dashboard"
             element={
@@ -165,7 +166,7 @@ function App() {
             }
           />
 
-          {/* PROTECTED ROUTES - STUDENT */}
+          {/* --- STUDENT SECURE INFRASTRUCTURE --- */}
           <Route
             path="/student-portal"
             element={
@@ -224,7 +225,7 @@ function App() {
             }
           />
 
-          {/* CATCH-ALL */}
+          {/* CATCH-ALL REDIRECT */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>

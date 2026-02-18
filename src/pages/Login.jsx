@@ -5,78 +5,76 @@ import { doc, getDoc } from "firebase/firestore";
 import { LogIn, ShieldCheck, Loader2, ShieldAlert } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const StaffLogin = () => {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const navigate = useNavigate();
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setLoading(true);
+  setError("");
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+  try {
+    const cleanEmail = email.trim().toLowerCase();
+    const userCredential = await signInWithEmailAndPassword(
+      auth,
+      cleanEmail,
+      password,
+    );
+    const user = userCredential.user;
 
-    try {
-      const cleanEmail = email.trim().toLowerCase();
-      const userCredential = await signInWithEmailAndPassword(
-        auth,
-        cleanEmail,
-        password,
-      );
-      const user = userCredential.user;
+    const userRef = doc(db, "users", user.uid);
+    const userDoc = await getDoc(userRef);
 
-      const userRef = doc(db, "users", user.uid);
-      const userDoc = await getDoc(userRef);
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      const userRole = userData.role;
 
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
-        const userRole = userData.role;
+      // 1. AUTHORIZED STAFF ROLES ONLY
+      const authorizedStaff = [
+        "super-admin",
+        "admin",
+        "supervisor",
+        "AdminContentManager",
+        "instructor",
+        "staff",
+      ];
 
-        const authorizedRoles = [
-          "super-admin",
-          "admin",
-          "instructor",
-          "staff",
-          "supervisor",
-          "AdminContentManager",
-        ];
-
-        if (!authorizedRoles.includes(userRole)) {
-          await signOut(auth);
-          setError("Access Denied: You do not have administrative clearance.");
-          setLoading(false);
-          return;
-        }
-
-        if (userData.status === "suspended" || userData.status === "inactive") {
-          await signOut(auth);
-          setError(
-            "Account Revoked: This staff account is currently inactive.",
-          );
-          setLoading(false);
-          return;
-        }
-
-        // REDIRECTION LOGIC
-        if (userRole === "super-admin") {
-          navigate("/super-admin");
-        } else if (userRole === "supervisor") {
-          navigate("/supervisor-dashboard");
-        } else {
-          // Both 'admin' and 'AdminContentManager' go here
-          navigate("/admin-dashboard");
-        }
-      } else {
+      if (!authorizedStaff.includes(userRole)) {
         await signOut(auth);
-        setError("Database Error: No staff profile found.");
+        setError(
+          "ACCESS_DENIED: Unauthorized access. Staff credentials required.",
+        );
+        setLoading(false);
+        return;
       }
-    } catch (err) {
-      setError("Authentication Failed: Invalid email or security key.");
-    } finally {
-      setLoading(false);
+
+      // 2. STATUS INTEGRITY CHECK
+      if (userData.status === "suspended" || userData.status === "inactive") {
+        await signOut(auth);
+        setError("ACCOUNT_REVOKED: This administrative account is inactive.");
+        setLoading(false);
+        return;
+      }
+
+      // 3. DYNAMIC REDIRECTION PROTOCOL
+      if (userRole === "super-admin") {
+        navigate("/super-admin");
+      } else if (userRole === "supervisor") {
+        navigate("/supervisor-dashboard");
+      } else if (userRole === "AdminContentManager") {
+        navigate("/admin-secret-portal");
+      } else if (userRole === "admin") {
+        navigate("/admin-dashboard");
+      } else {
+        // Fallback for other staff/instructors
+        navigate("/instructor-portal");
+      }
+    } else {
+      await signOut(auth);
+      setError("DATABASE_ERROR: No administrative profile found.");
     }
-  };
+  } catch (err) {
+    setError("AUTHENTICATION_FAILED: Invalid institutional credentials.");
+  } finally {
+    setLoading(false);
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-6 font-sans">
