@@ -15,7 +15,6 @@ import {
 import { useNavigate } from "react-router-dom";
 import {
   Users,
-  LayoutDashboard,
   LogOut,
   MessageSquare,
   Loader2,
@@ -23,13 +22,11 @@ import {
   Moon,
   ShieldCheck,
   Send,
-  User,
-  Clock,
 } from "lucide-react";
 
 const SupervisorDashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("forum"); // Mun mayar da Forum a matsayin default
+  const [activeTab, setActiveTab] = useState("forum");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [students, setStudents] = useState([]);
   const [forumThreads, setForumThreads] = useState([]);
@@ -52,7 +49,7 @@ const SupervisorDashboard = () => {
     "advanced Digital Marketing",
   ];
 
-  // 1. AUTH & THEME SYNC
+  // 1. AUTH & THEME PERSISTENCE ENGINE
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -65,10 +62,11 @@ const SupervisorDashboard = () => {
       }
     });
     localStorage.setItem("super-theme", isDarkMode ? "dark" : "light");
+    document.documentElement.classList.toggle("dark", isDarkMode);
     return () => unsubscribe();
   }, [isDarkMode, navigate]);
 
-  // 2. DATA SYNC (Forum & Students Only)
+  // 2. REAL-TIME DATA SYNC (FORUM & STUDENTS)
   useEffect(() => {
     if (!selectedCourse) return;
 
@@ -100,7 +98,7 @@ const SupervisorDashboard = () => {
     };
   }, [selectedCourse]);
 
-  // 3. FETCH REPLIES FOR ACTIVE THREAD
+  // 3. THREAD REPLY STREAMING
   useEffect(() => {
     if (!activeThread) return;
     const unsubReplies = onSnapshot(
@@ -125,31 +123,30 @@ const SupervisorDashboard = () => {
       });
       setReply("");
     } catch (err) {
-      alert("ERROR: Failed to send reply.");
+      console.error("INJECTION_ERROR: Reply failed.");
     }
   };
 
   const handleLogout = async () => {
-    if (window.confirm("Logout from Supervisor Terminal?")) {
+    if (window.confirm("CRITICAL: Terminate Supervisor Session?")) {
       await signOut(auth);
       navigate("/admin-gateway");
     }
   };
 
-  if (authLoading) {
+  if (authLoading)
     return (
       <div
         className={`min-h-screen flex flex-col items-center justify-center ${isDarkMode ? "bg-slate-950 text-blue-500" : "bg-white text-blue-600"}`}
       >
         <Loader2 className="animate-spin mb-4" size={48} />
         <p className="font-black uppercase tracking-[0.3em] text-xs">
-          Authenticating Supervisor...
+          Authenticating Supervisor Node...
         </p>
       </div>
     );
-  }
 
-  if (!selectedCourse) {
+  if (!selectedCourse)
     return (
       <div
         className={`min-h-screen flex items-center justify-center p-6 ${isDarkMode ? "bg-slate-950" : "bg-slate-50"}`}
@@ -162,7 +159,7 @@ const SupervisorDashboard = () => {
             <p
               className={`font-black uppercase tracking-widest text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}
             >
-              Terminal Access Granted
+              Access Level: Authorized
             </p>
             <h2
               className={`text-3xl font-bold mt-8 ${isDarkMode ? "text-white" : "text-slate-900"}`}
@@ -170,7 +167,8 @@ const SupervisorDashboard = () => {
               Welcome, {supervisorName}
             </h2>
             <p className="text-slate-500 mt-4 leading-relaxed text-lg">
-              Select a department to oversee discussions and student progress.
+              Select a department to monitor academic integrity and forum
+              activity.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-4 max-h-[70vh] overflow-y-auto pr-2">
@@ -191,13 +189,12 @@ const SupervisorDashboard = () => {
         </div>
       </div>
     );
-  }
 
   return (
     <div
       className={`flex min-h-screen font-sans transition-colors duration-300 ${isDarkMode ? "bg-slate-950 text-white" : "bg-[#f8fafc] text-slate-900"}`}
     >
-      {/* SIDEBAR */}
+      {/* SIDEBAR - SUPERVISOR SPECIFIC */}
       <aside
         className={`w-72 border-r p-8 flex flex-col sticky top-0 h-screen ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
       >
@@ -218,7 +215,7 @@ const SupervisorDashboard = () => {
             onClick={() => setActiveTab("forum")}
             className={`t-nav ${activeTab === "forum" ? "t-active" : ""}`}
           >
-            <MessageSquare size={18} /> Discussions
+            <MessageSquare size={18} /> Forum Patrol
           </button>
           <button
             onClick={() => setActiveTab("students")}
@@ -234,50 +231,44 @@ const SupervisorDashboard = () => {
             className={`w-full flex items-center justify-center gap-3 p-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${isDarkMode ? "bg-slate-800 text-yellow-400" : "bg-slate-100 text-slate-600"}`}
           >
             {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}{" "}
-            {isDarkMode ? "Light Mode" : "Dark Mode"}
+            {isDarkMode ? "Light" : "Dark"} Mode
           </button>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-3 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-red-900/20 active:scale-95 transition-all"
+            className="w-full flex items-center justify-center gap-3 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all"
           >
             <LogOut size={18} /> Logout Terminal
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
-      <main className="flex-1 p-10 overflow-y-auto max-h-screen">
+      {/* MAIN ANALYTICS HUB */}
+      <main className="flex-1 p-10 overflow-y-auto">
         <header className="flex justify-between items-center mb-10">
           <div>
             <h1 className="text-4xl font-black italic uppercase tracking-tighter">
-              {activeTab} Terminal
+              {activeTab} Hub
             </h1>
             <p className="text-blue-600 text-[10px] font-black uppercase tracking-[0.2em]">
-              {selectedCourse} | Monitor Mode
+              {selectedCourse} | Supervisor View
             </p>
           </div>
-          <div className="flex gap-4">
-            <div className="hidden md:flex items-center gap-2 px-5 py-3 rounded-2xl bg-blue-600/10 text-blue-600 font-black text-[10px] uppercase">
-              <div className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />{" "}
-              Supervisor Online
-            </div>
-            <button
-              onClick={() => setSelectedCourse(null)}
-              className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest ${isDarkMode ? "bg-white text-slate-900" : "bg-slate-900 text-white"}`}
-            >
-              Switch Course
-            </button>
-          </div>
+          <button
+            onClick={() => setSelectedCourse(null)}
+            className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest ${isDarkMode ? "bg-white text-slate-900" : "bg-slate-900 text-white"}`}
+          >
+            Switch Department
+          </button>
         </header>
 
-        {/* REAL-LIFE FORUM HUB */}
+        {/* FORUM INTERFACE */}
         {activeTab === "forum" && (
-          <div className="flex gap-8 h-[75vh] animate-in fade-in duration-500">
+          <div className="flex gap-8 h-[75vh]">
             <div
               className={`w-1/3 rounded-[2.5rem] border overflow-hidden flex flex-col ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
             >
               <div className="p-6 border-b border-slate-800 font-black uppercase text-[10px] opacity-50">
-                Active Threads
+                Active Discussions
               </div>
               <div className="overflow-y-auto flex-1">
                 {forumThreads.map((thread) => (
@@ -336,7 +327,7 @@ const SupervisorDashboard = () => {
                   >
                     <input
                       className={`flex-1 p-5 rounded-2xl outline-none font-bold text-sm transition-all ${isDarkMode ? "bg-slate-800 text-white focus:bg-slate-700" : "bg-slate-50 text-slate-900 focus:bg-white border border-transparent focus:border-blue-600"}`}
-                      placeholder="Type expert guidance..."
+                      placeholder="Expert Response..."
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
                     />
@@ -349,7 +340,7 @@ const SupervisorDashboard = () => {
                 <div className="flex-1 flex flex-col items-center justify-center opacity-20">
                   <MessageSquare size={80} className="mb-4" />
                   <p className="font-black uppercase text-xs tracking-[0.5em]">
-                    Select Thread
+                    Select Node
                   </p>
                 </div>
               )}
@@ -360,7 +351,7 @@ const SupervisorDashboard = () => {
         {/* STUDENT ROSTER */}
         {activeTab === "students" && (
           <div
-            className={`rounded-[3rem] border overflow-hidden animate-in fade-in duration-500 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-sm"}`}
+            className={`rounded-[3rem] border overflow-hidden ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-sm"}`}
           >
             <table className="w-full text-left">
               <thead>
@@ -368,8 +359,8 @@ const SupervisorDashboard = () => {
                   className={`text-[10px] font-black uppercase tracking-widest border-b ${isDarkMode ? "bg-slate-800/50 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-100 text-slate-500"}`}
                 >
                   <th className="p-8">Student Identity</th>
-                  <th className="p-8">Course Track</th>
-                  <th className="p-8">Enrolled Date</th>
+                  <th className="p-8">Track</th>
+                  <th className="p-8 text-center">Authorization</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
@@ -389,8 +380,10 @@ const SupervisorDashboard = () => {
                     <td className="p-8 text-xs font-bold text-blue-500 italic">
                       {std.course}
                     </td>
-                    <td className="p-8 text-xs font-bold opacity-50">
-                      {std.enrolledDate || "Academic Level 1"}
+                    <td className="p-8 text-center">
+                      <div className="px-3 py-1 bg-emerald-500/10 text-emerald-500 text-[8px] font-black uppercase rounded-full inline-block">
+                        Active Access
+                      </div>
                     </td>
                   </tr>
                 ))}

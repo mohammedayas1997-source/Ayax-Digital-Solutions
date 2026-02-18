@@ -4,33 +4,31 @@ import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useNavigate, Link } from "react-router-dom";
 import {
-  Trash2,
-  Save,
-  RefreshCcw,
-  LayoutDashboard,
   FileVideo,
   FileText,
   LogOut,
   Sun,
   Moon,
   ShieldCheck,
-  GraduationCap,
   Database,
-  Users,
-  MessageSquare,
   Menu,
   X,
+  PlusCircle,
+  Save,
+  RefreshCcw,
+  BookOpen,
+  Calendar,
 } from "lucide-react";
 
 const AdminContentManager = () => {
   const navigate = useNavigate();
-  // Karanta theme daga localStorage don ya dore
   const [isDarkMode, setIsDarkMode] = useState(
     () => localStorage.getItem("theme") === "dark",
   );
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
+  // Curriculum State
   const [courseId, setCourseId] = useState("web_dev");
   const [weekNum, setWeekNum] = useState(1);
   const [content, setContent] = useState({
@@ -41,28 +39,46 @@ const AdminContentManager = () => {
     startDate: "",
   });
 
-  const getDocRef = () =>
-    doc(db, "courses", courseId, "weeks", `week_${weekNum}`);
+  const getDocRef = () => doc(db, "course_settings", `week_${weekNum}`);
 
-  // Toggling Dark Mode
   useEffect(() => {
     localStorage.setItem("theme", isDarkMode ? "dark" : "light");
+    document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode]);
 
-  // Logout Function
   const handleLogout = async (e) => {
     e.preventDefault();
-    if (window.confirm("Logout from AYAX Admin?")) {
+    if (window.confirm("Terminate Content Manager Session?")) {
       try {
         await signOut(auth);
         navigate("/admin-gateway");
       } catch (err) {
-        console.error(err);
+        console.error("AUTH_ERROR:", err);
       }
     }
   };
 
-  // Fetch Data on Change
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await setDoc(
+        getDocRef(),
+        {
+          ...content,
+          startDate: content.startDate ? new Date(content.startDate) : null,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+      alert("CURRICULUM_SYNC_SUCCESS: Node Updated.");
+    } catch (err) {
+      alert("SYNC_FAILURE: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     const fetchCurrentContent = async () => {
       setLoading(true);
@@ -86,12 +102,12 @@ const AdminContentManager = () => {
           });
         }
       } catch (e) {
-        console.error(e);
+        console.error("NODE_FETCH_ERROR:", e);
       }
       setLoading(false);
     };
     fetchCurrentContent();
-  }, [courseId, weekNum]);
+  }, [weekNum]);
 
   return (
     <div
@@ -102,7 +118,7 @@ const AdminContentManager = () => {
         color: isDarkMode ? "white" : "#0f172a",
       }}
     >
-      {/* SIDEBAR - Mobile & Desktop Support */}
+      {/* SIDEBAR - CURRICULUM OPTIMIZED */}
       <aside
         style={{
           width: "280px",
@@ -113,7 +129,7 @@ const AdminContentManager = () => {
           padding: "30px",
           position: "fixed",
           height: "100vh",
-          zIndex: 9999, // Tilasta z-index
+          zIndex: 9999,
           left: 0,
           transform: isMenuOpen
             ? "translateX(0)"
@@ -142,7 +158,15 @@ const AdminContentManager = () => {
             >
               <ShieldCheck size={24} />
             </div>
-            <h1 style={{ fontWeight: 900, fontSize: "18px" }}>AYAX ADMIN</h1>
+            <h1
+              style={{
+                fontWeight: 900,
+                fontSize: "16px",
+                letterSpacing: "1px",
+              }}
+            >
+              AYAX CONTENT
+            </h1>
           </div>
           <button
             onClick={() => setIsMenuOpen(false)}
@@ -165,18 +189,17 @@ const AdminContentManager = () => {
             gap: "10px",
           }}
         >
-          <Link to="/admin-dashboard" style={navStyle(true, isDarkMode)}>
-            <LayoutDashboard size={18} /> Dashboard
-          </Link>
-          <Link to="/admin/grading" style={navStyle(false, isDarkMode)}>
-            <GraduationCap size={18} /> Student Grading
-          </Link>
-          <Link to="/admin/questions" style={navStyle(false, isDarkMode)}>
-            <Database size={18} /> Question Bank
-          </Link>
+          <button style={navStyle(true, isDarkMode)}>
+            <BookOpen size={18} /> Lesson Manager
+          </button>
+          <button style={navStyle(false, isDarkMode)}>
+            <FileVideo size={18} /> Video Assets
+          </button>
+          <button style={navStyle(false, isDarkMode)}>
+            <Calendar size={18} /> Week Scheduling
+          </button>
         </nav>
 
-        {/* LOGOUT & DARK MODE - Tilasta komawa kasa */}
         <div
           style={{
             marginTop: "auto",
@@ -206,48 +229,49 @@ const AdminContentManager = () => {
               border: "none",
             }}
           >
-            <LogOut size={18} /> LOGOUT
+            <LogOut size={18} /> LOGOUT TERMINAL
           </button>
         </div>
       </aside>
 
-      {/* OVERLAY FOR MOBILE */}
-      {isMenuOpen && (
-        <div
-          onClick={() => setIsMenuOpen(false)}
-          style={{
-            position: "fixed",
-            inset: 0,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            zIndex: 9998,
-          }}
-        ></div>
-      )}
-
-      {/* MAIN CONTENT AREA */}
+      {/* MAIN ENGINE AREA */}
       <main
         style={{
           flex: 1,
           marginLeft: window.innerWidth > 768 ? "280px" : "0",
-          padding: "25px",
+          padding: "40px",
           transition: "all 0.3s",
         }}
       >
-        {/* MOBILE HEADER (Yanzu zai bayyana a waya) */}
         <header
           style={{
             display: "flex",
-            alignItems: "center",
             justifyContent: "space-between",
-            marginBottom: "30px",
+            alignItems: "center",
+            marginBottom: "40px",
           }}
-          className="mobile-only-header"
         >
+          <div>
+            <h1 style={{ fontSize: "32px", fontWeight: 900, italic: "true" }}>
+              CURRICULUM <span style={{ color: "#2563eb" }}>DEPLOYMENT</span>
+            </h1>
+            <p
+              style={{
+                fontSize: "10px",
+                fontWeight: 800,
+                opacity: 0.5,
+                letterSpacing: "2px",
+              }}
+            >
+              ACADEMIC NODE : {courseId.toUpperCase()}
+            </p>
+          </div>
           <button
             onClick={() => setIsMenuOpen(true)}
             style={{
+              display: window.innerWidth < 768 ? "block" : "none",
               padding: "12px",
-              backgroundColor: "#2563eb",
+              background: "#2563eb",
               color: "white",
               borderRadius: "12px",
               border: "none",
@@ -255,128 +279,191 @@ const AdminContentManager = () => {
           >
             <Menu size={24} />
           </button>
-          <h2 style={{ fontSize: "14px", fontWeight: 900 }}>
-            MANAGEMENT <span style={{ color: "#2563eb" }}>CORE</span>
-          </h2>
         </header>
 
-        {/* Dash Cards & Quick Actions Grid */}
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
-            gap: "25px",
-            marginBottom: "40px",
+            maxWidth: "800px",
+            backgroundColor: isDarkMode ? "#0f172a" : "white",
+            padding: "40px",
+            borderRadius: "35px",
+            border: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+            boxShadow: "0 25px 50px -12px rgba(0,0,0,0.1)",
           }}
         >
           <div
             style={{
-              background: "linear-gradient(135deg, #2563eb, #3b82f6)",
-              padding: "35px",
-              borderRadius: "35px",
-              color: "white",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              marginBottom: "30px",
             }}
           >
-            <h3 style={{ fontSize: "14px" }}>Enrolled Students</h3>
-            <h2 style={{ fontSize: "36px", fontWeight: 900, margin: "15px 0" }}>
-              ---
+            <h2 style={{ fontSize: "18px", fontWeight: 900 }}>
+              WEEK {weekNum} CONFIGURATION
             </h2>
-            <Link to="/admin/students/all" style={cardBtnStyle}>
-              VIEW ROSTER
-            </Link>
-          </div>
-          <div
-            style={{
-              backgroundColor: isDarkMode ? "#1e293b" : "white",
-              padding: "35px",
-              borderRadius: "35px",
-              border: `1px solid ${isDarkMode ? "#334155" : "#e2e8f0"}`,
-            }}
-          >
-            <h3
+            <select
+              value={weekNum}
+              onChange={(e) => setWeekNum(Number(e.target.value))}
               style={{
-                fontSize: "14px",
-                color: isDarkMode ? "#94a3b8" : "#64748b",
+                padding: "10px 20px",
+                borderRadius: "15px",
+                border: "none",
+                backgroundColor: "#2563eb",
+                color: "white",
+                fontWeight: "bold",
               }}
             >
-              Grading Queue
-            </h3>
-            <h2
-              style={{
-                fontSize: "36px",
-                fontWeight: 900,
-                margin: "15px 0",
-                color: isDarkMode ? "white" : "#0f172a",
-              }}
-            >
-              ---
-            </h2>
-            <Link
-              to="/admin/grading"
-              style={{ ...cardBtnStyle, backgroundColor: "#0f172a" }}
-            >
-              START GRADING
-            </Link>
+              {[...Array(24)].map((_, i) => (
+                <option key={i + 1} value={i + 1}>
+                  Week {i + 1}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
 
-        {/* QUICK ACTIONS */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
-            gap: "15px",
-            marginBottom: "40px",
-          }}
-        >
-          <Link to="/admin/questions" style={quickActionStyle(isDarkMode)}>
-            <Database size={24} color="#2563eb" />
-            <span style={{ fontSize: "9px", fontWeight: 900 }}>QUESTIONS</span>
-          </Link>
-          <Link to="/admin/grading" style={quickActionStyle(isDarkMode)}>
-            <GraduationCap size={24} color="#2563eb" />
-            <span style={{ fontSize: "9px", fontWeight: 900 }}>GRADING</span>
-          </Link>
-          <Link to="/admin/students/all" style={quickActionStyle(isDarkMode)}>
-            <Users size={24} color="#2563eb" />
-            <span style={{ fontSize: "9px", fontWeight: 900 }}>STUDENTS</span>
-          </Link>
+          <form
+            onSubmit={handleUpdate}
+            style={{ display: "flex", flexDirection: "column", gap: "20px" }}
+          >
+            <div>
+              <label style={labelStyle}>Start Deployment Date</label>
+              <input
+                type="datetime-local"
+                value={content.startDate}
+                onChange={(e) =>
+                  setContent({ ...content, startDate: e.target.value })
+                }
+                style={inputStyle(isDarkMode)}
+                required
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Lesson Title</label>
+              <input
+                value={content.title}
+                onChange={(e) =>
+                  setContent({ ...content, title: e.target.value })
+                }
+                placeholder="e.g. Masterclass in Redux Architecture"
+                style={inputStyle(isDarkMode)}
+              />
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "20px",
+              }}
+            >
+              <div>
+                <label style={labelStyle}>Video Asset (YouTube ID)</label>
+                <input
+                  value={content.videoUrl}
+                  onChange={(e) =>
+                    setContent({ ...content, videoUrl: e.target.value })
+                  }
+                  placeholder="ID Only"
+                  style={inputStyle(isDarkMode)}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Reading Material (PDF URL)</label>
+                <input
+                  value={content.pdfUrl}
+                  onChange={(e) =>
+                    setContent({ ...content, pdfUrl: e.target.value })
+                  }
+                  placeholder="Cloud URL"
+                  style={inputStyle(isDarkMode)}
+                />
+              </div>
+            </div>
+            <div>
+              <label style={labelStyle}>Assignment Specification</label>
+              <textarea
+                value={content.assignment}
+                onChange={(e) =>
+                  setContent({ ...content, assignment: e.target.value })
+                }
+                style={{
+                  ...inputStyle(isDarkMode),
+                  height: "120px",
+                  resize: "none",
+                }}
+              />
+            </div>
+            <button type="submit" disabled={loading} style={submitBtnStyle}>
+              {loading ? (
+                <RefreshCcw className="animate-spin" />
+              ) : (
+                <>
+                  <Save size={18} /> PUSH TO LIVE PRODUCTION
+                </>
+              )}
+            </button>
+          </form>
         </div>
       </main>
-
-      <style>{`
-        @media (max-width: 768px) { .mobile-only-header { display: flex !important; } }
-        @media (min-width: 769px) { .mobile-only-header { display: none !important; } }
-      `}</style>
     </div>
   );
 };
 
-// Styles
+// PROFESSIONAL TERMINAL STYLES
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
   gap: "12px",
-  padding: "16px",
-  borderRadius: "16px",
+  padding: "18px",
+  borderRadius: "20px",
   textDecoration: "none",
-  fontWeight: "bold",
-  fontSize: "12px",
+  fontWeight: 900,
+  fontSize: "11px",
+  textTransform: "uppercase",
+  letterSpacing: "1px",
   backgroundColor: active ? "#2563eb" : "transparent",
-  color: active ? "white" : dark ? "#94a3b8" : "#64748b",
+  color: active ? "white" : dark ? "#475569" : "#64748b",
+  border: "none",
+  cursor: "pointer",
+  textAlign: "left",
 });
-const quickActionStyle = (dark) => ({
-  backgroundColor: dark ? "#1e293b" : "white",
+const inputStyle = (dark) => ({
+  width: "100%",
+  padding: "18px",
+  borderRadius: "18px",
+  border: `2px solid ${dark ? "#1e293b" : "#f1f5f9"}`,
+  backgroundColor: dark ? "#020617" : "#f8fafc",
+  color: "inherit",
+  fontWeight: "bold",
+  outline: "none",
+  transition: "0.3s",
+});
+const labelStyle = {
+  fontSize: "10px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "1.5px",
+  marginBottom: "8px",
+  display: "block",
+  color: "#2563eb",
+};
+const submitBtnStyle = {
+  width: "100%",
   padding: "20px",
   borderRadius: "20px",
-  border: `1px solid ${dark ? "#334155" : "#e2e8f0"}`,
+  border: "none",
+  backgroundColor: "#2563eb",
+  color: "white",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "2px",
+  cursor: "pointer",
   display: "flex",
-  flexDirection: "column",
   alignItems: "center",
-  gap: "10px",
-  textDecoration: "none",
-  color: dark ? "white" : "black",
-});
+  justifyContent: "center",
+  gap: "12px",
+  boxShadow: "0 10px 20px -5px rgba(37,99,235,0.4)",
+};
 const bottomBtnStyle = (dark) => ({
   padding: "15px",
   borderRadius: "15px",
@@ -386,17 +473,9 @@ const bottomBtnStyle = (dark) => ({
   alignItems: "center",
   gap: "10px",
   fontWeight: "bold",
+  fontSize: "10px",
   backgroundColor: dark ? "#1e293b" : "white",
   color: dark ? "white" : "#475569",
 });
-const cardBtnStyle = {
-  padding: "8px 15px",
-  background: "rgba(255,255,255,0.2)",
-  borderRadius: "10px",
-  color: "white",
-  fontSize: "10px",
-  fontWeight: "bold",
-  textDecoration: "none",
-};
 
 export default AdminContentManager;
