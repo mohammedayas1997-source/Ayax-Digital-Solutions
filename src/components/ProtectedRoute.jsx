@@ -4,10 +4,6 @@ import { doc, getDoc } from "firebase/firestore";
 import { Navigate, useLocation } from "react-router-dom";
 import { signOut } from "firebase/auth";
 
-/**
- * SECURE GATEWAY: PROTECTED ROUTE INFRASTRUCTURE
- * Optimized to prevent redirection loops and handle multi-tier administrative roles.
- */
 const ProtectedRoute = ({ children, requiredRole }) => {
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
@@ -24,8 +20,6 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
           if (userDoc.exists()) {
             const userData = userDoc.data();
-
-            // INTEGRITY CHECK: Immediately log out suspended or inactive accounts
             if (
               userData.status === "suspended" ||
               userData.status === "inactive"
@@ -40,7 +34,6 @@ const ProtectedRoute = ({ children, requiredRole }) => {
               setUser(currentUser);
             }
           } else {
-            // User authenticated but no Firestore profile found
             setUser(currentUser);
             setRole(null);
           }
@@ -55,11 +48,9 @@ const ProtectedRoute = ({ children, requiredRole }) => {
         setLoading(false);
       }
     });
-
     return () => unsubscribe();
   }, []);
 
-  // 1. LOADING TERMINAL
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#020617]">
@@ -73,45 +64,37 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     );
   }
 
-  // 2. ACCOUNT SUSPENSION PROTOCOL
   if (status === "suspended") {
     return (
       <Navigate to="/login" state={{ error: "Account Suspended" }} replace />
     );
   }
 
-  // 3. AUTHENTICATION CHECK
   if (!user) {
     const isAuthorityRoute =
       location.pathname.includes("admin") ||
       location.pathname.includes("super") ||
       location.pathname.includes("supervisor");
-
-    // Redirect staff to admin-gateway and students to login
     const loginPath = isAuthorityRoute ? "/admin-gateway" : "/login";
     return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
-  // 4. ROLE-BASED ACCESS CONTROL (RBAC) LOGIC
+  // --- REFINED RBAC LOGIC: STOP THE BOUNCING ---
   if (requiredRole) {
     const isSuperAdmin = role === "super-admin";
     const isAdminGeneral = role === "admin" || role === "AdminContentManager";
 
-    /**
-     * ACCESS GRANTED IF:
-     * 1. User is Super-Admin (Universal Access)
-     * 2. User role matches the requiredRole exactly
-     * 3. Page requires "admin" and user is either "admin" or "AdminContentManager"
-     */
-    const hasAccess =
+    // 1. Check if the user has permission for THIS specific route
+    const hasAccessToCurrentPage =
       isSuperAdmin ||
       role === requiredRole ||
       (requiredRole === "admin" && isAdminGeneral);
 
-    if (!hasAccess) {
-      // DYNAMIC REDIRECTION: Route users to their respective authorized dashboards
-      let redirectPath = "/student-portal";
+    if (!hasAccessToCurrentPage) {
+      // ONLY redirect if they actually don't have access.
+      // If an AdminContentManager is on an "admin" page, hasAccessToCurrentPage is TRUE.
 
+      let redirectPath = "/student-portal";
       if (isSuperAdmin) redirectPath = "/super-admin";
       else if (role === "AdminContentManager")
         redirectPath = "/admin-secret-portal";
@@ -122,6 +105,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     }
   }
 
+  // If they have access, just return the children. No Navigate call = No bouncing.
   return children;
 };
 
