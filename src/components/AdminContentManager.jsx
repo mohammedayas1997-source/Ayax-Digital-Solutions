@@ -19,7 +19,25 @@ import {
   Globe,
   Clock,
   ExternalLink,
+  Zap,
+  Timer,
 } from "lucide-react";
+
+// 1. MATSAR DA WANNAN SAMAN COMPONENT DIN
+const modeBtnStyle = (active, color) => ({
+  padding: "12px 24px",
+  borderRadius: "15px",
+  border: active ? `2px solid ${color}` : "2px solid transparent",
+  backgroundColor: active ? `${color}10` : "#f1f5f9",
+  color: active ? color : "#64748b",
+  fontWeight: 900,
+  fontSize: "10px",
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  cursor: "pointer",
+  transition: "0.3s",
+});
 
 const AdminContentManager = () => {
   const navigate = useNavigate();
@@ -92,30 +110,13 @@ const AdminContentManager = () => {
     },
   ];
 
-  const modeBtnStyle = (active, color) => ({
-    padding: "12px 24px",
-    borderRadius: "15px",
-    border: active ? `2px solid ${color}` : "2px solid transparent",
-    backgroundColor: active ? `${color}10` : "#f1f5f9",
-    color: active ? color : "#64748b",
-    fontWeight: 900,
-    fontSize: "10px",
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    cursor: "pointer",
-    transition: "0.3s",
-  });
-
   const getDocRef = () => doc(db, "course_settings", `week_${weekNum}`);
 
-  // ATOMIC CLOCK ENGINE
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // THEME PERSISTENCE
   useEffect(() => {
     localStorage.setItem("admin-theme", isDarkMode ? "dark" : "light");
     document.documentElement.classList.toggle("dark", isDarkMode);
@@ -132,16 +133,21 @@ const AdminContentManager = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Idan Manual ne, saita lokacin ya zama 'Yanzu' (Instant)
-      // Idan Auto ne, dauki lokacin da ka zaba (content.startDate)
-      const finalStartDate =
-        deploymentMode === "manual" ? new Date() : new Date(content.startDate);
+      // Gyara: Tabbatar akwai startDate idan mode din Auto ne
+      let finalStartDate;
+      if (deploymentMode === "manual") {
+        finalStartDate = new Date();
+      } else {
+        finalStartDate = content.startDate
+          ? new Date(content.startDate)
+          : new Date();
+      }
 
       await setDoc(
         getDocRef(),
         {
           ...content,
-          videoId: content.videoUrl, // Tabbatar ya yi mapping da Student Portal
+          videoId: content.videoUrl,
           startDate: finalStartDate,
           deploymentMode: deploymentMode,
           updatedAt: serverTimestamp(),
@@ -159,7 +165,6 @@ const AdminContentManager = () => {
     }
   };
 
-  // FETCH CONTENT ON WEEK CHANGE
   useEffect(() => {
     const fetchCurrentContent = async () => {
       setLoading(true);
@@ -244,13 +249,11 @@ const AdminContentManager = () => {
             </h1>
           </div>
 
-          {/* REAL TIME CLOCK */}
           <div
             style={{
               padding: "20px",
               borderRadius: "20px",
               backgroundColor: isDarkMode ? "#1e293b" : "#f1f5f9",
-              border: "1px solid transparent",
             }}
           >
             <div
@@ -333,16 +336,14 @@ const AdminContentManager = () => {
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
       <main style={{ flex: 1, marginLeft: "300px", padding: "60px" }}>
         {activeTab === "curriculum" && (
-          <div className="animate-in fade-in duration-700">
+          <div>
             <header style={{ marginBottom: "50px" }}>
               <h1
                 style={{
                   fontSize: "42px",
                   fontWeight: 900,
-                  letterSpacing: "-2px",
                   fontStyle: "italic",
                 }}
               >
@@ -362,16 +363,6 @@ const AdminContentManager = () => {
                   <Timer size={16} /> AUTO SCHEDULE
                 </button>
               </div>
-              <p
-                style={{
-                  fontSize: "11px",
-                  fontWeight: 800,
-                  opacity: 0.5,
-                  letterSpacing: "4px",
-                }}
-              >
-                AUTHORITY STATUS: ONLINE | WEEK {weekNum}
-              </p>
             </header>
 
             <div
@@ -430,55 +421,47 @@ const AdminContentManager = () => {
                     gap: "25px",
                   }}
                 >
-                  <div>
-                    <label style={labelStyle}>Release Date/Time</label>
-                    <input
-                      type="datetime-local"
-                      value={content.startDate}
-                      onChange={(e) =>
-                        setContent({ ...content, startDate: e.target.value })
-                      }
-                      style={inputStyle(isDarkMode)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Module Title</label>
-                    <input
-                      value={content.title}
-                      onChange={(e) =>
-                        setContent({ ...content, title: e.target.value })
-                      }
-                      placeholder="Enter Lesson Name"
-                      style={inputStyle(isDarkMode)}
-                    />
-                  </div>
+                  {/* WANNAN ZAI BAYYANA NE KAWAI IDAN AUTO NE */}
+                  {deploymentMode === "auto" ? (
+                    <div>
+                      <label style={labelStyle}>Scheduled Release Time</label>
+                      <input
+                        type="datetime-local"
+                        value={content.startDate}
+                        onChange={(e) =>
+                          setContent({ ...content, startDate: e.target.value })
+                        }
+                        style={inputStyle(isDarkMode)}
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={labelStyle}>Module Title</label>
+                      <input
+                        value={content.title}
+                        onChange={(e) =>
+                          setContent({ ...content, title: e.target.value })
+                        }
+                        placeholder="Enter Lesson Name"
+                        style={inputStyle(isDarkMode)}
+                      />
+                    </div>
+                  )}
+                  {deploymentMode === "auto" && (
+                    <div>
+                      <label style={labelStyle}>Module Title</label>
+                      <input
+                        value={content.title}
+                        onChange={(e) =>
+                          setContent({ ...content, title: e.target.value })
+                        }
+                        placeholder="Enter Lesson Name"
+                        style={inputStyle(isDarkMode)}
+                      />
+                    </div>
+                  )}
                 </div>
-                {deploymentMode === "auto" && (
-                  <div className="animate-in fade-in">
-                    <label style={labelStyle}>Scheduled Release Time</label>
-                    <input
-                      type="datetime-local"
-                      value={content.startDate}
-                      onChange={(e) =>
-                        setContent({ ...content, startDate: e.target.value })
-                      }
-                      style={inputStyle(isDarkMode)}
-                      required
-                    />
-                    <p
-                      style={{
-                        fontSize: "10px",
-                        marginTop: "5px",
-                        color: "#8b5cf6",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      Dalibai ba za su ga wannan ba sai lokacin da ka saita ya
-                      yi.
-                    </p>
-                  </div>
-                )}
 
                 <div
                   style={{
@@ -542,7 +525,7 @@ const AdminContentManager = () => {
         )}
 
         {activeTab === "library" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {libraryLinks.map((lib, i) => (
               <a
                 key={i}
@@ -603,7 +586,7 @@ const AdminContentManager = () => {
   );
 };
 
-// TERMINAL STYLES
+// TERMINAL STYLES (KEEP THESE AT THE BOTTOM)
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
