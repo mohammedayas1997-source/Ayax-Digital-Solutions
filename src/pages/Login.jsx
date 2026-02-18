@@ -5,77 +5,78 @@ import { doc, getDoc } from "firebase/firestore";
 import { LogIn, ShieldCheck, Loader2, ShieldAlert } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-const handleLogin = async (e) => {
-  e.preventDefault();
-  setLoading(true);
-  setError("");
+const StaffLogin = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const navigate = useNavigate();
 
-  try {
-    const cleanEmail = email.trim().toLowerCase();
-    const userCredential = await signInWithEmailAndPassword(
-      auth,
-      cleanEmail,
-      password,
-    );
-    const user = userCredential.user;
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
 
-    const userRef = doc(db, "users", user.uid);
-    const userDoc = await getDoc(userRef);
+    try {
+      const cleanEmail = email.trim().toLowerCase();
+      const userCredential = await signInWithEmailAndPassword(
+        auth,
+        cleanEmail,
+        password,
+      );
+      const user = userCredential.user;
 
-    if (userDoc.exists()) {
-      const userData = userDoc.data();
-      const userRole = userData.role;
+      const userRef = doc(db, "users", user.uid);
+      const userDoc = await getDoc(userRef);
 
-      // 1. AUTHORIZED STAFF ROLES ONLY
-      const authorizedStaff = [
-        "super-admin",
-        "admin",
-        "supervisor",
-        "AdminContentManager",
-        "instructor",
-        "staff",
-      ];
+      if (userDoc.exists()) {
+        const userData = userDoc.data();
+        const userRole = userData.role;
 
-      if (!authorizedStaff.includes(userRole)) {
-        await signOut(auth);
-        setError(
-          "ACCESS_DENIED: Unauthorized access. Staff credentials required.",
-        );
-        setLoading(false);
-        return;
-      }
+        const authorizedStaff = [
+          "super-admin",
+          "admin",
+          "supervisor",
+          "AdminContentManager",
+          "instructor",
+          "staff",
+        ];
 
-      // 2. STATUS INTEGRITY CHECK
-      if (userData.status === "suspended" || userData.status === "inactive") {
-        await signOut(auth);
-        setError("ACCOUNT_REVOKED: This administrative account is inactive.");
-        setLoading(false);
-        return;
-      }
+        if (!authorizedStaff.includes(userRole)) {
+          await signOut(auth);
+          setError(
+            "ACCESS_DENIED: Unauthorized access. Staff credentials required.",
+          );
+          setLoading(false);
+          return;
+        }
 
-      // 3. DYNAMIC REDIRECTION PROTOCOL
-      if (userRole === "super-admin") {
-        navigate("/super-admin");
-      } else if (userRole === "supervisor") {
-        navigate("/supervisor-dashboard");
-      } else if (userRole === "AdminContentManager") {
-        navigate("/admin-secret-portal");
-      } else if (userRole === "admin") {
-        navigate("/admin-dashboard");
+        if (userData.status === "suspended" || userData.status === "inactive") {
+          await signOut(auth);
+          setError("ACCOUNT_REVOKED: This administrative account is inactive.");
+          setLoading(false);
+          return;
+        }
+
+        // REDIRECTION PROTOCOL
+        if (userRole === "super-admin") navigate("/super-admin");
+        else if (userRole === "supervisor") navigate("/supervisor-dashboard");
+        else if (userRole === "AdminContentManager")
+          navigate("/admin-secret-portal");
+        else if (userRole === "admin") navigate("/admin-dashboard");
+        else navigate("/instructor-portal");
       } else {
-        // Fallback for other staff/instructors
-        navigate("/instructor-portal");
+        await signOut(auth);
+        setError("DATABASE_ERROR: No administrative profile found.");
       }
-    } else {
-      await signOut(auth);
-      setError("DATABASE_ERROR: No administrative profile found.");
+    } catch (err) {
+      setError("AUTHENTICATION_FAILED: Invalid institutional credentials.");
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    setError("AUTHENTICATION_FAILED: Invalid institutional credentials.");
-  } finally {
-    setLoading(false);
-  }
+  };
 
+  // WANNAN RETURN DIN DOLE YA ZAUNA A NAN (Wajen handleLogin)
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-6 font-sans">
       <form
@@ -90,11 +91,13 @@ const handleLogin = async (e) => {
         <h2 className="text-2xl font-black text-center mb-2 text-gray-900 uppercase tracking-tight">
           Staff Command Center
         </h2>
+
         {error && (
           <div className="mb-6 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 text-[10px] font-black flex items-center gap-2 rounded-xl uppercase">
             <ShieldAlert size={16} /> {error}
           </div>
         )}
+
         <div className="space-y-4">
           <input
             type="email"
@@ -114,7 +117,7 @@ const handleLogin = async (e) => {
           />
           <button
             disabled={loading}
-            className="w-full py-5 bg-red-600 text-white rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2"
+            className="w-full py-5 bg-red-600 text-white rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 hover:bg-red-700 transition-all"
           >
             {loading ? (
               <Loader2 className="animate-spin" />
