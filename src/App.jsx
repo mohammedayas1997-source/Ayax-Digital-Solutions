@@ -7,7 +7,7 @@ import {
 } from "react-router-dom";
 import { auth } from "./firebaseConfig";
 
-// --- EXISTING IMPORTS ---
+// --- ALL IMPORTS (Kamar yadda kake dasu) ---
 import AboutUs from "./pages/AboutUs";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
@@ -29,8 +29,6 @@ import AcademicExam from "./components/AcademicExam";
 import AdminQuestionBank from "./pages/AdminQuestionBank";
 import SuperAdmin from "./pages/SuperAdmin";
 import AdminContentManager from "./components/AdminContentManager";
-
-// --- NEW TERMINALS & PAGES ---
 import StudentLogin from "./pages/StudentLogin";
 import AdminLogin from "./pages/AdminLogin";
 import StudentGrades from "./pages/StudentGrades";
@@ -39,11 +37,7 @@ import AdminCourseList from "./pages/AdminCourseList";
 import AdminCourseDashboard from "./pages/AdminCourseDashboard";
 import AdminStudentsList from "./pages/AdminStudentsList";
 import ForumDetails from "./components/ForumDetails";
-
-// SUPERVISOR DASHBOARD
 import SupervisorDashboard from "./pages/SupervisorDashboard";
-
-// --- COURSE & PRICING COMPONENTS ---
 import CourseSection from "./components/CourseSection";
 import PricingCard from "./components/PricingCard";
 
@@ -64,28 +58,13 @@ function App() {
     <Router>
       <div className="App">
         <Navbar />
-
         <Routes>
-          {/* --- PUBLIC ACCESS PROTOCOLS --- */}
+          {/* PUBLIC ROUTES */}
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<AboutUs />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/launch-project" element={<ProjectForm />} />
-          <ProtectedRoute requiredRole="admin">
-            {" "}
-            <AdminDashboard />{" "}
-          </ProtectedRoute>
-          {/* SECURE CONTENT MANAGER PORTAL */}
-          <Route
-            path="/admin-secret-portal"
-            element={
-              <ProtectedRoute requiredRole="AdminContentManager">
-                <AdminContentManager />
-              </ProtectedRoute>
-            }
-          />
-
           <Route path="/enroll" element={<CourseEnrollment />} />
           <Route
             path="/verify/:certificateId"
@@ -97,35 +76,12 @@ function App() {
           />
           <Route path="/courses" element={<CourseSection />} />
           <Route path="/pricing" element={<PricingCard />} />
-
-          {/* --- AUTHENTICATION TERMINALS --- */}
           <Route path="/portal" element={<AuthPortal />} />
           <Route path="/login" element={<StudentLogin />} />
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
 
-          {/* --- SUPERVISOR SECURE INFRASTRUCTURE --- */}
-          <Route
-            path="/supervisor-dashboard"
-            element={
-              <ProtectedRoute requiredRole="supervisor">
-                <SupervisorDashboard />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* --- SUPER ADMIN EXCLUSIVE --- */}
-          <Route
-            path="/super-admin"
-            element={
-              <ProtectedRoute requiredRole="super-admin">
-                <SuperAdmin />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* --- SHARED ADMIN & CONTENT MANAGER ROUTES --- */}
-          {/* Tabbatar requiredRole="admin" domin duka roles din su samu damar shiga */}
+          {/* PROTECTED ROUTES - ADMIN */}
           <Route
             path="/admin-dashboard"
             element={
@@ -134,7 +90,14 @@ function App() {
               </ProtectedRoute>
             }
           />
-
+          <Route
+            path="/admin-secret-portal"
+            element={
+              <ProtectedRoute requiredRole="AdminContentManager">
+                <AdminContentManager />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/admin/courses"
             element={
@@ -143,7 +106,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/admin/dashboard/:courseId"
             element={
@@ -152,7 +114,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/admin/students/:courseId"
             element={
@@ -161,7 +122,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/admin/grading"
             element={
@@ -170,7 +130,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/admin/questions"
             element={
@@ -179,7 +138,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/admin/chat/:courseId"
             element={
@@ -189,7 +147,25 @@ function App() {
             }
           />
 
-          {/* --- STUDENT SECURE INFRASTRUCTURE --- */}
+          {/* PROTECTED ROUTES - SUPERVISOR & SUPER ADMIN */}
+          <Route
+            path="/supervisor-dashboard"
+            element={
+              <ProtectedRoute requiredRole="supervisor">
+                <SupervisorDashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/super-admin"
+            element={
+              <ProtectedRoute requiredRole="super-admin">
+                <SuperAdmin />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* PROTECTED ROUTES - STUDENT */}
           <Route
             path="/student-portal"
             element={
@@ -198,12 +174,10 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/dashboard"
             element={<Navigate to="/student-portal" replace />}
           />
-
           <Route
             path="/course/:courseId/grades"
             element={
@@ -212,7 +186,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/lesson/:lessonId"
             element={
@@ -221,7 +194,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/course/:courseId/forum/week/:weekId"
             element={
@@ -230,7 +202,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/course/:courseId/exam/week/:weekId"
             element={
@@ -239,7 +210,6 @@ function App() {
               </ProtectedRoute>
             }
           />
-
           <Route
             path="/certificate/:courseId"
             element={
@@ -254,7 +224,7 @@ function App() {
             }
           />
 
-          {/* CATCH-ALL REDIRECT */}
+          {/* CATCH-ALL */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
