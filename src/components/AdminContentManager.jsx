@@ -1,6 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebaseConfig";
-import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
+import {
+  doc,
+  setDoc,
+  serverTimestamp,
+  getDoc,
+  updateDoc,
+  deleteDoc,
+  collection,
+  query,
+  orderBy,
+  limit,
+  onSnapshot,
+  addDoc,
+} from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import {
@@ -21,9 +34,10 @@ import {
   ExternalLink,
   Zap,
   Timer,
+  Trash2,
+  History,
 } from "lucide-react";
 
-// 1. MATSAR DA WANNAN SAMAN COMPONENT DIN
 const modeBtnStyle = (active, color) => ({
   padding: "12px 24px",
   borderRadius: "15px",
@@ -44,15 +58,14 @@ const AdminContentManager = () => {
   const [isDarkMode, setIsDarkMode] = useState(
     () => localStorage.getItem("admin-theme") === "dark",
   );
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [deploymentMode, setDeploymentMode] = useState("manual");
 
   // Curriculum State
-  const [courseId, setCourseId] = useState("web_dev");
   const [weekNum, setWeekNum] = useState(1);
   const [activeTab, setActiveTab] = useState("curriculum");
+  const [updateHistory, setUpdateHistory] = useState([]);
   const [content, setContent] = useState({
     title: "",
     videoUrl: "",
@@ -122,8 +135,21 @@ const AdminContentManager = () => {
     document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode]);
 
+  // FETCH HISTORY LOGS
+  useEffect(() => {
+    const q = query(
+      collection(db, "deployment_logs"),
+      orderBy("timestamp", "desc"),
+      limit(10),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setUpdateHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, []);
+
   const handleLogout = async () => {
-    if (window.confirm("CRITICAL: Terminate Content Manager Session?")) {
+    if (window.confirm("CRITICAL: Terminate Session?")) {
       await signOut(auth);
       navigate("/admin-gateway");
     }
@@ -133,35 +159,63 @@ const AdminContentManager = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      // Gyara: Tabbatar akwai startDate idan mode din Auto ne
-      let finalStartDate;
-      if (deploymentMode === "manual") {
-        finalStartDate = new Date();
-      } else {
-        finalStartDate = content.startDate
-          ? new Date(content.startDate)
-          : new Date();
-      }
+      const finalStartDate =
+        deploymentMode === "manual" ? new Date() : new Date(content.startDate);
 
-      await setDoc(
-        getDocRef(),
-        {
-          ...content,
-          videoId: content.videoUrl,
-          startDate: finalStartDate,
-          deploymentMode: deploymentMode,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
+      const payload = {
+        ...content,
+        videoId: content.videoUrl,
+        startDate: finalStartDate,
+        deploymentMode: deploymentMode,
+        updatedAt: serverTimestamp(),
+      };
 
-      alert(
-        `SUCCESS: Week ${weekNum} deployed via ${deploymentMode.toUpperCase()} mode.`,
-      );
+      await setDoc(getDocRef(), payload, { merge: true });
+
+      // LOG TO HISTORY
+      await addDoc(collection(db, "deployment_logs"), {
+        week: weekNum,
+        title: content.title,
+        mode: deploymentMode,
+        timestamp: serverTimestamp(),
+        action: "UPDATE/DEPLOY",
+      });
+
+      alert(`SUCCESS: Week ${weekNum} is now synced.`);
     } catch (err) {
       alert("SYNC_FAILURE: " + err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteWeek = async () => {
+    if (
+      window.confirm(`PERMANENT ACTION: Wipe all data for Week ${weekNum}?`)
+    ) {
+      setLoading(true);
+      try {
+        await deleteDoc(getDocRef());
+        setContent({
+          title: "",
+          videoUrl: "",
+          pdfUrl: "",
+          assignment: "",
+          startDate: "",
+        });
+
+        await addDoc(collection(db, "deployment_logs"), {
+          week: weekNum,
+          timestamp: serverTimestamp(),
+          action: "DELETE_NODE",
+        });
+
+        alert("DELETION_COMPLETE: Week data purged.");
+      } catch (err) {
+        alert("DELETE_ERROR: " + err.message);
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -188,7 +242,7 @@ const AdminContentManager = () => {
           });
         }
       } catch (e) {
-        console.error("NODE_FETCH_ERROR:", e);
+        console.error(e);
       }
       setLoading(false);
     };
@@ -202,7 +256,6 @@ const AdminContentManager = () => {
         minHeight: "100vh",
         backgroundColor: isDarkMode ? "#020617" : "#f8fafc",
         color: isDarkMode ? "white" : "#0f172a",
-        transition: "background 0.3s ease",
       }}
     >
       {/* SIDEBAR */}
@@ -248,7 +301,6 @@ const AdminContentManager = () => {
               AYAX <span style={{ color: "#2563eb" }}>CONTENT</span>
             </h1>
           </div>
-
           <div
             style={{
               padding: "20px",
@@ -266,13 +318,7 @@ const AdminContentManager = () => {
               }}
             >
               <Clock size={14} />
-              <span
-                style={{
-                  fontSize: "10px",
-                  fontWeight: 900,
-                  letterSpacing: "1px",
-                }}
-              >
+              <span style={{ fontSize: "10px", fontWeight: 900 }}>
                 MASTER TIME
               </span>
             </div>
@@ -303,6 +349,12 @@ const AdminContentManager = () => {
             <BookOpen size={18} /> Lesson Manager
           </button>
           <button
+            onClick={() => setActiveTab("history")}
+            style={navStyle(activeTab === "history", isDarkMode)}
+          >
+            <History size={18} /> Deploy History
+          </button>
+          <button
             onClick={() => setActiveTab("library")}
             style={navStyle(activeTab === "library", isDarkMode)}
           >
@@ -319,8 +371,8 @@ const AdminContentManager = () => {
               <Sun size={18} color="#eab308" />
             ) : (
               <Moon size={18} color="#2563eb" />
-            )}
-            {isDarkMode ? "SPECTRUM: LIGHT" : "SPECTRUM: DARK"}
+            )}{" "}
+            {isDarkMode ? "LIGHT MODE" : "DARK MODE"}
           </button>
           <button
             onClick={handleLogout}
@@ -331,38 +383,61 @@ const AdminContentManager = () => {
               border: "none",
             }}
           >
-            <LogOut size={18} /> TERMINATE SESSION
+            <LogOut size={18} /> TERMINATE
           </button>
         </div>
       </aside>
 
+      {/* MAIN CONTENT AREA */}
       <main style={{ flex: 1, marginLeft: "300px", padding: "60px" }}>
         {activeTab === "curriculum" && (
-          <div>
-            <header style={{ marginBottom: "50px" }}>
-              <h1
+          <div className="animate-in fade-in duration-700">
+            <header
+              style={{
+                marginBottom: "50px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-end",
+              }}
+            >
+              <div>
+                <h1
+                  style={{
+                    fontSize: "42px",
+                    fontWeight: 900,
+                    fontStyle: "italic",
+                  }}
+                >
+                  CURRICULUM <span style={{ color: "#2563eb" }}>NODE</span>
+                </h1>
+                <div
+                  style={{ display: "flex", gap: "15px", marginTop: "20px" }}
+                >
+                  <button
+                    onClick={() => setDeploymentMode("manual")}
+                    style={modeBtnStyle(deploymentMode === "manual", "#2563eb")}
+                  >
+                    <Zap size={16} /> MANUAL PUSH
+                  </button>
+                  <button
+                    onClick={() => setDeploymentMode("auto")}
+                    style={modeBtnStyle(deploymentMode === "auto", "#8b5cf6")}
+                  >
+                    <Timer size={16} /> AUTO SCHEDULE
+                  </button>
+                </div>
+              </div>
+              <button
+                onClick={handleDeleteWeek}
                 style={{
-                  fontSize: "42px",
-                  fontWeight: 900,
-                  fontStyle: "italic",
+                  ...bottomBtnStyle(false),
+                  color: "#dc2626",
+                  borderColor: "#dc262610",
+                  backgroundColor: "#dc262605",
                 }}
               >
-                CURRICULUM <span style={{ color: "#2563eb" }}>NODE</span>
-              </h1>
-              <div style={{ display: "flex", gap: "15px", marginTop: "20px" }}>
-                <button
-                  onClick={() => setDeploymentMode("manual")}
-                  style={modeBtnStyle(deploymentMode === "manual", "#2563eb")}
-                >
-                  <Zap size={16} /> MANUAL PUSH (INSTANT)
-                </button>
-                <button
-                  onClick={() => setDeploymentMode("auto")}
-                  style={modeBtnStyle(deploymentMode === "auto", "#8b5cf6")}
-                >
-                  <Timer size={16} /> AUTO SCHEDULE
-                </button>
-              </div>
+                <Trash2 size={18} /> PURGE WEEK {weekNum}
+              </button>
             </header>
 
             <div
@@ -384,7 +459,7 @@ const AdminContentManager = () => {
                 }}
               >
                 <h2 style={{ fontSize: "20px", fontWeight: 900 }}>
-                  CONFIGURATION TERMINAL
+                  WEEK {weekNum} TERMINAL
                 </h2>
                 <select
                   value={weekNum}
@@ -421,10 +496,9 @@ const AdminContentManager = () => {
                     gap: "25px",
                   }}
                 >
-                  {/* WANNAN ZAI BAYYANA NE KAWAI IDAN AUTO NE */}
                   {deploymentMode === "auto" ? (
                     <div>
-                      <label style={labelStyle}>Scheduled Release Time</label>
+                      <label style={labelStyle}>Scheduled Release</label>
                       <input
                         type="datetime-local"
                         value={content.startDate}
@@ -436,31 +510,36 @@ const AdminContentManager = () => {
                       />
                     </div>
                   ) : (
-                    <div>
-                      <label style={labelStyle}>Module Title</label>
-                      <input
-                        value={content.title}
-                        onChange={(e) =>
-                          setContent({ ...content, title: e.target.value })
-                        }
-                        placeholder="Enter Lesson Name"
-                        style={inputStyle(isDarkMode)}
-                      />
+                    <div
+                      style={{
+                        padding: "20px",
+                        backgroundColor: "#2563eb10",
+                        borderRadius: "20px",
+                        border: "1px dashed #2563eb40",
+                      }}
+                    >
+                      <p
+                        style={{
+                          fontSize: "10px",
+                          fontWeight: 900,
+                          color: "#2563eb",
+                        }}
+                      >
+                        MANUAL STATUS: LIVE UPON SAVE
+                      </p>
                     </div>
                   )}
-                  {deploymentMode === "auto" && (
-                    <div>
-                      <label style={labelStyle}>Module Title</label>
-                      <input
-                        value={content.title}
-                        onChange={(e) =>
-                          setContent({ ...content, title: e.target.value })
-                        }
-                        placeholder="Enter Lesson Name"
-                        style={inputStyle(isDarkMode)}
-                      />
-                    </div>
-                  )}
+                  <div>
+                    <label style={labelStyle}>Module Title</label>
+                    <input
+                      value={content.title}
+                      onChange={(e) =>
+                        setContent({ ...content, title: e.target.value })
+                      }
+                      placeholder="Lesson Name"
+                      style={inputStyle(isDarkMode)}
+                    />
+                  </div>
                 </div>
 
                 <div
@@ -471,7 +550,7 @@ const AdminContentManager = () => {
                   }}
                 >
                   <div>
-                    <label style={labelStyle}>YouTube Video ID</label>
+                    <label style={labelStyle}>YouTube ID</label>
                     <input
                       value={content.videoUrl}
                       onChange={(e) =>
@@ -482,20 +561,20 @@ const AdminContentManager = () => {
                     />
                   </div>
                   <div>
-                    <label style={labelStyle}>Lecture PDF Link</label>
+                    <label style={labelStyle}>PDF Link</label>
                     <input
                       value={content.pdfUrl}
                       onChange={(e) =>
                         setContent({ ...content, pdfUrl: e.target.value })
                       }
-                      placeholder="https://cloud.storage/notes.pdf"
+                      placeholder="https://..."
                       style={inputStyle(isDarkMode)}
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Assignment Briefing</label>
+                  <label style={labelStyle}>Assignment Specification</label>
                   <textarea
                     value={content.assignment}
                     onChange={(e) =>
@@ -506,16 +585,26 @@ const AdminContentManager = () => {
                       height: "150px",
                       resize: "none",
                     }}
-                    placeholder="Describe the project requirements..."
                   />
                 </div>
 
-                <button type="submit" disabled={loading} style={submitBtnStyle}>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    ...submitBtnStyle,
+                    backgroundColor:
+                      deploymentMode === "manual" ? "#2563eb" : "#8b5cf6",
+                  }}
+                >
                   {loading ? (
                     <RefreshCcw className="animate-spin" />
                   ) : (
                     <>
-                      <Save size={20} /> SYNC TO LIVE STUDENT NODES
+                      <Save size={20} />{" "}
+                      {deploymentMode === "manual"
+                        ? "DEPLOY INSTANTLY"
+                        : "SAVE TO CLOUD SCHEDULE"}
                     </>
                   )}
                 </button>
@@ -524,8 +613,79 @@ const AdminContentManager = () => {
           </div>
         )}
 
+        {activeTab === "history" && (
+          <div className="animate-in slide-in-from-right duration-500">
+            <h2
+              style={{
+                fontSize: "32px",
+                fontWeight: 900,
+                marginBottom: "40px",
+              }}
+            >
+              DEPLOYMENT <span style={{ color: "#2563eb" }}>LOGS</span>
+            </h2>
+            <div
+              style={{ display: "flex", flexDirection: "column", gap: "15px" }}
+            >
+              {updateHistory.map((log) => (
+                <div
+                  key={log.id}
+                  style={{
+                    padding: "25px",
+                    borderRadius: "25px",
+                    backgroundColor: isDarkMode ? "#0f172a" : "white",
+                    border: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                  }}
+                >
+                  <div>
+                    <h4
+                      style={{
+                        fontWeight: 900,
+                        fontSize: "14px",
+                        color:
+                          log.action === "DELETE_NODE" ? "#dc2626" : "#2563eb",
+                      }}
+                    >
+                      {log.action}
+                    </h4>
+                    <p style={{ fontSize: "12px", fontWeight: 700 }}>
+                      Week {log.week} - {log.title || "No Title"}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <p
+                      style={{
+                        fontSize: "10px",
+                        fontWeight: 900,
+                        opacity: 0.5,
+                      }}
+                    >
+                      {log.timestamp?.toDate().toLocaleString() || "Syncing..."}
+                    </p>
+                    <span
+                      style={{
+                        fontSize: "8px",
+                        padding: "4px 8px",
+                        backgroundColor: "#2563eb10",
+                        borderRadius: "5px",
+                        color: "#2563eb",
+                        fontWeight: 900,
+                      }}
+                    >
+                      {log.mode?.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {activeTab === "library" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-6">
             {libraryLinks.map((lib, i) => (
               <a
                 key={i}
@@ -548,7 +708,6 @@ const AdminContentManager = () => {
                       fontSize: "10px",
                       fontWeight: 900,
                       color: "#2563eb",
-                      letterSpacing: "2px",
                     }}
                   >
                     {lib.cat}
@@ -571,7 +730,6 @@ const AdminContentManager = () => {
                       fontSize: "10px",
                       fontWeight: 900,
                       opacity: 0.5,
-                      color: isDarkMode ? "white" : "black",
                     }}
                   >
                     VISIT REPO <ExternalLink size={12} />
@@ -586,7 +744,7 @@ const AdminContentManager = () => {
   );
 };
 
-// TERMINAL STYLES (KEEP THESE AT THE BOTTOM)
+// TERMINAL STYLES
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
@@ -594,11 +752,11 @@ const navStyle = (active, dark) => ({
   padding: "20px",
   borderRadius: "22px",
   fontWeight: 900,
-  fontSize: "12px",
+  fontSize: "11px",
   textTransform: "uppercase",
   letterSpacing: "1px",
   backgroundColor: active ? "#2563eb" : "transparent",
-  color: active ? "white" : dark ? "#64748b" : "#94a3b8",
+  color: active ? "white" : dark ? "#475569" : "#94a3b8",
   border: "none",
   cursor: "pointer",
   textAlign: "left",
@@ -629,7 +787,6 @@ const submitBtnStyle = {
   padding: "25px",
   borderRadius: "25px",
   border: "none",
-  backgroundColor: "#2563eb",
   color: "white",
   fontWeight: 900,
   textTransform: "uppercase",
@@ -639,7 +796,7 @@ const submitBtnStyle = {
   alignItems: "center",
   justifyContent: "center",
   gap: "15px",
-  boxShadow: "0 15px 30px -10px rgba(37,99,235,0.6)",
+  boxShadow: "0 15px 30px -10px rgba(0,0,0,0.3)",
 };
 const bottomBtnStyle = (dark) => ({
   padding: "18px",
