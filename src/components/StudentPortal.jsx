@@ -42,6 +42,7 @@ import {
   Download,
   Calendar,
   User,
+  Loader2, // NA KARA WANNAN DOMIN MAGANCE BLANK SCREEN DIN
 } from "lucide-react";
 
 // ==========================================
@@ -148,7 +149,6 @@ const StudentPortal = () => {
   const [hasPassedMidterm, setHasPassedMidterm] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState(null);
   const totalWeeks = 24;
-  // Wannan zai rinka rike lokaci na yanzu
   const [currentTime, setCurrentTime] = useState(new Date());
 
   // Admin Data State (Real-time Sync)
@@ -198,14 +198,9 @@ const StudentPortal = () => {
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 1000); // 1000ms = 1 second
-
-    return () => clearInterval(timer); // Tabbatar ya tsaya idan an fita
+    }, 1000);
+    return () => clearInterval(timer);
   }, []);
-
-  // ==========================================
-  // 3. CORE LOGIC & EFFECTS
-  // ==========================================
 
   // A. REAL-TIME CURRICULUM SYNC
   useEffect(() => {
@@ -305,10 +300,6 @@ const StudentPortal = () => {
     document.documentElement.classList.toggle("dark", darkMode);
   }, [darkMode]);
 
-  // ==========================================
-  // 4. HANDLERS
-  // ==========================================
-
   const handleInitialCourseSelection = async (courseId) => {
     setLoading(true);
     try {
@@ -369,7 +360,6 @@ const StudentPortal = () => {
       </div>
     );
 
-  // COURSE SELECTION OVERLAY
   if (!selectedCourseId)
     return (
       <div
@@ -407,45 +397,30 @@ const StudentPortal = () => {
     <div
       className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"} transition-colors duration-300`}
     >
-      {/* SIDEBAR */}
       <aside
         className={`fixed lg:sticky top-0 z-50 h-screen w-80 border-r flex flex-col transition-transform ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
-        <div className="p-10 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl font-black text-blue-600 italic">
-              AYAX{" "}
-              <span className={darkMode ? "text-white" : "text-gray-900"}>
-                UNI
+        <div className="p-10 flex flex-col gap-4">
+          <h1 className="text-2xl font-black text-blue-600 italic">
+            AYAX{" "}
+            <span className={darkMode ? "text-white" : "text-gray-900"}>
+              UNI
+            </span>
+          </h1>
+          <div className="p-4 rounded-2xl bg-blue-600/10 border border-blue-600/20">
+            <div className="flex items-center gap-3 text-blue-500 mb-1">
+              <Clock size={14} className="animate-spin-slow" />
+              <span className="text-[10px] font-black uppercase tracking-widest">
+                System Time
               </span>
-            </h1>
-
-            {/* DIGITAL CLOCK UI */}
-            <div className="mt-4 p-4 rounded-2xl bg-blue-600/10 border border-blue-600/20">
-              <div className="flex items-center gap-3 text-blue-500 mb-1">
-                <Clock size={14} className="animate-spin-slow" />
-                <span className="text-[10px] font-black uppercase tracking-widest">
-                  System Time
-                </span>
-              </div>
-              <h4 className="text-xl font-black font-mono tracking-tighter">
-                {currentTime.toLocaleTimeString("en-GB", { hour12: false })}
-              </h4>
-              <p className="text-[8px] font-bold opacity-50 uppercase">
-                {currentTime.toDateString()}
-              </p>
             </div>
-
-            <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mt-1">
-              LMS NODE: {selectedCourseId.toUpperCase()}
+            <h4 className="text-xl font-black font-mono tracking-tighter">
+              {currentTime.toLocaleTimeString("en-GB", { hour12: false })}
+            </h4>
+            <p className="text-[8px] font-bold opacity-50 uppercase">
+              {currentTime.toDateString()}
             </p>
           </div>
-          <button
-            className="lg:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <X />
-          </button>
         </div>
 
         <nav className="flex-1 px-6 space-y-2 overflow-y-auto custom-scrollbar">
@@ -477,10 +452,10 @@ const StudentPortal = () => {
             </button>
           ))}
 
-          <div className="pt-8 pb-4 text-[8px] font-black text-gray-500 uppercase tracking-widest">
-            Syllabus Progress
+          <div className="pt-8 pb-4 text-[8px] font-black text-gray-500 uppercase tracking-widest px-2">
+            Roadmap Progress
           </div>
-          <div className="space-y-1 pb-10">
+          <div className="space-y-1 pb-10 px-2">
             {Array.from({ length: 24 }, (_, i) => i + 1).map((w) => {
               const locked = isWeekLocked(w);
               const weekSet = weeksData[`week_${w}`];
@@ -523,19 +498,30 @@ const StudentPortal = () => {
             onClick={() => setDarkMode(!darkMode)}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest bg-slate-800/50"
           >
-            {darkMode ? <Sun size={16} /> : <Moon size={16} />} Spectrum Shift
+            {darkMode ? <Sun size={16} /> : <Moon size={16} />} Shift Mode
           </button>
           <button
             onClick={() => signOut(auth)}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-[9px] uppercase bg-red-600 text-white shadow-lg"
           >
-            <LogOut size={16} /> Terminal Exit
+            <LogOut size={16} /> Logout
           </button>
         </div>
       </aside>
 
-      {/* MAIN CONTENT */}
       <main className="flex-1 p-6 md:p-14 overflow-y-auto">
+        <header className="lg:hidden flex justify-between items-center mb-10">
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="p-3 bg-blue-600 text-white rounded-xl"
+          >
+            <Menu />
+          </button>
+          <h2 className="font-black italic uppercase text-blue-600">
+            AYAX PORTAL
+          </h2>
+        </header>
+
         {activeTab === "dashboard" && (
           <div className="space-y-10 animate-in fade-in duration-700">
             <div className="bg-blue-600 p-16 rounded-[4rem] text-white shadow-2xl relative overflow-hidden group">
@@ -545,9 +531,8 @@ const StudentPortal = () => {
                   {selectedCourseId.replace("_", " ")}
                 </h2>
                 <p className="text-lg font-bold opacity-80 max-w-xl">
-                  Operationalizing specialized module data for Week{" "}
-                  {currentWeek}. Keep pushing,{" "}
-                  {studentData?.fullName?.split(" ")[0]}.
+                  Welcome, {studentData?.fullName}. Processing node data for
+                  Week {currentWeek}.
                 </p>
               </div>
             </div>
@@ -556,7 +541,7 @@ const StudentPortal = () => {
                 className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
               >
                 <p className="text-[10px] font-black text-gray-400 uppercase mb-1">
-                  Completion
+                  Completion Rate
                 </p>
                 <h4 className="text-4xl font-black italic text-blue-600">
                   {Math.round((currentWeek / 24) * 100)}%
@@ -566,7 +551,7 @@ const StudentPortal = () => {
                 className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
               >
                 <p className="text-[10px] font-black text-gray-400 uppercase mb-1">
-                  Current Node
+                  Module ID
                 </p>
                 <h4 className="text-4xl font-black italic text-emerald-500">
                   W-{currentWeek}
@@ -576,49 +561,46 @@ const StudentPortal = () => {
                 className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
               >
                 <p className="text-[10px] font-black text-gray-400 uppercase mb-1">
-                  Midterm Rank
+                  Certification Rank
                 </p>
                 <h4
                   className={`text-4xl font-black italic ${hasPassedMidterm ? "text-blue-500" : "text-orange-500"}`}
                 >
-                  {hasPassedMidterm ? "QUALIFIED" : "PENDING"}
+                  {hasPassedMidterm ? "ELITE" : "PROBATION"}
                 </h4>
               </div>
             </div>
           </div>
         )}
 
-        {/* E-LIBRARY TAB FOR STUDENTS */}
         {activeTab === "library" && (
-          <div className="animate-in fade-in slide-in-from-bottom-6 duration-700">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
-              {libraryLinks.map((lib, i) => (
-                <a
-                  key={i}
-                  href={lib.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className={`p-8 rounded-[2.5rem] border-2 transition-all hover:scale-105 hover:border-blue-600 group ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-white shadow-xl"}`}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-6 duration-700">
+            {libraryLinks.map((lib, i) => (
+              <a
+                key={i}
+                href={lib.url}
+                target="_blank"
+                rel="noreferrer"
+                className={`p-8 rounded-[2.5rem] border-2 transition-all hover:scale-105 hover:border-blue-600 group ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-white shadow-xl"}`}
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <div className="p-3 bg-blue-600/10 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                    <BookOpen size={24} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">
+                    {lib.cat}
+                  </span>
+                </div>
+                <h3
+                  className={`text-xl font-black uppercase italic mb-4 ${darkMode ? "text-white" : "text-slate-900"}`}
                 >
-                  <div className="flex justify-between items-start mb-6">
-                    <div className="p-3 bg-blue-600/10 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                      <BookOpen size={24} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">
-                      {lib.cat}
-                    </span>
-                  </div>
-                  <h3
-                    className={`text-xl font-black uppercase italic mb-4 ${darkMode ? "text-white" : "text-slate-900"}`}
-                  >
-                    {lib.name}
-                  </h3>
-                  <div className="flex items-center gap-2 text-[10px] font-black uppercase text-gray-500 group-hover:text-blue-600 transition-colors">
-                    Open Repository <ChevronRight size={14} />
-                  </div>
-                </a>
-              ))}
-            </div>
+                  {lib.name}
+                </h3>
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-gray-500 group-hover:text-blue-600">
+                  Open Repository <ChevronRight size={14} />
+                </div>
+              </a>
+            ))}
           </div>
         )}
 
@@ -633,7 +615,7 @@ const StudentPortal = () => {
                       className="text-red-600 mb-6 animate-pulse"
                     />
                     <h3 className="text-3xl font-black uppercase italic mb-2">
-                      Temporal Lock Engaged
+                      Temporal Lock Active
                     </h3>
                     <p className="text-blue-500 font-black text-xs uppercase tracking-widest">
                       Authorized Release:{" "}
@@ -661,7 +643,7 @@ const StudentPortal = () => {
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="p-8 bg-blue-600 rounded-[2.5rem] text-white">
                     <h5 className="font-black text-[10px] uppercase mb-4 flex items-center gap-2">
-                      <FileText size={18} /> Academic Repository
+                      <FileText size={18} /> Library Asset
                     </h5>
                     {weeksData[`week_${currentWeek}`]?.pdfUrl ? (
                       <a
@@ -670,10 +652,10 @@ const StudentPortal = () => {
                         rel="noreferrer"
                         className="block w-full py-4 bg-white text-blue-600 rounded-2xl font-black text-center text-[10px] uppercase"
                       >
-                        Retrieve PDF Material
+                        Download Material
                       </a>
                     ) : (
-                      <p className="opacity-50 text-[10px] italic font-black uppercase text-center">
+                      <p className="opacity-50 text-[10px] italic font-black text-center">
                         No Data Injected
                       </p>
                     )}
@@ -682,7 +664,7 @@ const StudentPortal = () => {
                     className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-white/5 border-white/5" : "bg-gray-50 border-gray-100"}`}
                   >
                     <h5 className="text-[10px] font-black text-blue-600 uppercase mb-4 flex items-center gap-2">
-                      <Clock size={18} /> Practical Node
+                      <Clock size={18} /> Weekly Task
                     </h5>
                     <p className="text-sm font-bold opacity-70 leading-relaxed">
                       {weeksData[`week_${currentWeek}`]?.assignment ||
@@ -812,7 +794,6 @@ const StudentPortal = () => {
           </div>
         )}
 
-        {/* PRIVATE SUPERVISOR CHAT */}
         {activeTab === "chat" && (
           <div
             className={`h-[80vh] flex flex-col rounded-[3.5rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-2xl"}`}
@@ -823,7 +804,7 @@ const StudentPortal = () => {
                   Private Secure Link
                 </h3>
                 <p className="text-[10px] font-black uppercase opacity-60">
-                  Supervisor Encrypted Channel
+                  Supervisor Direct Connection
                 </p>
               </div>
               <ShieldCheck size={30} />
@@ -865,6 +846,8 @@ const StudentPortal = () => {
         .s-input:focus { border-color: #2563eb; background: ${darkMode ? "#0f172a" : "white"}; }
         .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #2563eb33; border-radius: 10px; }
+        .animate-spin-slow { animation: spin 8s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
