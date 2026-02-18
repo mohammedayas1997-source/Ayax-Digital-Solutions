@@ -38,6 +38,7 @@ import {
   History,
 } from "lucide-react";
 
+// 1. STYLING COMPONENTS (HOISTED)
 const modeBtnStyle = (active, color) => ({
   padding: "12px 24px",
   borderRadius: "15px",
@@ -125,17 +126,19 @@ const AdminContentManager = () => {
 
   const getDocRef = () => doc(db, "course_settings", `week_${weekNum}`);
 
+  // REAL-TIME SYSTEM CLOCK
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
+  // THEME ENGINE
   useEffect(() => {
     localStorage.setItem("admin-theme", isDarkMode ? "dark" : "light");
     document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode]);
 
-  // FETCH HISTORY LOGS
+  // LIVE DEPLOYMENT LOGS
   useEffect(() => {
     const q = query(
       collection(db, "deployment_logs"),
@@ -149,7 +152,7 @@ const AdminContentManager = () => {
   }, []);
 
   const handleLogout = async () => {
-    if (window.confirm("CRITICAL: Terminate Session?")) {
+    if (window.confirm("CRITICAL: Terminate Content Management Session?")) {
       await signOut(auth);
       navigate("/admin-gateway");
     }
@@ -159,6 +162,8 @@ const AdminContentManager = () => {
     e.preventDefault();
     setLoading(true);
     try {
+      // MASTER DEPLOYMENT LOGIC
+      // Manual = Instant Release | Auto = Scheduled Release
       const finalStartDate =
         deploymentMode === "manual" ? new Date() : new Date(content.startDate);
 
@@ -172,16 +177,16 @@ const AdminContentManager = () => {
 
       await setDoc(getDocRef(), payload, { merge: true });
 
-      // LOG TO HISTORY
+      // LOG ACTION TO HISTORY
       await addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
-        title: content.title,
+        title: content.title || "Module Update",
         mode: deploymentMode,
         timestamp: serverTimestamp(),
         action: "UPDATE/DEPLOY",
       });
 
-      alert(`SUCCESS: Week ${weekNum} is now synced.`);
+      alert(`SUCCESS: Week ${weekNum} Synchronization Complete.`);
     } catch (err) {
       alert("SYNC_FAILURE: " + err.message);
     } finally {
@@ -191,7 +196,9 @@ const AdminContentManager = () => {
 
   const handleDeleteWeek = async () => {
     if (
-      window.confirm(`PERMANENT ACTION: Wipe all data for Week ${weekNum}?`)
+      window.confirm(
+        `PERMANENT DELETION: Purge all assets for Week ${weekNum}?`,
+      )
     ) {
       setLoading(true);
       try {
@@ -210,7 +217,7 @@ const AdminContentManager = () => {
           action: "DELETE_NODE",
         });
 
-        alert("DELETION_COMPLETE: Week data purged.");
+        alert("DELETION_SUCCESS: Data purged from cloud.");
       } catch (err) {
         alert("DELETE_ERROR: " + err.message);
       } finally {
@@ -256,6 +263,7 @@ const AdminContentManager = () => {
         minHeight: "100vh",
         backgroundColor: isDarkMode ? "#020617" : "#f8fafc",
         color: isDarkMode ? "white" : "#0f172a",
+        transition: "0.3s",
       }}
     >
       {/* SIDEBAR */}
@@ -318,8 +326,14 @@ const AdminContentManager = () => {
               }}
             >
               <Clock size={14} />
-              <span style={{ fontSize: "10px", fontWeight: 900 }}>
-                MASTER TIME
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 900,
+                  letterSpacing: "1px",
+                }}
+              >
+                SYSTEM CLOCK
               </span>
             </div>
             <div
@@ -362,7 +376,14 @@ const AdminContentManager = () => {
           </button>
         </nav>
 
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div
+          style={{
+            marginTop: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
             style={bottomBtnStyle(isDarkMode)}
@@ -372,7 +393,7 @@ const AdminContentManager = () => {
             ) : (
               <Moon size={18} color="#2563eb" />
             )}{" "}
-            {isDarkMode ? "LIGHT MODE" : "DARK MODE"}
+            {isDarkMode ? "SPECTRUM: LIGHT" : "SPECTRUM: DARK"}
           </button>
           <button
             onClick={handleLogout}
@@ -388,7 +409,6 @@ const AdminContentManager = () => {
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
       <main style={{ flex: 1, marginLeft: "300px", padding: "60px" }}>
         {activeTab === "curriculum" && (
           <div className="animate-in fade-in duration-700">
@@ -432,8 +452,7 @@ const AdminContentManager = () => {
                 style={{
                   ...bottomBtnStyle(false),
                   color: "#dc2626",
-                  borderColor: "#dc262610",
-                  backgroundColor: "#dc262605",
+                  borderColor: "#dc262620",
                 }}
               >
                 <Trash2 size={18} /> PURGE WEEK {weekNum}
@@ -447,7 +466,7 @@ const AdminContentManager = () => {
                 padding: "50px",
                 borderRadius: "40px",
                 border: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
-                boxShadow: "0 40px 80px -20px rgba(0,0,0,0.15)",
+                boxShadow: "0 40px 80px -20px rgba(0,0,0,0.2)",
               }}
             >
               <div
@@ -459,7 +478,7 @@ const AdminContentManager = () => {
                 }}
               >
                 <h2 style={{ fontSize: "20px", fontWeight: 900 }}>
-                  WEEK {weekNum} TERMINAL
+                  WEEK {weekNum} CONFIGURATION
                 </h2>
                 <select
                   value={weekNum}
@@ -475,7 +494,7 @@ const AdminContentManager = () => {
                 >
                   {[...Array(24)].map((_, i) => (
                     <option key={i + 1} value={i + 1}>
-                      SELECT WEEK {i + 1}
+                      WEEK {i + 1}
                     </option>
                   ))}
                 </select>
@@ -498,7 +517,9 @@ const AdminContentManager = () => {
                 >
                   {deploymentMode === "auto" ? (
                     <div>
-                      <label style={labelStyle}>Scheduled Release</label>
+                      <label style={labelStyle}>
+                        Scheduled Release (Date & Time)
+                      </label>
                       <input
                         type="datetime-local"
                         value={content.startDate}
@@ -525,7 +546,7 @@ const AdminContentManager = () => {
                           color: "#2563eb",
                         }}
                       >
-                        MANUAL STATUS: LIVE UPON SAVE
+                        MANUAL STATUS: DEPLOYING INSTANTLY UPON SAVE
                       </p>
                     </div>
                   )}
@@ -536,7 +557,7 @@ const AdminContentManager = () => {
                       onChange={(e) =>
                         setContent({ ...content, title: e.target.value })
                       }
-                      placeholder="Lesson Name"
+                      placeholder="Enter Lesson Name"
                       style={inputStyle(isDarkMode)}
                     />
                   </div>
@@ -550,7 +571,7 @@ const AdminContentManager = () => {
                   }}
                 >
                   <div>
-                    <label style={labelStyle}>YouTube ID</label>
+                    <label style={labelStyle}>YouTube Video ID</label>
                     <input
                       value={content.videoUrl}
                       onChange={(e) =>
@@ -561,13 +582,13 @@ const AdminContentManager = () => {
                     />
                   </div>
                   <div>
-                    <label style={labelStyle}>PDF Link</label>
+                    <label style={labelStyle}>Lecture PDF Link</label>
                     <input
                       value={content.pdfUrl}
                       onChange={(e) =>
                         setContent({ ...content, pdfUrl: e.target.value })
                       }
-                      placeholder="https://..."
+                      placeholder="Cloud URL"
                       style={inputStyle(isDarkMode)}
                     />
                   </div>
@@ -585,6 +606,7 @@ const AdminContentManager = () => {
                       height: "150px",
                       resize: "none",
                     }}
+                    placeholder="Describe the practical project requirements..."
                   />
                 </div>
 
@@ -604,7 +626,7 @@ const AdminContentManager = () => {
                       <Save size={20} />{" "}
                       {deploymentMode === "manual"
                         ? "DEPLOY INSTANTLY"
-                        : "SAVE TO CLOUD SCHEDULE"}
+                        : "COMMIT TO SCHEDULE"}
                     </>
                   )}
                 </button>
@@ -622,7 +644,7 @@ const AdminContentManager = () => {
                 marginBottom: "40px",
               }}
             >
-              DEPLOYMENT <span style={{ color: "#2563eb" }}>LOGS</span>
+              SYSTEM <span style={{ color: "#2563eb" }}>LOGS</span>
             </h2>
             <div
               style={{ display: "flex", flexDirection: "column", gap: "15px" }}
@@ -652,7 +674,7 @@ const AdminContentManager = () => {
                       {log.action}
                     </h4>
                     <p style={{ fontSize: "12px", fontWeight: 700 }}>
-                      Week {log.week} - {log.title || "No Title"}
+                      Week {log.week} - {log.title || "PURGED"}
                     </p>
                   </div>
                   <div style={{ textAlign: "right" }}>
@@ -708,6 +730,7 @@ const AdminContentManager = () => {
                       fontSize: "10px",
                       fontWeight: 900,
                       color: "#2563eb",
+                      letterSpacing: "2px",
                     }}
                   >
                     {lib.cat}
@@ -732,7 +755,7 @@ const AdminContentManager = () => {
                       opacity: 0.5,
                     }}
                   >
-                    VISIT REPO <ExternalLink size={12} />
+                    VISIT REPOSITORY <ExternalLink size={12} />
                   </div>
                 </div>
               </a>
@@ -744,7 +767,7 @@ const AdminContentManager = () => {
   );
 };
 
-// TERMINAL STYLES
+// TERMINAL STYLES (FINALIZED)
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
@@ -756,7 +779,7 @@ const navStyle = (active, dark) => ({
   textTransform: "uppercase",
   letterSpacing: "1px",
   backgroundColor: active ? "#2563eb" : "transparent",
-  color: active ? "white" : dark ? "#475569" : "#94a3b8",
+  color: active ? "white" : dark ? "#64748b" : "#94a3b8",
   border: "none",
   cursor: "pointer",
   textAlign: "left",
@@ -796,7 +819,7 @@ const submitBtnStyle = {
   alignItems: "center",
   justifyContent: "center",
   gap: "15px",
-  boxShadow: "0 15px 30px -10px rgba(0,0,0,0.3)",
+  boxShadow: "0 15px 30px -10px rgba(0,0,0,0.4)",
 };
 const bottomBtnStyle = (dark) => ({
   padding: "18px",
