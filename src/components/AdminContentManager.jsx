@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
-import { db, auth } from "../firebaseConfig";
+import { db, auth, storage } from "../firebaseConfig"; // Tabbatar storage yana nan a config
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import {
   doc,
   setDoc,
@@ -36,6 +37,7 @@ import {
   Timer,
   Trash2,
   History,
+  Upload, // Sabon icon don upload
 } from "lucide-react";
 
 // 1. STYLING COMPONENTS (HOISTED)
@@ -62,11 +64,15 @@ const AdminContentManager = () => {
   const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [deploymentMode, setDeploymentMode] = useState("manual");
+  const [uploadProgress, setUploadProgress] = useState(0); // Don nuna saurin upload
 
-  // Curriculum State
+  // Curriculum & Course States
+  const [selectedCourse, setSelectedCourse] = useState("web_dev"); // Default course
   const [weekNum, setWeekNum] = useState(1);
   const [activeTab, setActiveTab] = useState("curriculum");
   const [updateHistory, setUpdateHistory] = useState([]);
+  const [pdfFile, setPdfFile] = useState(null); // Don rike file din da za a loda
+
   const [content, setContent] = useState({
     title: "",
     videoUrl: "",
@@ -74,6 +80,16 @@ const AdminContentManager = () => {
     assignment: "",
     startDate: "",
   });
+
+  const availableCourses = [
+    { id: "cyber_security", name: "Cyber Security" },
+    { id: "data_analytics", name: "Data Analytics" },
+    { id: "software_eng", name: "Software Engineering" },
+    { id: "ai_tech", name: "Artificial Intelligence" },
+    { id: "blockchain", name: "Blockchain Technology" },
+    { id: "web_dev", name: "Web Development" },
+    { id: "digital_marketing", name: "Digital Marketing" },
+  ];
 
   const libraryLinks = [
     {
@@ -124,21 +140,20 @@ const AdminContentManager = () => {
     },
   ];
 
-  const getDocRef = () => doc(db, "course_settings", `week_${weekNum}`);
+  // Path din Firestore yanzu ya hada da Course ID
+  const getDocRef = () =>
+    doc(db, "course_settings", `${selectedCourse}_week_${weekNum}`);
 
-  // REAL-TIME SYSTEM CLOCK
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // THEME ENGINE
   useEffect(() => {
     localStorage.setItem("admin-theme", isDarkMode ? "dark" : "light");
     document.documentElement.classList.toggle("dark", isDarkMode);
   }, [isDarkMode]);
 
-  // LIVE DEPLOYMENT LOGS
   useEffect(() => {
     const q = query(
       collection(db, "deployment_logs"),
@@ -158,35 +173,72 @@ const AdminContentManager = () => {
     }
   };
 
+  // PDF UPLOAD LOGIC
+  const handleFileUpload = async (file) => {
+    return new Promise((resolve, reject) => {
+      const storageRef = ref(
+        storage,
+        `curriculum/${selectedCourse}/week_${weekNum}/${file.name}`,
+      );
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on(
+        "state_changed",
+        (snapshot) => {
+          const progress =
+            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        },
+        (error) => reject(error),
+        () => {
+          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) =>
+            resolve(downloadURL),
+          );
+        },
+      );
+    });
+  };
+
   const handleUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // MASTER DEPLOYMENT LOGIC
-      // Manual = Instant Release | Auto = Scheduled Release
+      let finalPdfUrl = content.pdfUrl;
+
+      // Idan an zabi sabon file, a loda shi a samu link
+      if (pdfFile) {
+        finalPdfUrl = await handleFileUpload(pdfFile);
+      }
+
       const finalStartDate =
         deploymentMode === "manual" ? new Date() : new Date(content.startDate);
 
       const payload = {
         ...content,
+        pdfUrl: finalPdfUrl,
         videoId: content.videoUrl,
         startDate: finalStartDate,
         deploymentMode: deploymentMode,
+        courseId: selectedCourse,
         updatedAt: serverTimestamp(),
       };
 
       await setDoc(getDocRef(), payload, { merge: true });
 
-      // LOG ACTION TO HISTORY
       await addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
+        course: selectedCourse,
         title: content.title || "Module Update",
         mode: deploymentMode,
         timestamp: serverTimestamp(),
         action: "UPDATE/DEPLOY",
       });
 
-      alert(`SUCCESS: Week ${weekNum} Synchronization Complete.`);
+      alert(
+        `SUCCESS: ${selectedCourse.toUpperCase()} - Week ${weekNum} Synchronization Complete.`,
+      );
+      setPdfFile(null);
+      setUploadProgress(0);
     } catch (err) {
       alert("SYNC_FAILURE: " + err.message);
     } finally {
@@ -197,7 +249,7 @@ const AdminContentManager = () => {
   const handleDeleteWeek = async () => {
     if (
       window.confirm(
-        `PERMANENT DELETION: Purge all assets for Week ${weekNum}?`,
+        `PERMANENT DELETION: Purge Week ${weekNum} for ${selectedCourse}?`,
       )
     ) {
       setLoading(true);
@@ -210,13 +262,12 @@ const AdminContentManager = () => {
           assignment: "",
           startDate: "",
         });
-
         await addDoc(collection(db, "deployment_logs"), {
           week: weekNum,
+          course: selectedCourse,
           timestamp: serverTimestamp(),
           action: "DELETE_NODE",
         });
-
         alert("DELETION_SUCCESS: Data purged from cloud.");
       } catch (err) {
         alert("DELETE_ERROR: " + err.message);
@@ -254,7 +305,7 @@ const AdminContentManager = () => {
       setLoading(false);
     };
     fetchCurrentContent();
-  }, [weekNum]);
+  }, [weekNum, selectedCourse]);
 
   return (
     <div
@@ -469,35 +520,43 @@ const AdminContentManager = () => {
                 boxShadow: "0 40px 80px -20px rgba(0,0,0,0.2)",
               }}
             >
+              {/* COURSE & WEEK SELECTION GRID */}
               <div
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "25px",
                   marginBottom: "40px",
                 }}
               >
-                <h2 style={{ fontSize: "20px", fontWeight: 900 }}>
-                  WEEK {weekNum} CONFIGURATION
-                </h2>
-                <select
-                  value={weekNum}
-                  onChange={(e) => setWeekNum(Number(e.target.value))}
-                  style={{
-                    padding: "12px 25px",
-                    borderRadius: "15px",
-                    border: "none",
-                    backgroundColor: "#2563eb",
-                    color: "white",
-                    fontWeight: 900,
-                  }}
-                >
-                  {[...Array(24)].map((_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      WEEK {i + 1}
-                    </option>
-                  ))}
-                </select>
+                <div>
+                  <label style={labelStyle}>Target Specialization</label>
+                  <select
+                    value={selectedCourse}
+                    onChange={(e) => setSelectedCourse(e.target.value)}
+                    style={inputStyle(isDarkMode)}
+                  >
+                    {availableCourses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Target Week</label>
+                  <select
+                    value={weekNum}
+                    onChange={(e) => setWeekNum(Number(e.target.value))}
+                    style={inputStyle(isDarkMode)}
+                  >
+                    {[...Array(24)].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        WEEK {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <form
@@ -517,9 +576,7 @@ const AdminContentManager = () => {
                 >
                   {deploymentMode === "auto" ? (
                     <div>
-                      <label style={labelStyle}>
-                        Scheduled Release (Date & Time)
-                      </label>
+                      <label style={labelStyle}>Scheduled Release</label>
                       <input
                         type="datetime-local"
                         value={content.startDate}
@@ -546,7 +603,7 @@ const AdminContentManager = () => {
                           color: "#2563eb",
                         }}
                       >
-                        MANUAL STATUS: DEPLOYING INSTANTLY UPON SAVE
+                        MANUAL STATUS: INSTANT BROADCAST
                       </p>
                     </div>
                   )}
@@ -557,8 +614,9 @@ const AdminContentManager = () => {
                       onChange={(e) =>
                         setContent({ ...content, title: e.target.value })
                       }
-                      placeholder="Enter Lesson Name"
+                      placeholder="Lesson Title"
                       style={inputStyle(isDarkMode)}
+                      required
                     />
                   </div>
                 </div>
@@ -581,21 +639,65 @@ const AdminContentManager = () => {
                       style={inputStyle(isDarkMode)}
                     />
                   </div>
+
+                  {/* PDF UPLOAD INPUT */}
                   <div>
-                    <label style={labelStyle}>Lecture PDF Link</label>
-                    <input
-                      value={content.pdfUrl}
-                      onChange={(e) =>
-                        setContent({ ...content, pdfUrl: e.target.value })
-                      }
-                      placeholder="Cloud URL"
-                      style={inputStyle(isDarkMode)}
-                    />
+                    <label style={labelStyle}>Lecture PDF (Upload)</label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type="file"
+                        accept=".pdf"
+                        onChange={(e) => setPdfFile(e.target.files[0])}
+                        style={{
+                          position: "absolute",
+                          opacity: 0,
+                          width: "100%",
+                          height: "100%",
+                          cursor: "pointer",
+                          zIndex: 2,
+                        }}
+                      />
+                      <div
+                        style={{
+                          ...inputStyle(isDarkMode),
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                          borderColor: pdfFile ? "#2563eb" : "",
+                        }}
+                      >
+                        <Upload size={16} />
+                        <span style={{ fontSize: "12px", opacity: 0.7 }}>
+                          {pdfFile ? pdfFile.name : "Select PDF File"}
+                        </span>
+                      </div>
+                    </div>
+                    {uploadProgress > 0 && uploadProgress < 100 && (
+                      <div
+                        style={{
+                          width: "100%",
+                          height: "4px",
+                          backgroundColor: "#e2e8f0",
+                          marginTop: "8px",
+                          borderRadius: "10px",
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${uploadProgress}%`,
+                            height: "100%",
+                            backgroundColor: "#2563eb",
+                            transition: "0.3s",
+                          }}
+                        ></div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Assignment Specification</label>
+                  <label style={labelStyle}>Assignment Briefing</label>
                   <textarea
                     value={content.assignment}
                     onChange={(e) =>
@@ -603,10 +705,10 @@ const AdminContentManager = () => {
                     }
                     style={{
                       ...inputStyle(isDarkMode),
-                      height: "150px",
+                      height: "120px",
                       resize: "none",
                     }}
-                    placeholder="Describe the practical project requirements..."
+                    placeholder="Practical tasks..."
                   />
                 </div>
 
@@ -623,10 +725,7 @@ const AdminContentManager = () => {
                     <RefreshCcw className="animate-spin" />
                   ) : (
                     <>
-                      <Save size={20} />{" "}
-                      {deploymentMode === "manual"
-                        ? "DEPLOY INSTANTLY"
-                        : "COMMIT TO SCHEDULE"}
+                      <Save size={20} /> SYNC TO PRODUCTION
                     </>
                   )}
                 </button>
@@ -674,7 +773,8 @@ const AdminContentManager = () => {
                       {log.action}
                     </h4>
                     <p style={{ fontSize: "12px", fontWeight: 700 }}>
-                      Week {log.week} - {log.title || "PURGED"}
+                      {log.course?.toUpperCase()} | Week {log.week} -{" "}
+                      {log.title}
                     </p>
                   </div>
                   <div style={{ textAlign: "right" }}>
@@ -685,7 +785,7 @@ const AdminContentManager = () => {
                         opacity: 0.5,
                       }}
                     >
-                      {log.timestamp?.toDate().toLocaleString() || "Syncing..."}
+                      {log.timestamp?.toDate().toLocaleString() || "..."}
                     </p>
                     <span
                       style={{
@@ -730,7 +830,6 @@ const AdminContentManager = () => {
                       fontSize: "10px",
                       fontWeight: 900,
                       color: "#2563eb",
-                      letterSpacing: "2px",
                     }}
                   >
                     {lib.cat}
@@ -767,7 +866,7 @@ const AdminContentManager = () => {
   );
 };
 
-// TERMINAL STYLES (FINALIZED)
+// TERMINAL STYLES
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",

@@ -42,7 +42,7 @@ import {
   Download,
   Calendar,
   User,
-  Loader2, // NA KARA WANNAN DOMIN MAGANCE BLANK SCREEN DIN
+  Loader2,
 } from "lucide-react";
 
 // ==========================================
@@ -135,7 +135,6 @@ const libraryLinks = [
 const StudentPortal = () => {
   const navigate = useNavigate();
 
-  // Interface States
   const [activeTab, setActiveTab] = useState("dashboard");
   const [darkMode, setDarkMode] = useState(
     () => localStorage.getItem("stu-theme") === "dark",
@@ -143,7 +142,6 @@ const StudentPortal = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Student & Progress States
   const [studentData, setStudentData] = useState(null);
   const [currentWeek, setCurrentWeek] = useState(1);
   const [hasPassedMidterm, setHasPassedMidterm] = useState(false);
@@ -151,17 +149,14 @@ const StudentPortal = () => {
   const totalWeeks = 24;
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Admin Data State (Real-time Sync)
   const [weeksData, setWeeksData] = useState({});
 
-  // Forum & Selection States
   const [viewState, setViewState] = useState("list");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedPath, setSelectedPath] = useState(null);
   const [forumThreads, setForumThreads] = useState([]);
   const [newPost, setNewPost] = useState({ title: "", content: "" });
 
-  // Private Chat States (Supervisor Direct)
   const [privateMessages, setPrivateMessages] = useState([]);
   const [newPrivateMsg, setNewPrivateMsg] = useState("");
 
@@ -196,13 +191,10 @@ const StudentPortal = () => {
   ];
 
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // A. REAL-TIME CURRICULUM SYNC
   useEffect(() => {
     const unsubWeeks = onSnapshot(
       collection(db, "course_settings"),
@@ -217,7 +209,6 @@ const StudentPortal = () => {
     return () => unsubWeeks();
   }, []);
 
-  // B. AUTH & PROFILE INITIALIZATION
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -231,13 +222,11 @@ const StudentPortal = () => {
           const data = userSnap.data();
           setStudentData({ id: user.uid, ...data });
           if (data.selectedCourseId) setSelectedCourseId(data.selectedCourseId);
-
           const courseStartDate = new Date("2026-01-01");
           const diffTime = new Date() - courseStartDate;
           const weekCount =
             Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
           setCurrentWeek(weekCount > 24 ? 24 : weekCount < 1 ? 1 : weekCount);
-
           await updateDoc(userRef, {
             lastOnline: serverTimestamp(),
             status: "Active",
@@ -257,7 +246,6 @@ const StudentPortal = () => {
     return () => unsubscribe();
   }, [navigate]);
 
-  // C. PRIVATE CHAT SYNC (SUPERVISOR)
   useEffect(() => {
     if (!studentData?.id) return;
     const q = query(
@@ -271,7 +259,6 @@ const StudentPortal = () => {
     return () => unsubChat();
   }, [studentData]);
 
-  // D. FORUM THREAD SYNC
   useEffect(() => {
     if (
       activeTab === "discussions" &&
@@ -294,7 +281,6 @@ const StudentPortal = () => {
     }
   }, [activeTab, viewState, selectedCourse, selectedPath]);
 
-  // E. THEME PERSISTENCE
   useEffect(() => {
     localStorage.setItem("stu-theme", darkMode ? "dark" : "light");
     document.documentElement.classList.toggle("dark", darkMode);
@@ -459,6 +445,7 @@ const StudentPortal = () => {
             {Array.from({ length: 24 }, (_, i) => i + 1).map((w) => {
               const locked = isWeekLocked(w);
               const weekSet = weeksData[`week_${w}`];
+              const isExamWeek = w === 12 || w === 24;
               return (
                 <div
                   key={w}
@@ -482,11 +469,23 @@ const StudentPortal = () => {
                       <CheckCircle size={10} className="text-emerald-500" />
                     )}
                   </div>
-                  {weekSet?.startDate && locked && (
-                    <span className="mt-1 ml-9 text-[7px] font-black text-red-400 uppercase">
-                      Opens: {formatDate(weekSet.startDate)}
-                    </span>
-                  )}
+
+                  {/* UMURNI: NUNA DATE DA TIME DA EXAM LABELS */}
+                  <div className="mt-1 ml-9 flex flex-col gap-0.5">
+                    {weekSet?.startDate && (
+                      <span
+                        className={`text-[7px] font-black uppercase flex items-center gap-1 ${locked ? "text-red-400" : "text-blue-500"}`}
+                      >
+                        <Clock size={8} /> {locked ? "Opens:" : "Released:"}{" "}
+                        {formatDate(weekSet.startDate)}
+                      </span>
+                    )}
+                    {isExamWeek && (
+                      <span className="text-[7px] font-black bg-orange-500 text-white px-1.5 py-0.5 rounded-md w-fit uppercase tracking-tighter animate-pulse">
+                        Exams Week
+                      </span>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -677,6 +676,7 @@ const StudentPortal = () => {
           </div>
         )}
 
+        {/* Discussions and Chat tabs remain same to preserve code integrity */}
         {activeTab === "discussions" && (
           <div className="animate-in fade-in duration-500">
             {viewState === "list" && (
