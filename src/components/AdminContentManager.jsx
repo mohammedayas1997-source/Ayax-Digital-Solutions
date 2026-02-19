@@ -40,7 +40,6 @@ import {
   Upload,
 } from "lucide-react";
 
-// 1. STYLING COMPONENTS (HOISTED)
 const modeBtnStyle = (active, color) => ({
   padding: "12px 24px",
   borderRadius: "15px",
@@ -66,7 +65,6 @@ const AdminContentManager = () => {
   const [deploymentMode, setDeploymentMode] = useState("manual");
   const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Curriculum & Course States
   const [selectedCourse, setSelectedCourse] = useState("web_dev");
   const [weekNum, setWeekNum] = useState(1);
   const [activeTab, setActiveTab] = useState("curriculum");
@@ -140,13 +138,17 @@ const AdminContentManager = () => {
     },
   ];
 
-  // SABON GYARA: Function dake tace YouTube ID daga kowane irin link
   const extractVideoID = (url) => {
     if (!url) return "";
     const regExp =
       /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
-    return match && match[7].length === 11 ? match[7] : url;
+    if (match && match[7].length === 11) {
+      return match[7];
+    } else {
+      const shortsMatch = url.match(/shorts\/([a-zA-Z0-9_-]{11})/);
+      return shortsMatch ? shortsMatch[1] : url;
+    }
   };
 
   const getDocRef = () =>
@@ -207,6 +209,7 @@ const AdminContentManager = () => {
 
   const handleUpdate = async (e) => {
     if (e) e.preventDefault();
+    if (loading) return;
     setLoading(true);
 
     try {
@@ -215,25 +218,24 @@ const AdminContentManager = () => {
         finalPdfUrl = await handleFileUpload(pdfFile);
       }
 
-      // TACE VIDEO ID KAFIN TURASHI CLOUD
       const cleanVideoID = extractVideoID(content.videoUrl);
-
       const finalStartDate =
         deploymentMode === "manual" ? new Date() : new Date(content.startDate);
 
       const payload = {
         ...content,
         pdfUrl: finalPdfUrl,
-        videoId: cleanVideoID, // Muna tura tsaftataccen ID kawai
+        videoId: cleanVideoID,
         startDate: finalStartDate,
         deploymentMode: deploymentMode,
         courseId: selectedCourse,
         updatedAt: serverTimestamp(),
       };
 
-      // Kashe loading nan take don bawa UI damar wucewa
+      // GYARA: Muna sakin UI din nan take
       setLoading(false);
 
+      // Wadannan zasu tafi a background ba tare da jiran su ba
       setDoc(getDocRef(), payload, { merge: true });
       addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
@@ -244,9 +246,7 @@ const AdminContentManager = () => {
         action: "UPDATE/DEPLOY",
       });
 
-      alert(
-        `SUCCESS: ${selectedCourse.toUpperCase()} Node Synced Successfully.`,
-      );
+      alert(`SUCCESS: Node Synced. Redirecting...`);
       navigate("/student-portal");
     } catch (err) {
       setLoading(false);
@@ -329,7 +329,6 @@ const AdminContentManager = () => {
         transition: "0.3s",
       }}
     >
-      {/* SIDEBAR */}
       <aside
         style={{
           width: "300px",
@@ -647,7 +646,7 @@ const AdminContentManager = () => {
                       onChange={(e) =>
                         setContent({ ...content, videoUrl: e.target.value })
                       }
-                      placeholder="e.g. dQw4w9WgXcQ ko Cikakken Link"
+                      placeholder="e.g. Cikakken Link ko ID"
                       style={inputStyle(isDarkMode)}
                     />
                   </div>
