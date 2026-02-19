@@ -142,7 +142,7 @@ const StudentPortal = () => {
   const [examActive, setExamActive] = useState(false);
   const [answers, setAnswers] = useState({});
   const [examScore, setExamScore] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(3600); // 60 minutes
+  const [timeLeft, setTimeLeft] = useState(3600); // 60 minutes in seconds
 
   const availableCourses = [
     {
@@ -179,6 +179,7 @@ const StudentPortal = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Sync Weeks Data from Firestore
   useEffect(() => {
     if (!selectedCourseId) return;
     const unsubWeeks = onSnapshot(
@@ -197,12 +198,15 @@ const StudentPortal = () => {
     return () => unsubWeeks();
   }, [selectedCourseId]);
 
+  // Exam Timer Logic
   useEffect(() => {
     let timer;
     if (examActive && timeLeft > 0) {
-      timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
     } else if (timeLeft === 0 && examActive) {
-      handleExamSubmit();
+      handleExamSubmit(); // Auto-submit when time expires
     }
     return () => clearInterval(timer);
   }, [examActive, timeLeft]);
@@ -308,25 +312,32 @@ const StudentPortal = () => {
     setExamActive(false);
     const questions = weeksData[String(currentWeek)]?.exams || [];
     let correctCount = 0;
+
+    // Lissafa maki
     questions.forEach((q, idx) => {
       if (answers[idx] === q.correctAnswer) correctCount++;
     });
+
     const totalQuestions = questions.length;
     const finalScore = Math.round((correctCount / totalQuestions) * 100);
+
+    // Adana cikakken sakamakon a Firebase
     const resultData = {
       score: finalScore,
       correctAnswers: correctCount,
-      totalQuestions,
+      totalQuestions: totalQuestions,
       passed: finalScore >= 50,
       timeCompleted: serverTimestamp(),
       courseId: selectedCourseId,
       week: currentWeek,
     };
+
     await setDoc(
       doc(db, `students/${studentData.id}/exams/week_${currentWeek}`),
       resultData,
     );
-    setExamScore(resultData);
+
+    setExamScore(resultData); // Ajiye dukkan object din
     if (finalScore >= 50 && currentWeek === 12) setHasPassedMidterm(true);
   };
 
@@ -385,6 +396,7 @@ const StudentPortal = () => {
     <div
       className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"} transition-colors duration-300`}
     >
+      {/* SIDEBAR */}
       <aside
         className={`fixed lg:sticky top-0 z-50 h-screen w-80 border-r flex flex-col transition-transform ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
@@ -439,29 +451,43 @@ const StudentPortal = () => {
             Roadmap Progress
           </div>
           <div className="space-y-1 pb-10 px-2">
-            {Array.from({ length: 24 }, (_, i) => i + 1).map((w) => (
-              <div
-                key={w}
-                onClick={() => !isWeekLocked(w) && setCurrentWeek(w)}
-                className={`px-4 py-3 rounded-xl flex items-center justify-between transition-all ${isWeekLocked(w) ? "opacity-30 cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer"} ${currentWeek === w ? "bg-blue-600/10 border border-blue-600/20" : ""}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`px-2 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${w === 12 || w === 24 ? "bg-red-600 text-white min-w-[70px]" : isWeekLocked(w) ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}
-                  >
-                    {w === 12 || w === 24 ? "EXAMS WEEK" : w}
+            {Array.from({ length: 24 }, (_, i) => i + 1).map((w) => {
+              const weekInfo = weeksData[String(w)];
+              return (
+                <div
+                  key={w}
+                  onClick={() => !isWeekLocked(w) && setCurrentWeek(w)}
+                  className={`px-4 py-3 rounded-xl flex flex-col transition-all ${isWeekLocked(w) ? "opacity-30 cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer"} ${currentWeek === w ? "bg-blue-600/10 border border-blue-600/20" : ""}`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`px-2 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${w === 12 || w === 24 ? "bg-red-600 text-white min-w-[70px]" : isWeekLocked(w) ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}
+                      >
+                        {w === 12 || w === 24 ? "EXAMS WEEK" : w}
+                      </div>
+                      <span className="text-[10px] font-black uppercase">
+                        Week {w}
+                      </span>
+                    </div>
+                    {isWeekLocked(w) ? (
+                      <Lock size={10} className="text-red-500" />
+                    ) : (
+                      <CheckCircle size={10} className="text-emerald-500" />
+                    )}
                   </div>
-                  <span className="text-[10px] font-black uppercase">
-                    Week {w}
-                  </span>
+                  {/* UMURNI: Nuna date da time da aka tura a kowane icon */}
+                  {!isWeekLocked(w) && weekInfo?.updatedAt && (
+                    <div className="flex items-center gap-2 mt-2 opacity-50">
+                      <Clock size={10} className="text-blue-500" />
+                      <span className="text-[8px] font-black uppercase tracking-tighter">
+                        {formatDate(weekInfo.updatedAt)}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                {isWeekLocked(w) ? (
-                  <Lock size={10} className="text-red-500" />
-                ) : (
-                  <CheckCircle size={10} className="text-emerald-500" />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         </nav>
         <div className="p-6 border-t border-slate-800 space-y-2">
@@ -594,21 +620,15 @@ const StudentPortal = () => {
                         </h4>
                       </div>
                     </div>
-                    <div className="flex flex-col items-center gap-4">
-                      <p className="text-sm font-bold opacity-60 italic">
-                        Sakamakonka an adana shi a cikin rumbun ajiyar mu
-                        (Secure Database).
-                      </p>
-                      <button
-                        onClick={() => {
-                          setActiveTab("dashboard");
-                          setExamScore(null);
-                        }}
-                        className="px-12 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase italic shadow-2xl hover:scale-105 transition-all"
-                      >
-                        Return to Dashboard
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => {
+                        setActiveTab("dashboard");
+                        setExamScore(null);
+                      }}
+                      className="px-12 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase italic shadow-2xl hover:scale-105 transition-all"
+                    >
+                      Return to Dashboard
+                    </button>
                   </div>
                 ) : (
                   <div className="space-y-12 h-[600px] overflow-y-auto px-4 custom-scrollbar">
@@ -716,16 +736,14 @@ const StudentPortal = () => {
                 className={`p-8 rounded-[2.5rem] border-2 transition-all hover:scale-105 group ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-white shadow-xl"}`}
               >
                 <div className="flex justify-between items-start mb-6">
-                  <div className="p-3 bg-blue-600/10 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                  <div className="p-3 bg-blue-600/10 text-blue-600 rounded-xl group-hover:bg-blue-600 transition-colors">
                     <BookOpen size={24} />
                   </div>
                   <span className="text-[10px] font-black uppercase text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">
                     {lib.cat}
                   </span>
                 </div>
-                <h3
-                  className={`text-xl font-black uppercase italic mb-4 ${darkMode ? "text-white" : "text-slate-900"}`}
-                >
+                <h3 className="text-xl font-black uppercase italic mb-4">
                   {lib.name}
                 </h3>
                 <div className="flex items-center gap-2 text-[10px] font-black uppercase text-gray-500 group-hover:text-blue-600">
