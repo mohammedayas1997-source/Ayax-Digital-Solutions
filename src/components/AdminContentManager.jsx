@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { db, auth, storage } from "../firebaseConfig"; // Tabbatar storage yana nan a config
+import { db, auth, storage } from "../firebaseConfig";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import {
   doc,
@@ -37,10 +37,9 @@ import {
   Timer,
   Trash2,
   History,
-  Upload, // Sabon icon don upload
+  Upload,
 } from "lucide-react";
 
-// 1. STYLING COMPONENTS (HOISTED)
 const modeBtnStyle = (active, color) => ({
   padding: "12px 24px",
   borderRadius: "15px",
@@ -64,14 +63,13 @@ const AdminContentManager = () => {
   const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [deploymentMode, setDeploymentMode] = useState("manual");
-  const [uploadProgress, setUploadProgress] = useState(0); // Don nuna saurin upload
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Curriculum & Course States
-  const [selectedCourse, setSelectedCourse] = useState("web_dev"); // Default course
+  const [selectedCourse, setSelectedCourse] = useState("web_dev");
   const [weekNum, setWeekNum] = useState(1);
   const [activeTab, setActiveTab] = useState("curriculum");
   const [updateHistory, setUpdateHistory] = useState([]);
-  const [pdfFile, setPdfFile] = useState(null); // Don rike file din da za a loda
+  const [pdfFile, setPdfFile] = useState(null);
 
   const [content, setContent] = useState({
     title: "",
@@ -140,7 +138,6 @@ const AdminContentManager = () => {
     },
   ];
 
-  // Path din Firestore yanzu ya hada da Course ID
   const getDocRef = () =>
     doc(db, "course_settings", `${selectedCourse}_week_${weekNum}`);
 
@@ -173,12 +170,12 @@ const AdminContentManager = () => {
     }
   };
 
-  // PDF UPLOAD LOGIC
   const handleFileUpload = async (file) => {
     return new Promise((resolve, reject) => {
+      // GYARA: Tabbatar an samar da sunan file mai kyau don gujewa kuskure
       const storageRef = ref(
         storage,
-        `curriculum/${selectedCourse}/week_${weekNum}/${file.name}`,
+        `curriculum/${selectedCourse}/week_${weekNum}/${Date.now()}_${file.name}`,
       );
       const uploadTask = uploadBytesResumable(storageRef, file);
 
@@ -189,7 +186,10 @@ const AdminContentManager = () => {
             (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(progress);
         },
-        (error) => reject(error),
+        (error) => {
+          console.error("Storage Error:", error);
+          reject(error);
+        },
         () => {
           getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) =>
             resolve(downloadURL),
@@ -202,10 +202,11 @@ const AdminContentManager = () => {
   const handleUpdate = async (e) => {
     e.preventDefault();
     setLoading(true);
-    try {
-      let finalPdfUrl = content.pdfUrl;
+    setUploadProgress(0); // Reset progress
 
-      // Idan an zabi sabon file, a loda shi a samu link
+    try {
+      let finalPdfUrl = content.pdfUrl || "";
+
       if (pdfFile) {
         finalPdfUrl = await handleFileUpload(pdfFile);
       }
@@ -237,9 +238,14 @@ const AdminContentManager = () => {
       alert(
         `SUCCESS: ${selectedCourse.toUpperCase()} - Week ${weekNum} Synchronization Complete.`,
       );
+
       setPdfFile(null);
       setUploadProgress(0);
+
+      // UMURNI: KAI TSAYE DASHBOARD NA DALIBI
+      navigate("/student-portal");
     } catch (err) {
+      console.error("Sync Failure:", err);
       alert("SYNC_FAILURE: " + err.message);
     } finally {
       setLoading(false);
@@ -317,7 +323,6 @@ const AdminContentManager = () => {
         transition: "0.3s",
       }}
     >
-      {/* SIDEBAR */}
       <aside
         style={{
           width: "300px",
@@ -398,7 +403,6 @@ const AdminContentManager = () => {
             </div>
           </div>
         </div>
-
         <nav
           style={{
             flex: 1,
@@ -426,7 +430,6 @@ const AdminContentManager = () => {
             <Globe size={18} /> Research Repo
           </button>
         </nav>
-
         <div
           style={{
             marginTop: "auto",
@@ -485,12 +488,14 @@ const AdminContentManager = () => {
                   style={{ display: "flex", gap: "15px", marginTop: "20px" }}
                 >
                   <button
+                    type="button"
                     onClick={() => setDeploymentMode("manual")}
                     style={modeBtnStyle(deploymentMode === "manual", "#2563eb")}
                   >
                     <Zap size={16} /> MANUAL PUSH
                   </button>
                   <button
+                    type="button"
                     onClick={() => setDeploymentMode("auto")}
                     style={modeBtnStyle(deploymentMode === "auto", "#8b5cf6")}
                   >
@@ -499,6 +504,7 @@ const AdminContentManager = () => {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={handleDeleteWeek}
                 style={{
                   ...bottomBtnStyle(false),
@@ -520,7 +526,6 @@ const AdminContentManager = () => {
                 boxShadow: "0 40px 80px -20px rgba(0,0,0,0.2)",
               }}
             >
-              {/* COURSE & WEEK SELECTION GRID */}
               <div
                 style={{
                   display: "grid",
@@ -639,8 +644,6 @@ const AdminContentManager = () => {
                       style={inputStyle(isDarkMode)}
                     />
                   </div>
-
-                  {/* PDF UPLOAD INPUT */}
                   <div>
                     <label style={labelStyle}>Lecture PDF (Upload)</label>
                     <div style={{ position: "relative" }}>
@@ -672,7 +675,7 @@ const AdminContentManager = () => {
                         </span>
                       </div>
                     </div>
-                    {uploadProgress > 0 && uploadProgress < 100 && (
+                    {uploadProgress > 0 && (
                       <div
                         style={{
                           width: "100%",
@@ -866,7 +869,6 @@ const AdminContentManager = () => {
   );
 };
 
-// TERMINAL STYLES
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",

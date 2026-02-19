@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { auth, db } from "../firebaseConfig";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { LogIn, ShieldCheck, Loader2, ShieldAlert } from "lucide-react";
+import { LogIn, ShieldCheck, Loader2, ShieldAlert, X } from "lucide-react"; // Na ƙara X a nan
 import { useNavigate } from "react-router-dom";
 
 const StaffLogin = () => {
@@ -76,18 +76,27 @@ const StaffLogin = () => {
     }
   };
 
-  // WANNAN RETURN DIN DOLE YA ZAUNA A NAN (Wajen handleLogin)
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-6 font-sans">
       <form
         onSubmit={handleLogin}
-        className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-md w-full border border-gray-100"
+        className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-md w-full border border-gray-100 relative"
       >
+        {/* UMURNI: CLOSE BUTTON INTEGRATION */}
+        <button
+          type="button"
+          onClick={() => navigate("/")}
+          className="absolute top-8 right-8 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all duration-300"
+        >
+          <X size={24} strokeWidth={3} />
+        </button>
+
         <div className="flex justify-center mb-6">
           <div className="p-4 bg-red-50 text-red-600 rounded-3xl animate-bounce">
             <ShieldCheck size={40} />
           </div>
         </div>
+
         <h2 className="text-2xl font-black text-center mb-2 text-gray-900 uppercase tracking-tight">
           Staff Command Center
         </h2>

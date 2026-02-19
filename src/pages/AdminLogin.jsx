@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { auth, db } from "../firebaseConfig";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { ShieldCheck, Loader2, ShieldAlert } from "lucide-react";
+import { ShieldCheck, Loader2, ShieldAlert, X } from "lucide-react"; // Na ƙara X a nan
 import { useNavigate } from "react-router-dom";
 
 const StaffLogin = () => {
@@ -14,7 +14,7 @@ const StaffLogin = () => {
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (loading) return; // Prevent double submission
+    if (loading) return;
 
     setLoading(true);
     setError("");
@@ -60,7 +60,6 @@ const StaffLogin = () => {
           return;
         }
 
-        // --- DYNAMIC REDIRECTION LOGIC ---
         if (userRole === "super-admin") {
           navigate("/super-admin", { replace: true });
         } else if (userRole === "supervisor") {
@@ -85,10 +84,23 @@ const StaffLogin = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-6 font-sans">
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-6 font-sans relative">
+      {/* UMURNI: CLOSE BUTTON INTEGRATION */}
+      <button
+        type="button"
+        onClick={() => navigate("/")}
+        className="absolute top-10 right-10 p-3 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all duration-300 group"
+      >
+        <X
+          size={28}
+          strokeWidth={3}
+          className="group-hover:rotate-90 transition-transform duration-300"
+        />
+      </button>
+
       <form
         onSubmit={handleLogin}
-        className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-md w-full border border-gray-100"
+        className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-md w-full border border-gray-100 relative"
       >
         <div className="flex justify-center mb-6">
           <div className="p-4 bg-red-50 text-red-600 rounded-3xl animate-bounce">
@@ -138,7 +150,7 @@ const StaffLogin = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-5 mt-4 bg-red-600 text-white rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 hover:bg-red-700 active:scale-95 transition-all shadow-lg shadow-red-900/20 disabled:opacity-50"
+            className="w-full py-5 bg-red-600 text-white rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 hover:bg-red-700 active:scale-95 transition-all shadow-lg shadow-red-900/20 disabled:opacity-50"
           >
             {loading ? (
               <Loader2 className="animate-spin" />

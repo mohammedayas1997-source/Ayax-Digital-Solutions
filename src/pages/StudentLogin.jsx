@@ -13,6 +13,7 @@ import {
   Loader2,
   UserCheck,
   KeyRound,
+  X, // Na shigo da X icon
 } from "lucide-react";
 
 const StudentLogin = () => {
@@ -92,7 +93,15 @@ const StudentLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-6 selection:bg-blue-600 selection:text-white font-sans">
+    <div className="min-h-screen bg-white flex items-center justify-center px-6 selection:bg-blue-600 selection:text-white font-sans relative">
+      {/* UMURNI: CLOSE BUTTON INTEGRATION */}
+      <button
+        onClick={() => navigate("/")}
+        className="absolute top-10 right-10 p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all duration-300"
+      >
+        <X size={28} strokeWidth={3} />
+      </button>
+
       <div className="max-w-md w-full relative">
         <div className="text-center mb-12">
           <div className="w-20 h-20 bg-blue-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-2xl shadow-blue-200">
