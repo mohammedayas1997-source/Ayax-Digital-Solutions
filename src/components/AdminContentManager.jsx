@@ -40,6 +40,7 @@ import {
   Upload,
 } from "lucide-react";
 
+// 1. STYLING COMPONENTS (HOISTED)
 const modeBtnStyle = (active, color) => ({
   padding: "12px 24px",
   borderRadius: "15px",
@@ -138,6 +139,7 @@ const AdminContentManager = () => {
     },
   ];
 
+  // GYARA NA MUSAMMAN: Extract YouTube ID
   const extractVideoID = (url) => {
     if (!url) return "";
     const regExp =
@@ -190,6 +192,7 @@ const AdminContentManager = () => {
         `curriculum/${selectedCourse}/week_${weekNum}/${Date.now()}_${file.name}`,
       );
       const uploadTask = uploadBytesResumable(storageRef, file);
+
       uploadTask.on(
         "state_changed",
         (snapshot) => {
@@ -197,7 +200,10 @@ const AdminContentManager = () => {
             (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(progress);
         },
-        (error) => reject(error),
+        (error) => {
+          console.error("Storage Error:", error);
+          reject(error);
+        },
         () => {
           getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) =>
             resolve(downloadURL),
@@ -209,11 +215,11 @@ const AdminContentManager = () => {
 
   const handleUpdate = async (e) => {
     if (e) e.preventDefault();
-    if (loading) return;
     setLoading(true);
 
     try {
       let finalPdfUrl = content.pdfUrl || "";
+
       if (pdfFile) {
         finalPdfUrl = await handleFileUpload(pdfFile);
       }
@@ -232,10 +238,9 @@ const AdminContentManager = () => {
         updatedAt: serverTimestamp(),
       };
 
-      // GYARA: Muna sakin UI din nan take
+      // Tura aiki a background
       setLoading(false);
 
-      // Wadannan zasu tafi a background ba tare da jiran su ba
       setDoc(getDocRef(), payload, { merge: true });
       addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
@@ -246,10 +251,11 @@ const AdminContentManager = () => {
         action: "UPDATE/DEPLOY",
       });
 
-      alert(`SUCCESS: Node Synced. Redirecting...`);
+      alert(`SUCCESS: ${selectedCourse.toUpperCase()} - Sync Complete.`);
       navigate("/student-portal");
     } catch (err) {
       setLoading(false);
+      console.error("Sync Failure:", err);
       alert("SYNC_FAILURE: " + err.message);
     }
   };
@@ -329,6 +335,7 @@ const AdminContentManager = () => {
         transition: "0.3s",
       }}
     >
+      {/* SIDEBAR */}
       <aside
         style={{
           width: "300px",
@@ -646,7 +653,7 @@ const AdminContentManager = () => {
                       onChange={(e) =>
                         setContent({ ...content, videoUrl: e.target.value })
                       }
-                      placeholder="e.g. Cikakken Link ko ID"
+                      placeholder="Link ko ID"
                       style={inputStyle(isDarkMode)}
                     />
                   </div>
@@ -867,7 +874,7 @@ const AdminContentManager = () => {
   );
 };
 
-// TERMINAL STYLES
+// TERMINAL STYLES (Dukkan CSS naka na asali)
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
