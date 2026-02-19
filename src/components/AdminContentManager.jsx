@@ -40,6 +40,7 @@ import {
   Upload,
 } from "lucide-react";
 
+// 1. STYLING COMPONENTS (HOISTED)
 const modeBtnStyle = (active, color) => ({
   padding: "12px 24px",
   borderRadius: "15px",
@@ -65,6 +66,7 @@ const AdminContentManager = () => {
   const [deploymentMode, setDeploymentMode] = useState("manual");
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Curriculum & Course States
   const [selectedCourse, setSelectedCourse] = useState("web_dev");
   const [weekNum, setWeekNum] = useState(1);
   const [activeTab, setActiveTab] = useState("curriculum");
@@ -184,9 +186,7 @@ const AdminContentManager = () => {
             (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(progress);
         },
-        (error) => {
-          reject(error);
-        },
+        (error) => reject(error),
         () => {
           getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) =>
             resolve(downloadURL),
@@ -219,10 +219,10 @@ const AdminContentManager = () => {
         updatedAt: serverTimestamp(),
       };
 
-      // GYARA: Muna kashe loading kafin mu danna Firestore don gujewa "UI-Freeze"
+      // GYARA: Kashe loading nan take kafin mu shiga Firestore
       setLoading(false);
 
-      // Wannan zai tafi a background
+      // Async Operations (Background)
       setDoc(getDocRef(), payload, { merge: true });
       addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
@@ -234,7 +234,7 @@ const AdminContentManager = () => {
       });
 
       alert(
-        `SUCCESS: ${selectedCourse.toUpperCase()} - Week ${weekNum} Sync Complete.`,
+        `SUCCESS: ${selectedCourse.toUpperCase()} Synchronization Complete.`,
       );
       navigate("/student-portal");
     } catch (err) {
@@ -266,7 +266,7 @@ const AdminContentManager = () => {
           action: "DELETE_NODE",
         });
         setLoading(false);
-        alert("DELETION_SUCCESS: Data purged from cloud.");
+        alert("DELETION_SUCCESS: Data purged.");
       } catch (err) {
         setLoading(false);
         alert("DELETE_ERROR: " + err.message);
@@ -318,6 +318,7 @@ const AdminContentManager = () => {
         transition: "0.3s",
       }}
     >
+      {/* SIDEBAR */}
       <aside
         style={{
           width: "300px",
@@ -536,9 +537,9 @@ const AdminContentManager = () => {
                     onChange={(e) => setSelectedCourse(e.target.value)}
                     style={inputStyle(isDarkMode)}
                   >
-                    {availableCourses.map((course) => (
-                      <option key={course.id} value={course.id}>
-                        {course.name}
+                    {availableCourses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
                       </option>
                     ))}
                   </select>
@@ -710,15 +711,7 @@ const AdminContentManager = () => {
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  style={{
-                    ...submitBtnStyle,
-                    backgroundColor:
-                      deploymentMode === "manual" ? "#2563eb" : "#8b5cf6",
-                  }}
-                >
+                <button type="submit" disabled={loading} style={submitBtnStyle}>
                   {loading ? (
                     <RefreshCcw className="animate-spin" />
                   ) : (
@@ -864,6 +857,7 @@ const AdminContentManager = () => {
   );
 };
 
+// TERMINAL STYLES
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
@@ -907,6 +901,7 @@ const submitBtnStyle = {
   borderRadius: "25px",
   border: "none",
   color: "white",
+  backgroundColor: "#2563eb",
   fontWeight: 900,
   textTransform: "uppercase",
   letterSpacing: "2px",
