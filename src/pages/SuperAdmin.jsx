@@ -71,7 +71,14 @@ const SuperAdmin = () => {
   const [globalNotice, setGlobalNotice] = useState("");
   const [selectedCourseForSchedule, setSelectedCourseForSchedule] =
     useState("Web development");
+  // State don adana ɗalibin da aka zaɓa don gani cikakken info
+  const [selectedStudentInfo, setSelectedStudentInfo] = useState(null);
 
+  // Sababbin states don Chat Monitor
+  const [chats, setChats] = useState([]);
+  const [selectedChatStudent, setSelectedChatStudent] = useState(null);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [chatSearch, setChatSearch] = useState("");
   // PDF Material Deployment State
   const [pdfData, setPdfData] = useState({
     courseTitle: "Web development",
@@ -355,6 +362,37 @@ const SuperAdmin = () => {
     }
   };
 
+  // Master Chat Monitor Stream
+  const unsubChats = onSnapshot(
+    query(collection(db, "private_chats"), orderBy("createdAt", "desc")),
+    (snap) => {
+      const allMsgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const uniqueThreads = [];
+      const seen = new Set();
+
+      allMsgs.forEach((m) => {
+        if (!seen.has(m.studentId)) {
+          seen.add(m.studentId);
+          uniqueThreads.push(m);
+        }
+      });
+      setChats(uniqueThreads);
+    },
+  );
+
+  useEffect(() => {
+    if (!selectedChatStudent) return;
+    const q = query(
+      collection(db, "private_chats"),
+      where("studentId", "==", selectedChatStudent.id),
+      orderBy("createdAt", "asc"),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setChatMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [selectedChatStudent]);
+
   const handleCreateForum = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -430,6 +468,215 @@ const SuperAdmin = () => {
     });
     setAdminReply("");
     alert("AUTHORITY_RESPONSE: Message injected into forum.");
+  };
+
+  const renderChatMonitor = () => (
+    <div className="flex gap-6 h-[80vh] animate-in fade-in duration-500">
+      {/* Jerin Dalibai */}
+      <div
+        className={`w-1/3 p-6 rounded-[2.5rem] border shadow-xl flex flex-col ${darkMode ? "bg-slate-800 border-white/5" : "bg-white border-gray-100"}`}
+      >
+        <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2">
+          <Eye size={16} className="text-red-500" /> Private Surveillance
+        </h3>
+        <div className="relative mb-4">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+            size={14}
+          />
+          <input
+            className="admin-input pl-10"
+            placeholder="Search Student..."
+            onChange={(e) => setChatSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+          {chats
+            .filter((c) =>
+              c.sender.toLowerCase().includes(chatSearch.toLowerCase()),
+            )
+            .map((chat) => (
+              <div
+                key={chat.studentId}
+                onClick={() =>
+                  setSelectedChatStudent({
+                    id: chat.studentId,
+                    name: chat.sender,
+                  })
+                }
+                className={`p-4 rounded-2xl cursor-pointer border transition-all ${selectedChatStudent?.id === chat.studentId ? "bg-red-600 border-red-600 text-white shadow-lg" : "hover:bg-gray-50 border-transparent"}`}
+              >
+                <p className="font-black text-[11px] uppercase">
+                  {chat.sender}
+                </p>
+                <p
+                  className={`text-[9px] truncate mt-1 ${selectedChatStudent?.id === chat.studentId ? "text-white/70" : "text-gray-400"}`}
+                >
+                  {chat.text}
+                </p>
+              </div>
+            ))}
+        </div>
+      </div>
+
+      {/* Inda ake ganin Hirar */}
+      <div
+        className={`flex-1 rounded-[2.5rem] border shadow-2xl flex flex-col overflow-hidden ${darkMode ? "bg-slate-800 border-white/5" : "bg-white border-gray-100"}`}
+      >
+        {selectedChatStudent ? (
+          <>
+            <header className="p-6 border-b flex justify-between items-center bg-gray-50/30">
+              <div>
+                <h4 className="font-black text-lg italic uppercase">
+                  {selectedChatStudent.name}
+                </h4>
+                <p className="text-[9px] font-black text-red-500 uppercase">
+                  Monitoring Live Session
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedChatStudent(null)}
+                className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </header>
+            <div className="flex-1 p-8 overflow-y-auto space-y-4 bg-slate-50/50">
+              {chatMessages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`flex flex-col ${m.senderRole === "student" ? "items-start" : "items-end"}`}
+                >
+                  <div
+                    className={`max-w-[75%] p-4 rounded-2xl font-bold text-xs shadow-sm ${m.senderRole === "student" ? "bg-white text-slate-800" : "bg-red-600 text-white"}`}
+                  >
+                    {m.text}
+                    <p className="text-[7px] mt-2 uppercase opacity-50">
+                      {m.createdAt?.toDate().toLocaleTimeString()} •{" "}
+                      {m.senderRole}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center opacity-20 text-center">
+            <ShieldAlert size={80} className="animate-pulse" />
+            <p className="font-black uppercase tracking-widest text-[10px] mt-4">
+              Select Thread to Audit
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+  const renderStudentProfileModal = () => {
+    if (!selectedStudentInfo) return null;
+
+    return (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-6 animate-in fade-in duration-300">
+        <div
+          className={`relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[3rem] shadow-2xl border ${darkMode ? "bg-slate-900 border-white/10" : "bg-white border-gray-100"}`}
+        >
+          {/* Close Button */}
+          <button
+            onClick={() => setSelectedStudentInfo(null)}
+            className="absolute top-8 right-8 p-3 bg-red-500 text-white rounded-2xl hover:bg-black transition-all z-10"
+          >
+            <X size={24} />
+          </button>
+
+          <div className="p-8 md:p-12">
+            {/* Header with Passport */}
+            <div className="flex flex-col md:flex-row gap-8 items-center border-b border-gray-100/10 pb-10 mb-10">
+              <img
+                src={selectedStudentInfo.passportUrl}
+                className="w-48 h-48 rounded-[2.5rem] object-cover border-4 border-blue-600 shadow-2xl"
+                alt="Passport"
+              />
+              <div className="text-center md:text-left">
+                <h2 className="text-4xl font-black uppercase italic tracking-tighter mb-2">
+                  {selectedStudentInfo.studentName}
+                </h2>
+                <span className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase tracking-widest">
+                  {selectedStudentInfo.course}
+                </span>
+                <p className="mt-4 text-slate-400 font-bold text-sm flex items-center justify-center md:justify-start gap-2">
+                  <Clock size={16} /> Applied on:{" "}
+                  {selectedStudentInfo.appliedAt?.toDate().toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-10">
+              {/* Contact & Bio */}
+              <div className="space-y-6">
+                <h3 className="text-blue-600 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+                  <User size={16} /> Contact & Residency
+                </h3>
+                <div
+                  className={`p-6 rounded-3xl space-y-4 ${darkMode ? "bg-white/5" : "bg-slate-50"}`}
+                >
+                  <p className="text-sm font-bold truncate">
+                    <span className="opacity-50 uppercase text-[10px] block">
+                      Email
+                    </span>{" "}
+                    {selectedStudentInfo.email}
+                  </p>
+                  <p className="text-sm font-bold">
+                    <span className="opacity-50 uppercase text-[10px] block">
+                      Phone
+                    </span>{" "}
+                    {selectedStudentInfo.phone}
+                  </p>
+                  <p className="text-sm font-bold">
+                    <span className="opacity-50 uppercase text-[10px] block">
+                      Current Address
+                    </span>{" "}
+                    {selectedStudentInfo.address},{" "}
+                    {selectedStudentInfo.currentLGA},{" "}
+                    {selectedStudentInfo.currentState}
+                  </p>
+                  <p className="text-sm font-bold">
+                    <span className="opacity-50 uppercase text-[10px] block">
+                      State of Origin
+                    </span>{" "}
+                    {selectedStudentInfo.stateOfOrigin} (
+                    {selectedStudentInfo.lgaOfOrigin})
+                  </p>
+                </div>
+              </div>
+
+              {/* Education History */}
+              <div className="space-y-6">
+                <h3 className="text-emerald-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
+                  <School size={16} /> Academic Background
+                </h3>
+                <div className="space-y-4">
+                  {selectedStudentInfo.educationBackground?.map((edu, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-6 rounded-3xl border ${darkMode ? "border-white/10" : "border-gray-100 bg-slate-50"}`}
+                    >
+                      <p className="text-blue-600 font-black text-xs uppercase">
+                        {edu.qualification}
+                      </p>
+                      <h4 className="font-black text-sm mt-1">
+                        {edu.institution}
+                      </h4>
+                      <p className="text-xs font-bold opacity-60 mt-1">
+                        {edu.course} • Class of {edu.year}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Rendering logic for the PDF tab - Insert this in your return UI
@@ -542,6 +789,13 @@ const SuperAdmin = () => {
             className={`nav-link ${activeTab === "students" ? "active-nav" : ""}`}
           >
             <Users size={18} /> Admissions
+          </button>
+          <button
+            onClick={() => setSelectedStudentInfo(s)}
+            className="p-3 bg-slate-800 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all"
+            title="View Full Profile"
+          >
+            <Eye size={16} />
           </button>
           <button
             onClick={() => setActiveTab("academic")}
@@ -737,6 +991,9 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
+
+        {/* Nemo inda sauran tabs dinka suke */}
+        {activeTab === "chat_monitor" && renderChatMonitor()}
 
         {/* HISTORY LOGS TAB */}
         {activeTab === "history" && (
@@ -1417,6 +1674,7 @@ const SuperAdmin = () => {
           </div>
         )}
       </div>
+      {renderStudentProfileModal()}
 
       <style>{`
         .nav-link { width: 100%; display: flex; align-items: center; gap: 15px; padding: 20px 25px; border-radius: 24px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.1em; transition: 0.4s; }
