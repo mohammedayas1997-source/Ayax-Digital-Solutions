@@ -1,120 +1,166 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebaseConfig";
-import { signOut, onAuthStateChanged } from "firebase/auth";
 import {
+  doc,
+  setDoc,
+  serverTimestamp,
+  getDoc,
   collection,
-  getDocs,
   query,
   orderBy,
-  doc,
-  getDoc,
-  updateDoc,
-  serverTimestamp,
-  addDoc,
+  limit,
   onSnapshot,
-  where,
-  setDoc,
+  addDoc,
 } from "firebase/firestore";
+import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import {
-  BookOpen,
-  GraduationCap,
-  LayoutDashboard,
-  MessageSquare,
-  PlayCircle,
-  CheckCircle,
-  Clock,
-  ChevronRight,
-  Lock,
-  Award,
-  Send,
-  ShieldCheck,
+  FileVideo,
+  FileText,
   LogOut,
-  Moon,
   Sun,
+  Moon,
+  ShieldCheck,
   Menu,
   X,
-  Layers,
-  Users,
-  Search,
-  Bell,
-  Cpu,
-  FileText,
-  Download,
+  Save,
+  RefreshCcw,
+  BookOpen,
   Calendar,
-  User,
-  Loader2,
-  Trophy,
-  AlertTriangle,
+  Globe,
+  Clock,
+  ExternalLink,
+  Zap,
+  Timer,
+  Trash2,
+  History,
+  Link as LinkIcon,
+  AlertOctagon,
 } from "lucide-react";
 
-// ==========================================
-// 1. HELPERS & CONFIGURATION
-// ==========================================
-const formatDate = (timestamp) => {
-  if (!timestamp) return "TBD";
-  const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-  return date.toLocaleString("en-GB", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-};
+// 1. STYLING COMPONENTS (HOISTED)
+const modeBtnStyle = (active, color) => ({
+  padding: "12px 24px",
+  borderRadius: "15px",
+  border: active ? `2px solid ${color}` : "2px solid transparent",
+  backgroundColor: active ? `${color}10` : "#f1f5f9",
+  color: active ? color : "#64748b",
+  fontWeight: 900,
+  fontSize: "10px",
+  display: "flex",
+  alignItems: "center",
+  gap: "8px",
+  cursor: "pointer",
+  transition: "0.3s",
+});
 
-const libraryLinks = [
-  { name: "O'Reilly Open Books", url: "https://www.oreilly.com/library/view/open-books/", cat: "Engineering" },
-  { name: "MIT OpenCourseWare", url: "https://ocw.mit.edu/", cat: "CS" },
-  { name: "Google Scholar Central", url: "https://scholar.google.com/", cat: "Research" },
-  { name: "GitHub Archive", url: "https://archive.org/details/github", cat: "Code" },
-  { name: "ArXiv.org AI Research", url: "https://arxiv.org/list/cs.AI/recent", cat: "AI/ML" },
-  { name: "Microsoft Academic Search", url: "https://academic.microsoft.com/", cat: "Multi" },
-  { name: "Project Gutenberg", url: "https://www.gutenberg.org/", cat: "Literature" },
-  { name: "Leanpub Free Shelf", url: "https://leanpub.com/bookstore/type/book/sort/top_free", cat: "Tech" },
-  { name: "Springboard Data Resources", url: "https://www.springboard.com/blog/data-science/data-science-books/", cat: "Data" },
-  { name: "Coursera Resource Hub", url: "https://www.coursera.org/browse", cat: "Courses" },
-];
-
-const StudentPortal = () => {
+const AdminContentManager = () => {
   const navigate = useNavigate();
-
-  const [activeTab, setActiveTab] = useState("dashboard");
-  const [darkMode, setDarkMode] = useState(() => localStorage.getItem("stu-theme") === "dark");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [loading, setLoading] = useState(true);
-
-  const [studentData, setStudentData] = useState(null);
-  const [currentWeek, setCurrentWeek] = useState(1);
-  const [hasPassedMidterm, setHasPassedMidterm] = useState(false);
-  const [selectedCourseId, setSelectedCourseId] = useState(null);
+  const [isDarkMode, setIsDarkMode] = useState(
+    () => localStorage.getItem("admin-theme") === "dark",
+  );
+  const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  const [weeksData, setWeeksData] = useState({});
-  const [viewState, setViewState] = useState("list");
-  const [selectedCourse, setSelectedCourse] = useState(null);
-  const [selectedPath, setSelectedPath] = useState(null);
-  const [forumThreads, setForumThreads] = useState([]);
-  const [newPost, setNewPost] = useState({ title: "", content: "" });
+  const [deploymentMode, setDeploymentMode] = useState("scheduled");
 
-  const [privateMessages, setPrivateMessages] = useState([]);
-  const [newPrivateMsg, setNewPrivateMsg] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("web_dev");
+  const [weekNum, setWeekNum] = useState(1);
+  const [activeTab, setActiveTab] = useState("curriculum");
+  const [updateHistory, setUpdateHistory] = useState([]);
 
-  // Exam States
-  const [examActive, setExamActive] = useState(false);
-  const [answers, setAnswers] = useState({});
-  const [examScore, setExamScore] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(3600); 
+  const [content, setContent] = useState({
+    title: "",
+    videoUrl: "",
+    pdfNode: "",
+    assignment: "",
+    startDate: "",
+    examRules:
+      "1. No external resources.\n2. 60 Minutes duration.\n3. One attempt only.",
+  });
+
+  const [examData, setExamData] = useState(
+    Array.from({ length: 50 }, (_, i) => ({
+      id: i + 1,
+      question: "",
+      optionA: "",
+      optionB: "",
+      optionC: "",
+      correctAnswer: "A",
+    })),
+  );
 
   const availableCourses = [
-    { id: "cyber_security", name: "Cyber Security", icon: <ShieldCheck size={20} /> },
-    { id: "data_analytics", name: "Data Analytics", icon: <Search size={20} /> },
-    { id: "software_eng", name: "Software Engineering", icon: <Layers size={20} /> },
-    { id: "ai_tech", name: "Artificial Intelligence", icon: <Cpu size={20} /> },
-    { id: "blockchain", name: "Blockchain Technology", icon: <Lock size={20} /> },
-    { id: "web_dev", name: "Web Development", icon: <PlayCircle size={20} /> },
-    { id: "digital_marketing", name: "Advanced Digital Marketing", icon: <Send size={20} /> },
+    { id: "cyber_security", name: "Cyber Security" },
+    { id: "data_analytics", name: "Data Analytics" },
+    { id: "software_eng", name: "Software Engineering" },
+    { id: "ai_tech", name: "Artificial Intelligence" },
+    { id: "blockchain", name: "Blockchain Technology" },
+    { id: "web_dev", name: "Web Development" },
+    { id: "digital_marketing", name: "Digital Marketing" },
   ];
+
+  const libraryLinks = [
+    {
+      name: "O'Reilly Open Books",
+      url: "https://www.oreilly.com/library/view/open-books/",
+      cat: "Engineering",
+    },
+    { name: "MIT OpenCourseWare", url: "https://ocw.mit.edu/", cat: "CS" },
+    {
+      name: "Google Scholar Central",
+      url: "https://scholar.google.com/",
+      cat: "Research",
+    },
+    {
+      name: "GitHub Archive",
+      url: "https://archive.org/details/github",
+      cat: "Code",
+    },
+    {
+      name: "ArXiv.org AI Research",
+      url: "https://arxiv.org/list/cs.AI/recent",
+      cat: "AI/ML",
+    },
+    {
+      name: "Microsoft Academic Search",
+      url: "https://academic.microsoft.com/",
+      cat: "Multi",
+    },
+    {
+      name: "Project Gutenberg",
+      url: "https://www.gutenberg.org/",
+      cat: "Literature",
+    },
+    {
+      name: "Leanpub Free Shelf",
+      url: "https://leanpub.com/bookstore/type/book/sort/top_free",
+      cat: "Tech",
+    },
+    {
+      name: "Springboard Data Resources",
+      url: "https://www.springboard.com/blog/data-science/data-science-books/",
+      cat: "Data",
+    },
+    {
+      name: "Coursera Resource Hub",
+      url: "https://www.coursera.org/browse",
+      cat: "Courses",
+    },
+  ];
+
+  const extractVideoID = (url) => {
+    if (!url) return "";
+    const regExp =
+      /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    if (match && match[7].length === 11) return match[7];
+    const shortsMatch = url.match(/shorts\/([a-zA-Z0-9_-]{11})/);
+    return shortsMatch ? shortsMatch[1] : url;
+  };
+
+  const getDocRef = () =>
+    doc(db, "course_settings", `${selectedCourse}_week_${weekNum}`);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -122,357 +168,791 @@ const StudentPortal = () => {
   }, []);
 
   useEffect(() => {
-    if (!selectedCourseId) return;
-    const unsubWeeks = onSnapshot(collection(db, "course_settings"), (snapshot) => {
-      const data = {};
-      snapshot.forEach((doc) => {
-        if (doc.id.startsWith(selectedCourseId)) {
-          const weekPart = doc.id.split("_week_")[1];
-          data[weekPart] = doc.data();
-        }
-      });
-      setWeeksData(data);
+    localStorage.setItem("admin-theme", isDarkMode ? "dark" : "light");
+    document.documentElement.classList.toggle("dark", isDarkMode);
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    const q = query(
+      collection(db, "deployment_logs"),
+      orderBy("timestamp", "desc"),
+      limit(10),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setUpdateHistory(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
-    return () => unsubWeeks();
-  }, [selectedCourseId]);
+    return () => unsub();
+  }, []);
 
-  useEffect(() => {
-    let timer;
-    if (examActive && timeLeft > 0) {
-      timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-    } else if (timeLeft === 0 && examActive) {
-      handleExamSubmit(); 
+  const handleUpdate = async (e) => {
+    if (e) e.preventDefault();
+    setLoading(true);
+
+    try {
+      const isExamWeek = weekNum === 12 || weekNum === 24;
+
+      const payload = {
+        title: content.title || (isExamWeek ? "Official Examination" : ""),
+        startDate: new Date(content.startDate), // Scheduled Unlock Time
+        updatedAt: serverTimestamp(),
+        videoId: isExamWeek ? null : extractVideoID(content.videoUrl),
+        pdfNode: isExamWeek ? null : content.pdfNode,
+        assignment: isExamWeek ? null : content.assignment,
+        exams: isExamWeek ? examData : null,
+        examRules: isExamWeek ? content.examRules : null,
+        durationMinutes: isExamWeek ? 60 : null,
+      };
+
+      await setDoc(getDocRef(), payload, { merge: true });
+      await addDoc(collection(db, "deployment_logs"), {
+        week: weekNum,
+        course: selectedCourse,
+        title: content.title || (isExamWeek ? "EXAM" : "SYNC"),
+        mode: "scheduled",
+        timestamp: serverTimestamp(),
+        action: isExamWeek ? "EXAM_DEPLOY" : "SYNC_COMPLETE",
+      });
+
+      setLoading(false);
+      alert(
+        isExamWeek
+          ? "EXAM SCHEDULED: Access will open at set time."
+          : "CONTENT SCHEDULED: Success.",
+      );
+      navigate("/student-portal");
+    } catch (err) {
+      setLoading(false);
+      alert("SYNC_FAILURE: " + err.message);
     }
-    return () => clearInterval(timer);
-  }, [examActive, timeLeft]);
+  };
+
+  const updateExamQuestion = (index, field, value) => {
+    const newData = [...examData];
+    newData[index][field] = value;
+    setExamData(newData);
+  };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) { navigate("/login"); return; }
+    let isMounted = true;
+    const fetchCurrentContent = async () => {
       try {
-        const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          const data = userSnap.data();
-          setStudentData({ id: user.uid, ...data });
-          if (data.selectedCourseId) setSelectedCourseId(data.selectedCourseId);
-          const courseStartDate = data.courseSelectionDate?.toDate() || new Date("2026-01-01");
-          const diffTime = new Date() - courseStartDate;
-          const weekCount = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
-          setCurrentWeek(weekCount > 24 ? 24 : weekCount < 1 ? 1 : weekCount);
+        const snap = await getDoc(getDocRef());
+        if (isMounted && snap.exists()) {
+          const data = snap.data();
+          setContent({
+            ...data,
+            startDate: data.startDate?.toDate
+              ? data.startDate.toDate().toISOString().slice(0, 16)
+              : data.startDate || "",
+            examRules:
+              data.examRules ||
+              "1. No external resources.\n2. 60 Minutes duration.\n3. One attempt only.",
+          });
+          if (data.exams) {
+            const loadedExams = [...data.exams];
+            while (loadedExams.length < 50) {
+              loadedExams.push({
+                id: loadedExams.length + 1,
+                question: "",
+                optionA: "",
+                optionB: "",
+                optionC: "",
+                correctAnswer: "A",
+              });
+            }
+            setExamData(loadedExams);
+          }
         }
-        const examRef = doc(db, `students/${user.uid}/exams/week_12`);
-        const examSnap = await getDoc(examRef);
-        if (examSnap.exists() && examSnap.data().passed) setHasPassedMidterm(true);
-      } catch (error) { console.error(error); } finally { setLoading(false); }
-    });
-    return () => unsubscribe();
-  }, [navigate]);
-
-  useEffect(() => {
-    if (!studentData?.id) return;
-    const q = query(collection(db, "private_chats"), where("studentId", "==", studentData.id), orderBy("createdAt", "asc"));
-    const unsubChat = onSnapshot(q, (snap) => {
-      setPrivateMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return () => unsubChat();
-  }, [studentData]);
-
-  useEffect(() => {
-    if (activeTab === "discussions" && viewState === "forum" && selectedCourse && selectedPath) {
-      const q = query(collection(db, "forum_threads"), where("courseId", "==", selectedCourse.id), where("studentType", "==", selectedPath), orderBy("createdAt", "desc"));
-      const unsub = onSnapshot(q, (snap) => {
-        setForumThreads(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      });
-      return () => unsub();
-    }
-  }, [activeTab, viewState, selectedCourse, selectedPath]);
-
-  const isWeekLocked = (weekNumber) => {
-    const weekSettings = weeksData[String(weekNumber)];
-    if (!weekSettings || !weekSettings.startDate) return true;
-    const releaseDate = weekSettings.startDate.toDate ? weekSettings.startDate.toDate() : new Date(weekSettings.startDate);
-    const isMidtermLocked = weekNumber > 12 && !hasPassedMidterm;
-    return new Date() < releaseDate || isMidtermLocked;
-  };
-
-  const handleExamSubmit = async () => {
-    setExamActive(false);
-    const questions = weeksData[String(currentWeek)]?.exams || [];
-    let correctCount = 0;
-    questions.forEach((q, idx) => { if (answers[idx] === q.correctAnswer) correctCount++; });
-    const totalQuestions = questions.length;
-    const finalScore = Math.round((correctCount / totalQuestions) * 100);
-    const resultData = { score: finalScore, correctAnswers: correctCount, totalQuestions, passed: finalScore >= 50, timeCompleted: serverTimestamp(), courseId: selectedCourseId, week: currentWeek };
-    await setDoc(doc(db, `students/${studentData.id}/exams/week_${currentWeek}`), resultData);
-    setExamScore(resultData);
-    if (finalScore >= 50 && currentWeek === 12) setHasPassedMidterm(true);
-  };
-
-  const formatTimer = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-  };
-
-  if (loading) return (
-    <div className="min-h-screen flex flex-col items-center justify-center font-black text-blue-600 bg-slate-950">
-      <Loader2 className="animate-spin mb-4" size={48} />
-      <p className="tracking-widest animate-pulse uppercase">Syncing Security Protocols...</p>
-    </div>
-  );
-
-  const currentWeekInfo = weeksData[String(currentWeek)] || {};
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchCurrentContent();
+    return () => {
+      isMounted = false;
+    };
+  }, [weekNum, selectedCourse]);
 
   return (
-    <div className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"} transition-colors duration-300`}>
-      <aside className={`fixed lg:sticky top-0 z-50 h-screen w-80 border-r flex flex-col transition-transform ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-        <div className="p-10 flex flex-col gap-4">
-          <h1 className="text-2xl font-black text-blue-600 italic">AYAX <span className={darkMode ? "text-white" : "text-gray-900"}>UNI</span></h1>
-          <div className="p-4 rounded-2xl bg-blue-600/10 border border-blue-600/20">
-            <div className="flex items-center gap-3 text-blue-500 mb-1">
-              <Clock size={14} className="animate-spin-slow" />
-              <span className="text-[10px] font-black uppercase tracking-widest">System Time</span>
+    <div
+      style={{
+        display: "flex",
+        minHeight: "100vh",
+        backgroundColor: isDarkMode ? "#020617" : "#f8fafc",
+        color: isDarkMode ? "white" : "#0f172a",
+        transition: "0.3s",
+      }}
+    >
+      <aside
+        style={{
+          width: "300px",
+          backgroundColor: isDarkMode ? "#0f172a" : "#ffffff",
+          borderRight: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+          display: "flex",
+          flexDirection: "column",
+          padding: "40px 30px",
+          position: "fixed",
+          height: "100vh",
+          zIndex: 100,
+        }}
+      >
+        <div style={{ marginBottom: "40px" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: "12px",
+              marginBottom: "20px",
+            }}
+          >
+            <div
+              style={{
+                padding: "10px",
+                backgroundColor: "#2563eb",
+                borderRadius: "15px",
+                color: "white",
+              }}
+            >
+              <ShieldCheck size={28} />
             </div>
-            <h4 className="text-xl font-black font-mono tracking-tighter">{currentTime.toLocaleTimeString("en-GB", { hour12: false })}</h4>
+            <h1
+              style={{
+                fontWeight: 900,
+                fontSize: "18px",
+                letterSpacing: "-0.5px",
+              }}
+            >
+              AYAX <span style={{ color: "#2563eb" }}>CONTENT</span>
+            </h1>
+          </div>
+          <div
+            style={{
+              padding: "20px",
+              borderRadius: "20px",
+              backgroundColor: isDarkMode ? "#1e293b" : "#f1f5f9",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                color: "#2563eb",
+                marginBottom: "5px",
+              }}
+            >
+              <Clock size={14} />
+              <span
+                style={{
+                  fontSize: "10px",
+                  fontWeight: 900,
+                  letterSpacing: "1px",
+                }}
+              >
+                SYSTEM CLOCK
+              </span>
+            </div>
+            <div
+              style={{
+                fontSize: "20px",
+                fontWeight: 900,
+                fontFamily: "monospace",
+              }}
+            >
+              {currentTime.toLocaleTimeString("en-GB", { hour12: false })}
+            </div>
           </div>
         </div>
-
-        <nav className="flex-1 px-6 space-y-2 overflow-y-auto custom-scrollbar">
-          {[{ id: "dashboard", name: "Dashboard", icon: <LayoutDashboard size={18} /> },
-            { id: "courses", name: "Curriculum", icon: <BookOpen size={18} /> },
-            { id: "discussions", name: "Community Forum", icon: <MessageSquare size={18} /> },
-            { id: "library", name: "E-Library", icon: <BookOpen size={18} /> },
-            { id: "chat", name: "Supervisor Direct", icon: <User size={18} /> }].map((item) => (
-            <button key={item.id} onClick={() => { setActiveTab(item.id); setViewState("list"); setMobileMenuOpen(false); }} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-lg" : "text-gray-400 hover:bg-blue-50/10"}`}>
-              {item.icon} {item.name}
-            </button>
-          ))}
-
-          <div className="pt-8 pb-4 text-[8px] font-black text-gray-500 uppercase tracking-widest px-2">Roadmap Progress</div>
-          <div className="space-y-3 pb-10 px-2">
-            {Array.from({ length: 24 }, (_, i) => i + 1).map((w) => {
-              const weekInfo = weeksData[String(w)];
-              return (
-                <div key={w} onClick={() => !isWeekLocked(w) && setCurrentWeek(w)} className={`px-4 py-3 rounded-2xl flex flex-col gap-2 transition-all ${isWeekLocked(w) ? "opacity-30 cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer shadow-sm"} ${currentWeek === w ? "bg-blue-600/10 border border-blue-600/20" : "border border-transparent"}`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`px-2 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${(w === 12 || w === 24) ? "bg-red-600 text-white min-w-[70px]" : isWeekLocked(w) ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}>
-                        {(w === 12 || w === 24) ? "EXAMS WEEK" : w}
-                      </div>
-                      <span className="text-[10px] font-black uppercase">Week {w}</span>
-                    </div>
-                    {isWeekLocked(w) ? <Lock size={10} className="text-red-500" /> : <CheckCircle size={10} className="text-emerald-500" />}
-                  </div>
-                  {!isWeekLocked(w) && weekInfo?.updatedAt && (
-                    <div className="flex items-center gap-2 mt-1 opacity-70">
-                      <Calendar size={10} className="text-blue-500" />
-                      <span className="text-[8px] font-black uppercase tracking-tighter">
-                        Deployed: {formatDate(weekInfo.updatedAt)}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+        <nav
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: "10px",
+          }}
+        >
+          <button
+            onClick={() => setActiveTab("curriculum")}
+            style={navStyle(activeTab === "curriculum", isDarkMode)}
+          >
+            <BookOpen size={18} /> Lesson Manager
+          </button>
+          <button
+            onClick={() => setActiveTab("history")}
+            style={navStyle(activeTab === "history", isDarkMode)}
+          >
+            <History size={18} /> Deploy History
+          </button>
+          <button
+            onClick={() => setActiveTab("library")}
+            style={navStyle(activeTab === "library", isDarkMode)}
+          >
+            <Globe size={18} /> Research Repo
+          </button>
         </nav>
-
-        <div className="p-6 border-t border-slate-800 space-y-2">
-          <button onClick={() => setDarkMode(!darkMode)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-[9px] uppercase tracking-widest bg-slate-800/50">{darkMode ? <Sun size={16} /> : <Moon size={16} />} Shift Mode</button>
-          <button onClick={() => signOut(auth)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-black text-[9px] uppercase bg-red-600 text-white shadow-lg"><LogOut size={16} /> Logout</button>
+        <div
+          style={{
+            marginTop: "auto",
+            display: "flex",
+            flexDirection: "column",
+            gap: "12px",
+          }}
+        >
+          <button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            style={bottomBtnStyle(isDarkMode)}
+          >
+            {isDarkMode ? (
+              <Sun size={18} color="#eab308" />
+            ) : (
+              <Moon size={18} color="#2563eb" />
+            )}{" "}
+            {isDarkMode ? "SPECTRUM: LIGHT" : "SPECTRUM: DARK"}
+          </button>
+          <button
+            onClick={() => signOut(auth).then(() => navigate("/admin-gateway"))}
+            style={{
+              ...bottomBtnStyle(false),
+              backgroundColor: "#dc2626",
+              color: "white",
+              border: "none",
+            }}
+          >
+            <LogOut size={18} /> TERMINATE
+          </button>
         </div>
       </aside>
 
-      <main className="flex-1 p-6 md:p-14 overflow-y-auto">
-        <header className="lg:hidden flex justify-between items-center mb-10">
-          <button onClick={() => setMobileMenuOpen(true)} className="p-3 bg-blue-600 text-white rounded-xl"><Menu /></button>
-          <h2 className="font-black italic uppercase text-blue-600">AYAX PORTAL</h2>
-        </header>
+      <main style={{ flex: 1, marginLeft: "300px", padding: "60px" }}>
+        {activeTab === "curriculum" && (
+          <div className="animate-in fade-in duration-700">
+            <header
+              style={{
+                marginBottom: "50px",
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-end",
+              }}
+            >
+              <h1
+                style={{
+                  fontSize: "42px",
+                  fontWeight: 900,
+                  fontStyle: "italic",
+                }}
+              >
+                {weekNum === 12 || weekNum === 24 ? "EXAM" : "CURRICULUM"}{" "}
+                <span style={{ color: "#2563eb" }}>NODE</span>
+              </h1>
+            </header>
 
-        {activeTab === "dashboard" && (
-          <div className="space-y-10 animate-in fade-in duration-700">
-            <div className="bg-blue-600 p-16 rounded-[4rem] text-white shadow-2xl relative overflow-hidden group">
-              <Award className="absolute -right-10 -bottom-10 w-64 h-64 opacity-10 rotate-12" />
-              <div className="relative z-10">
-                <h2 className="text-6xl font-black italic tracking-tighter mb-4 uppercase">{selectedCourseId?.replace("_", " ")}</h2>
-                <p className="text-lg font-bold opacity-80 max-w-xl">Welcome, {studentData?.fullName}. Week {currentWeek}.</p>
+            <div
+              style={{
+                maxWidth: "900px",
+                backgroundColor: isDarkMode ? "#0f172a" : "white",
+                padding: "50px",
+                borderRadius: "40px",
+                border: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+                boxShadow: "0 40px 80px -20px rgba(0,0,0,0.2)",
+              }}
+            >
+              {/* UMURNI: Set time for EVERY week including 12 and 24 */}
+              <div
+                style={{
+                  marginBottom: "40px",
+                  padding: "25px",
+                  borderRadius: "25px",
+                  backgroundColor: "#2563eb10",
+                  border: "2px solid #2563eb20",
+                }}
+              >
+                <label style={labelStyle}>
+                  <Calendar
+                    size={14}
+                    style={{ display: "inline", marginRight: "8px" }}
+                  />{" "}
+                  Set Global Unlock Date & Time
+                </label>
+                <input
+                  type="datetime-local"
+                  value={content.startDate}
+                  onChange={(e) =>
+                    setContent({ ...content, startDate: e.target.value })
+                  }
+                  style={inputStyle(isDarkMode)}
+                  required
+                />
+                <p
+                  style={{
+                    fontSize: "10px",
+                    fontWeight: "bold",
+                    marginTop: "10px",
+                    opacity: 0.6,
+                  }}
+                >
+                  Warning: Week {weekNum} will remain locked until this precise
+                  time.
+                </p>
               </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: "25px",
+                  marginBottom: "40px",
+                }}
+              >
+                <div>
+                  <label style={labelStyle}>Target Specialization</label>
+                  <select
+                    value={selectedCourse}
+                    onChange={(e) => setSelectedCourse(e.target.value)}
+                    style={inputStyle(isDarkMode)}
+                  >
+                    {availableCourses.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={labelStyle}>Target Week</label>
+                  <select
+                    value={weekNum}
+                    onChange={(e) => setWeekNum(Number(e.target.value))}
+                    style={inputStyle(isDarkMode)}
+                  >
+                    {[...Array(24)].map((_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        WEEK {i + 1}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <form
+                onSubmit={handleUpdate}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "25px",
+                }}
+              >
+                {weekNum === 12 || weekNum === 24 ? (
+                  <div
+                    style={{
+                      padding: "30px",
+                      borderRadius: "25px",
+                      backgroundColor: "#dc262605",
+                      border: "2px solid #dc262620",
+                    }}
+                  >
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        marginBottom: "20px",
+                      }}
+                    >
+                      <AlertOctagon color="#dc2626" />
+                      <h3
+                        style={{
+                          ...labelStyle,
+                          color: "#dc2626",
+                          marginBottom: 0,
+                        }}
+                      >
+                        SECURE EXAM PROTOCOL (50 QUESTIONS / 1 HOUR)
+                      </h3>
+                    </div>
+                    <label style={labelStyle}>Exam Instructions (Rules)</label>
+                    <textarea
+                      value={content.examRules}
+                      onChange={(e) =>
+                        setContent({ ...content, examRules: e.target.value })
+                      }
+                      style={{
+                        ...inputStyle(isDarkMode),
+                        height: "100px",
+                        marginBottom: "20px",
+                        border: "1px dashed #dc262640",
+                      }}
+                    />
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "30px",
+                        maxHeight: "600px",
+                        overflowY: "auto",
+                        paddingRight: "10px",
+                      }}
+                    >
+                      {examData.map((ex, index) => (
+                        <div
+                          key={ex.id}
+                          style={{
+                            borderBottom: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+                            paddingBottom: "20px",
+                          }}
+                        >
+                          <label style={labelStyle}>Question {ex.id}</label>
+                          <input
+                            value={ex.question}
+                            onChange={(e) =>
+                              updateExamQuestion(
+                                index,
+                                "question",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Type question..."
+                            style={{
+                              ...inputStyle(isDarkMode),
+                              marginBottom: "10px",
+                            }}
+                          />
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr 1fr",
+                              gap: "10px",
+                            }}
+                          >
+                            <input
+                              value={ex.optionA}
+                              onChange={(e) =>
+                                updateExamQuestion(
+                                  index,
+                                  "optionA",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="A"
+                              style={inputStyle(isDarkMode)}
+                            />
+                            <input
+                              value={ex.optionB}
+                              onChange={(e) =>
+                                updateExamQuestion(
+                                  index,
+                                  "optionB",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="B"
+                              style={inputStyle(isDarkMode)}
+                            />
+                            <input
+                              value={ex.optionC}
+                              onChange={(e) =>
+                                updateExamQuestion(
+                                  index,
+                                  "optionC",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="C"
+                              style={inputStyle(isDarkMode)}
+                            />
+                          </div>
+                          <select
+                            value={ex.correctAnswer}
+                            onChange={(e) =>
+                              updateExamQuestion(
+                                index,
+                                "correctAnswer",
+                                e.target.value,
+                              )
+                            }
+                            style={{
+                              ...inputStyle(isDarkMode),
+                              marginTop: "10px",
+                              color: "#2563eb",
+                            }}
+                          >
+                            <option value="A">Correct: Option A</option>
+                            <option value="B">Correct: Option B</option>
+                            <option value="C">Correct: Option C</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "25px",
+                      }}
+                    >
+                      <div>
+                        <label style={labelStyle}>Module Title</label>
+                        <input
+                          value={content.title}
+                          onChange={(e) =>
+                            setContent({ ...content, title: e.target.value })
+                          }
+                          style={inputStyle(isDarkMode)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>YouTube Link/ID</label>
+                        <input
+                          value={content.videoUrl}
+                          onChange={(e) =>
+                            setContent({ ...content, videoUrl: e.target.value })
+                          }
+                          style={inputStyle(isDarkMode)}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      {/* UMURNI: PDF Secure link entry */}
+                      <label style={labelStyle}>
+                        <FileText
+                          size={14}
+                          style={{ display: "inline", marginRight: "8px" }}
+                        />{" "}
+                        Secure PDF Resource Node (URL)
+                      </label>
+                      <div style={{ position: "relative" }}>
+                        <input
+                          value={content.pdfNode}
+                          onChange={(e) =>
+                            setContent({ ...content, pdfNode: e.target.value })
+                          }
+                          placeholder="Paste Secure PDF Storage Link"
+                          style={{
+                            ...inputStyle(isDarkMode),
+                            paddingLeft: "50px",
+                          }}
+                        />
+                        <LinkIcon
+                          size={18}
+                          style={{
+                            position: "absolute",
+                            left: "20px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            opacity: 0.5,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Assignment Briefing</label>
+                      <textarea
+                        value={content.assignment}
+                        onChange={(e) =>
+                          setContent({ ...content, assignment: e.target.value })
+                        }
+                        style={{ ...inputStyle(isDarkMode), height: "120px" }}
+                      />
+                    </div>
+                  </>
+                )}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  style={{
+                    ...submitBtnStyle,
+                    backgroundColor:
+                      weekNum === 12 || weekNum === 24 ? "#dc2626" : "#2563eb",
+                  }}
+                >
+                  {loading ? (
+                    <RefreshCcw className="animate-spin" />
+                  ) : (
+                    "SYNC TO PRODUCTION"
+                  )}
+                </button>
+              </form>
             </div>
           </div>
         )}
 
-        {activeTab === "courses" && (
-          <div className="space-y-8 animate-in fade-in duration-500">
-            {currentWeek === 12 || currentWeek === 24 ? (
-              <div className={`p-10 rounded-[3rem] border-4 ${darkMode ? "bg-slate-900 border-red-500/20" : "bg-white border-red-500/20 shadow-2xl"}`}>
-                <div className="flex justify-between items-center mb-8">
-                  <div className="flex items-center gap-4">
-                    <ShieldCheck className="text-red-600" size={48} />
-                    <div>
-                      <h2 className="text-4xl font-black italic uppercase">Week {currentWeek} Exam Protocol</h2>
-                      <p className="font-black text-xs text-red-500 uppercase tracking-widest">60 Minutes Assessment</p>
-                    </div>
-                  </div>
-                  {examActive && <div className="px-8 py-4 bg-red-600 text-white rounded-2xl font-black text-2xl font-mono shadow-xl animate-pulse">{formatTimer(timeLeft)}</div>}
+        {activeTab === "history" && (
+          <div className="animate-in slide-in-from-right duration-500">
+            <h2
+              style={{
+                fontSize: "32px",
+                fontWeight: 900,
+                marginBottom: "40px",
+              }}
+            >
+              SYSTEM <span style={{ color: "#2563eb" }}>LOGS</span>
+            </h2>
+            {updateHistory.map((log) => (
+              <div
+                key={log.id}
+                style={{
+                  padding: "25px",
+                  borderRadius: "25px",
+                  backgroundColor: isDarkMode ? "#0f172a" : "white",
+                  border: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+                  marginBottom: "15px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <h4
+                    style={{
+                      fontWeight: 900,
+                      fontSize: "14px",
+                      color: "#2563eb",
+                    }}
+                  >
+                    {log.action}
+                  </h4>
+                  <p style={{ fontSize: "12px", fontWeight: 700 }}>
+                    {log.course?.toUpperCase()} | Week {log.week} - {log.title}
+                  </p>
                 </div>
-
-                {!examActive && !examScore ? (
-                  <div className="p-10 bg-black/5 rounded-[2rem] border border-white/5">
-                    <h4 className="text-xl font-black uppercase mb-6 flex items-center gap-2"><AlertTriangle className="text-orange-500" /> Rules</h4>
-                    <div className="space-y-4 opacity-80 font-bold mb-10 whitespace-pre-wrap">{currentWeekInfo.examRules || "Authorized Access Required."}</div>
-                    <button onClick={() => setExamActive(true)} className="w-full py-5 bg-red-600 text-white rounded-2xl font-black uppercase italic text-xl shadow-2xl hover:scale-95 transition-all">Start Assessment</button>
-                  </div>
-                ) : examScore !== null ? (
-                  <div className="text-center py-16 bg-blue-600/5 rounded-[3rem] border-2 border-blue-600/10 animate-in zoom-in duration-500">
-                    <Trophy className="mx-auto mb-8 text-yellow-500 animate-bounce" size={100} />
-                    <h2 className="text-3xl font-black uppercase italic mb-2">Performance Report</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto px-6 mb-12">
-                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">Grade</p>
-                        <h4 className={`text-6xl font-black italic ${examScore.passed ? "text-blue-600" : "text-red-600"}`}>{examScore.score}%</h4>
-                      </div>
-                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">Accuracy</p>
-                        <h4 className="text-5xl font-black italic text-emerald-500">{examScore.correctAnswers}/{examScore.totalQuestions}</h4>
-                      </div>
-                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
-                        <p className="text-[10px] font-black text-gray-400 uppercase">Status</p>
-                        <h4 className={`text-3xl font-black italic uppercase ${examScore.passed ? "text-blue-600" : "text-red-600"}`}>{examScore.passed ? "Pass" : "Fail"}</h4>
-                      </div>
-                    </div>
-                    <button onClick={() => { setActiveTab("dashboard"); setExamScore(null); }} className="px-12 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase italic shadow-2xl transition-all">Back</button>
-                  </div>
-                ) : (
-                  <div className="space-y-12 h-[600px] overflow-y-auto px-4 custom-scrollbar">
-                    {currentWeekInfo.exams?.map((q, idx) => (
-                      <div key={idx} className="p-8 bg-black/5 rounded-[2rem] border border-white/5">
-                        <p className="text-xl font-black mb-6">{idx + 1}. {q.question}</p>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          {["A", "B", "C"].map((opt) => (
-                            <button key={opt} onClick={() => setAnswers({ ...answers, [idx]: opt })} className={`p-5 rounded-xl font-black border-2 transition-all ${answers[idx] === opt ? "bg-blue-600 border-blue-600 text-white" : "bg-black/10 hover:bg-black/20"}`}>
-                              {opt}: {q[`option${opt}`]}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    <button onClick={handleExamSubmit} className="w-full py-6 bg-emerald-600 text-white rounded-[2rem] font-black uppercase text-xl shadow-2xl sticky bottom-0">Submit Exam</button>
-                  </div>
-                )}
+                <div style={{ textAlign: "right" }}>
+                  <p
+                    style={{ fontSize: "10px", fontWeight: 900, opacity: 0.5 }}
+                  >
+                    {log.timestamp?.toDate().toLocaleString() || "..."}
+                  </p>
+                </div>
               </div>
-            ) : (
-              <>
-                <div className="bg-black aspect-video rounded-[3rem] overflow-hidden shadow-2xl relative border-4 border-white/5">
-                  {isWeekLocked(currentWeek) ? (
-                    <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center"><Lock size={64} className="text-red-600 animate-pulse" /></div>
-                  ) : (
-                    <iframe width="100%" height="100%" src={`https://www.youtube.com/embed/${currentWeekInfo.videoId}`} frameBorder="0" allowFullScreen></iframe>
-                  )}
-                </div>
-                <div className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white shadow-xl"}`}>
-                  <h3 className="text-3xl font-black uppercase italic mb-6">{currentWeekInfo.title || "Lector"}</h3>
-                  <div className="grid md:grid-cols-2 gap-6">
-                    <div className="p-8 bg-blue-600 rounded-[2.5rem] text-white">
-                      <a href={currentWeekInfo.pdfNode} target="_blank" rel="noreferrer" className="block w-full py-4 bg-white text-blue-600 rounded-2xl font-black text-center uppercase">PDF Node</a>
-                    </div>
-                    <div className="p-8 rounded-[2.5rem] bg-gray-50 dark:bg-white/5">
-                      <p className="text-sm font-bold opacity-70">{currentWeekInfo.assignment || "Task node."}</p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        )}
-
-        {/* LIBRARY */}
-        {activeTab === "library" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {libraryLinks.map((lib, i) => (
-              <a key={i} href={lib.url} target="_blank" rel="noreferrer" className={`p-8 rounded-[2.5rem] border-2 transition-all hover:scale-105 group ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-white shadow-xl"}`}>
-                <div className="flex justify-between items-start mb-6">
-                  <div className="p-3 bg-blue-600/10 text-blue-600 rounded-xl group-hover:bg-blue-600 transition-colors"><BookOpen size={24} /></div>
-                  <span className="text-[10px] font-black uppercase text-blue-500 bg-blue-500/10 px-3 py-1 rounded-full">{lib.cat}</span>
-                </div>
-                <h3 className="text-xl font-black uppercase italic mb-4">{lib.name}</h3>
-              </a>
             ))}
           </div>
         )}
 
-        {/* DISCUSSIONS */}
-        {activeTab === "discussions" && (
-          <div className="animate-in fade-in duration-500">
-            {viewState === "list" && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                {availableCourses.map((c) => (
-                  <div key={c.id} onClick={() => { setSelectedCourse(c); setViewState("selection"); }} className={`p-10 rounded-[2.5rem] border cursor-pointer hover:border-blue-600 transition-all ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}>
-                    <div className="w-12 h-12 bg-blue-600 text-white rounded-xl flex items-center justify-center mb-6">{c.icon}</div>
-                    <h4 className="text-2xl font-black italic uppercase">{c.name}</h4>
+        {activeTab === "library" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {libraryLinks.map((lib, i) => (
+              <a
+                key={i}
+                href={lib.url}
+                target="_blank"
+                rel="noreferrer"
+                style={{ textDecoration: "none" }}
+              >
+                <div
+                  style={{
+                    padding: "35px",
+                    borderRadius: "35px",
+                    backgroundColor: isDarkMode ? "#0f172a" : "white",
+                    border: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+                    height: "100%",
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      fontWeight: 900,
+                      color: "#2563eb",
+                    }}
+                  >
+                    {lib.cat}
+                  </span>
+                  <h3
+                    style={{
+                      margin: "15px 0",
+                      fontSize: "20px",
+                      fontWeight: 900,
+                      color: isDarkMode ? "white" : "#0f172a",
+                    }}
+                  >
+                    {lib.name}
+                  </h3>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                      fontSize: "10px",
+                      fontWeight: 900,
+                      opacity: 0.5,
+                    }}
+                  >
+                    VISIT REPOSITORY <ExternalLink size={12} />
                   </div>
-                ))}
-              </div>
-            )}
-            {viewState === "selection" && (
-              <div className="flex flex-col md:flex-row items-center justify-center gap-10 min-h-[50vh]">
-                <button onClick={() => { setSelectedPath("Path 1"); setViewState("forum"); }} className="p-16 bg-blue-600 text-white rounded-[4rem] font-black italic text-5xl uppercase shadow-2xl hover:scale-105 transition-all">Path 1</button>
-                <button onClick={() => { setSelectedPath("Path 2"); setViewState("forum"); }} className="p-16 bg-slate-900 text-white rounded-[4rem] font-black italic text-5xl uppercase shadow-2xl hover:scale-105 transition-all">Path 2</button>
-              </div>
-            )}
-            {viewState === "forum" && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                <div className={`p-10 rounded-[3rem] border sticky top-0 h-fit ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}>
-                  <form onSubmit={async (e) => { e.preventDefault(); if (!newPost.title || !newPost.content) return; await addDoc(collection(db, "forum_threads"), { ...newPost, studentName: studentData?.fullName || "Student", studentId: auth.currentUser.uid, courseId: selectedCourse.id, studentType: selectedPath, createdAt: serverTimestamp() }); setNewPost({ title: "", content: "" }); }} className="space-y-4">
-                    <input className="s-input" placeholder="SUBJECT" value={newPost.title} onChange={(e) => setNewPost({ ...newPost, title: e.target.value })} />
-                    <textarea className="s-input h-40 pt-4" placeholder="DETAILS..." value={newPost.content} onChange={(e) => setNewPost({ ...newPost, content: e.target.value })} />
-                    <button className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest">Transmit Post</button>
-                  </form>
                 </div>
-                <div className="lg:col-span-2 space-y-6">
-                  {forumThreads.map((t) => (
-                    <div key={t.id} className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-sm"}`}>
-                      <h3 className="text-2xl font-black italic uppercase mb-4 tracking-tighter">"{t.title}"</h3>
-                      <p className="opacity-60 text-sm leading-relaxed mb-8">{t.content}</p>
-                      <span className="text-[10px] font-black text-blue-600 uppercase">By {t.studentName}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+              </a>
+            ))}
           </div>
         )}
-
-        {/* CHAT */}
-        {activeTab === "chat" && (
-          <div className={`h-[80vh] flex flex-col rounded-[3.5rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-2xl"}`}>
-            <div className="p-8 bg-blue-600 text-white flex justify-between items-center shadow-lg"><h3 className="text-2xl font-black uppercase italic">Private Secure Link</h3><ShieldCheck size={30} /></div>
-            <div className="flex-1 p-8 overflow-y-auto space-y-4 flex flex-col custom-scrollbar">
-              {privateMessages.map((m) => (
-                <div key={m.id} className={`max-w-[75%] p-5 rounded-[2rem] text-sm font-bold shadow-sm ${m.senderRole === "student" ? "bg-blue-600 text-white self-end rounded-tr-none" : "bg-slate-800 text-white self-start rounded-tl-none border border-white/5"}`}>
-                  {m.text}
-                  <div className="text-[8px] opacity-40 mt-2 uppercase">{m.sender} • {m.createdAt ? formatDate(m.createdAt) : "Transmitting..."}</div>
-                </div>
-              ))}
-            </div>
-            <form onSubmit={async (e) => { e.preventDefault(); if (!newPrivateMsg.trim()) return; await addDoc(collection(db, "private_chats"), { text: newPrivateMsg, sender: studentData?.fullName || "Student", senderRole: "student", studentId: studentData?.id, createdAt: serverTimestamp() }); setNewPrivateMsg(""); }} className="p-6 border-t border-white/5 flex gap-4">
-              <input value={newPrivateMsg} onChange={(e) => setNewPrivateMsg(e.target.value)} className="flex-1 bg-transparent border-none outline-none font-black text-sm" placeholder="Transmit direct message..." />
-              <button className="p-5 bg-blue-600 text-white rounded-2xl shadow-xl"><Send size={20} /></button>
-            </form>
-          </div>
-        )}
-      </aside>
-
-      <style>{`
-        .s-input { width: 100%; padding: 1.25rem; background: ${darkMode ? "#1e293b" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.5rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
-        .s-input:focus { border-color: #2563eb; background: ${darkMode ? "#0f172a" : "white"}; }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #2563eb33; border-radius: 10px; }
-        .animate-spin-slow { animation: spin 8s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-      `}</style>
+      </main>
     </div>
   );
 };
 
-export default StudentPortal;
+// PRESERVED STYLES
+const navStyle = (active, dark) => ({
+  display: "flex",
+  alignItems: "center",
+  gap: "15px",
+  padding: "20px",
+  borderRadius: "22px",
+  fontWeight: 900,
+  fontSize: "11px",
+  textTransform: "uppercase",
+  letterSpacing: "1px",
+  backgroundColor: active ? "#2563eb" : "transparent",
+  color: active ? "white" : dark ? "#64748b" : "#94a3b8",
+  border: "none",
+  cursor: "pointer",
+  textAlign: "left",
+  transition: "0.3s",
+});
+const inputStyle = (dark) => ({
+  width: "100%",
+  padding: "20px",
+  borderRadius: "20px",
+  border: `2px solid ${dark ? "#1e293b" : "#f1f5f9"}`,
+  backgroundColor: dark ? "#020617" : "#f8fafc",
+  color: "inherit",
+  fontWeight: "bold",
+  outline: "none",
+  transition: "0.3s",
+});
+const labelStyle = {
+  fontSize: "11px",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "1.5px",
+  marginBottom: "10px",
+  display: "block",
+  color: "#2563eb",
+};
+const submitBtnStyle = {
+  width: "100%",
+  padding: "25px",
+  borderRadius: "25px",
+  border: "none",
+  color: "white",
+  backgroundColor: "#2563eb",
+  fontWeight: 900,
+  textTransform: "uppercase",
+  letterSpacing: "2px",
+  cursor: "pointer",
+  boxShadow: "0 15px 30px -10px rgba(0,0,0,0.4)",
+};
+const bottomBtnStyle = (dark) => ({
+  padding: "18px",
+  borderRadius: "18px",
+  border: `1px solid ${dark ? "#1e293b" : "#e2e8f0"}`,
+  cursor: "pointer",
+  display: "flex",
+  alignItems: "center",
+  gap: "12px",
+  fontWeight: 900,
+  fontSize: "11px",
+  backgroundColor: dark ? "#0f172a" : "white",
+  color: dark ? "white" : "#475569",
+});
+
+export default AdminContentManager;
