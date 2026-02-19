@@ -40,7 +40,6 @@ import {
   Upload,
 } from "lucide-react";
 
-// 1. STYLING COMPONENTS (HOISTED)
 const modeBtnStyle = (active, color) => ({
   padding: "12px 24px",
   borderRadius: "15px",
@@ -78,6 +77,7 @@ const AdminContentManager = () => {
     pdfUrl: "",
     assignment: "",
     startDate: "",
+    examQuestions: "", // Sabon sashi don Exams
   });
 
   const availableCourses = [
@@ -139,7 +139,6 @@ const AdminContentManager = () => {
     },
   ];
 
-  // GYARA NA MUSAMMAN: Extract YouTube ID
   const extractVideoID = (url) => {
     if (!url) return "";
     const regExp =
@@ -192,7 +191,6 @@ const AdminContentManager = () => {
         `curriculum/${selectedCourse}/week_${weekNum}/${Date.now()}_${file.name}`,
       );
       const uploadTask = uploadBytesResumable(storageRef, file);
-
       uploadTask.on(
         "state_changed",
         (snapshot) => {
@@ -205,9 +203,7 @@ const AdminContentManager = () => {
           reject(error);
         },
         () => {
-          getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) =>
-            resolve(downloadURL),
-          );
+          getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve(url));
         },
       );
     });
@@ -219,7 +215,6 @@ const AdminContentManager = () => {
 
     try {
       let finalPdfUrl = content.pdfUrl || "";
-
       if (pdfFile) {
         finalPdfUrl = await handleFileUpload(pdfFile);
       }
@@ -238,20 +233,23 @@ const AdminContentManager = () => {
         updatedAt: serverTimestamp(),
       };
 
-      // Tura aiki a background
-      setLoading(false);
-
-      setDoc(getDocRef(), payload, { merge: true });
-      addDoc(collection(db, "deployment_logs"), {
+      // GYARA: Mun maida shi "await" don tabbatar bayanan sun tafi
+      await setDoc(getDocRef(), payload, { merge: true });
+      await addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
         course: selectedCourse,
-        title: content.title || "Module Update",
+        title:
+          content.title ||
+          (weekNum % 12 === 0 ? "Semester Exam" : "Module Update"),
         mode: deploymentMode,
         timestamp: serverTimestamp(),
         action: "UPDATE/DEPLOY",
       });
 
-      alert(`SUCCESS: ${selectedCourse.toUpperCase()} - Sync Complete.`);
+      setLoading(false);
+      alert(
+        `SUCCESS: ${selectedCourse.toUpperCase()} - Week ${weekNum} Synced.`,
+      );
       navigate("/student-portal");
     } catch (err) {
       setLoading(false);
@@ -275,6 +273,7 @@ const AdminContentManager = () => {
           pdfUrl: "",
           assignment: "",
           startDate: "",
+          examQuestions: "",
         });
         await addDoc(collection(db, "deployment_logs"), {
           week: weekNum,
@@ -304,6 +303,7 @@ const AdminContentManager = () => {
               startDate: data.startDate?.toDate
                 ? data.startDate.toDate().toISOString().slice(0, 16)
                 : data.startDate || "",
+              examQuestions: data.examQuestions || "",
             });
           } else {
             setContent({
@@ -312,6 +312,7 @@ const AdminContentManager = () => {
               pdfUrl: "",
               assignment: "",
               startDate: "",
+              examQuestions: "",
             });
           }
         }
@@ -335,7 +336,6 @@ const AdminContentManager = () => {
         transition: "0.3s",
       }}
     >
-      {/* SIDEBAR */}
       <aside
         style={{
           width: "300px",
@@ -495,7 +495,8 @@ const AdminContentManager = () => {
                     fontStyle: "italic",
                   }}
                 >
-                  CURRICULUM <span style={{ color: "#2563eb" }}>NODE</span>
+                  {weekNum % 12 === 0 ? "EXAM" : "CURRICULUM"}{" "}
+                  <span style={{ color: "#2563eb" }}>NODE</span>
                 </h1>
                 <div
                   style={{ display: "flex", gap: "15px", marginTop: "20px" }}
@@ -585,6 +586,38 @@ const AdminContentManager = () => {
                   gap: "25px",
                 }}
               >
+                {/* EXAM SECTION: Zai fito ne kawai a Week 12 da 24 */}
+                {(weekNum === 12 || weekNum === 24) && (
+                  <div
+                    style={{
+                      padding: "30px",
+                      borderRadius: "25px",
+                      backgroundColor: "#dc262605",
+                      border: "2px solid #dc262620",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    <label style={{ ...labelStyle, color: "#dc2626" }}>
+                      Exam Questions Setup (Week {weekNum})
+                    </label>
+                    <textarea
+                      value={content.examQuestions}
+                      onChange={(e) =>
+                        setContent({
+                          ...content,
+                          examQuestions: e.target.value,
+                        })
+                      }
+                      placeholder="Enter exam questions here..."
+                      style={{
+                        ...inputStyle(isDarkMode),
+                        height: "200px",
+                        border: "2px solid #dc262610",
+                      }}
+                    />
+                  </div>
+                )}
+
                 <div
                   style={{
                     display: "grid",
@@ -713,7 +746,7 @@ const AdminContentManager = () => {
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Assignment Briefing</label>
+                  <label style={labelStyle}>Assignment/Description</label>
                   <textarea
                     value={content.assignment}
                     onChange={(e) =>
@@ -724,7 +757,7 @@ const AdminContentManager = () => {
                       height: "120px",
                       resize: "none",
                     }}
-                    placeholder="Practical tasks..."
+                    placeholder="Tasks for students..."
                   />
                 </div>
 
@@ -742,6 +775,7 @@ const AdminContentManager = () => {
           </div>
         )}
 
+        {/* LOGS TAB & LIBRARY TAB remain unchanged as per your original code */}
         {activeTab === "history" && (
           <div className="animate-in slide-in-from-right duration-500">
             <h2
@@ -874,7 +908,7 @@ const AdminContentManager = () => {
   );
 };
 
-// TERMINAL STYLES (Dukkan CSS naka na asali)
+// TERMINAL STYLES (Kept exactly as original)
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
