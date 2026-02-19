@@ -177,7 +177,6 @@ const AdminContentManager = () => {
         `curriculum/${selectedCourse}/week_${weekNum}/${Date.now()}_${file.name}`,
       );
       const uploadTask = uploadBytesResumable(storageRef, file);
-
       uploadTask.on(
         "state_changed",
         (snapshot) => {
@@ -186,7 +185,6 @@ const AdminContentManager = () => {
           setUploadProgress(progress);
         },
         (error) => {
-          console.error("Storage Error:", error);
           reject(error);
         },
         () => {
@@ -200,23 +198,17 @@ const AdminContentManager = () => {
 
   const handleUpdate = async (e) => {
     if (e) e.preventDefault();
-    if (loading) return; // Prevent double trigger
-
     setLoading(true);
 
     try {
       let finalPdfUrl = content.pdfUrl || "";
-
-      // 1. Process File Upload if exists
       if (pdfFile) {
         finalPdfUrl = await handleFileUpload(pdfFile);
       }
 
-      // 2. Define Start Date
       const finalStartDate =
         deploymentMode === "manual" ? new Date() : new Date(content.startDate);
 
-      // 3. Update Course Settings
       const payload = {
         ...content,
         pdfUrl: finalPdfUrl,
@@ -227,10 +219,12 @@ const AdminContentManager = () => {
         updatedAt: serverTimestamp(),
       };
 
-      await setDoc(getDocRef(), payload, { merge: true });
+      // GYARA: Muna kashe loading kafin mu danna Firestore don gujewa "UI-Freeze"
+      setLoading(false);
 
-      // 4. Log the action
-      await addDoc(collection(db, "deployment_logs"), {
+      // Wannan zai tafi a background
+      setDoc(getDocRef(), payload, { merge: true });
+      addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
         course: selectedCourse,
         title: content.title || "Module Update",
@@ -239,17 +233,12 @@ const AdminContentManager = () => {
         action: "UPDATE/DEPLOY",
       });
 
-      // 5. Success Feedback
-      setLoading(false); // Kashe loading kafin alert domin kada ya tsaya
       alert(
         `SUCCESS: ${selectedCourse.toUpperCase()} - Week ${weekNum} Sync Complete.`,
       );
-
-      // 6. Direct Navigation
       navigate("/student-portal");
     } catch (err) {
       setLoading(false);
-      console.error("Sync Failure:", err);
       alert("SYNC_FAILURE: " + err.message);
     }
   };
@@ -276,43 +265,47 @@ const AdminContentManager = () => {
           timestamp: serverTimestamp(),
           action: "DELETE_NODE",
         });
+        setLoading(false);
         alert("DELETION_SUCCESS: Data purged from cloud.");
       } catch (err) {
-        alert("DELETE_ERROR: " + err.message);
-      } finally {
         setLoading(false);
+        alert("DELETE_ERROR: " + err.message);
       }
     }
   };
 
   useEffect(() => {
+    let isMounted = true;
     const fetchCurrentContent = async () => {
-      setLoading(true);
       try {
         const snap = await getDoc(getDocRef());
-        if (snap.exists()) {
-          const data = snap.data();
-          setContent({
-            ...data,
-            startDate: data.startDate?.toDate
-              ? data.startDate.toDate().toISOString().slice(0, 16)
-              : data.startDate || "",
-          });
-        } else {
-          setContent({
-            title: "",
-            videoUrl: "",
-            pdfUrl: "",
-            assignment: "",
-            startDate: "",
-          });
+        if (isMounted) {
+          if (snap.exists()) {
+            const data = snap.data();
+            setContent({
+              ...data,
+              startDate: data.startDate?.toDate
+                ? data.startDate.toDate().toISOString().slice(0, 16)
+                : data.startDate || "",
+            });
+          } else {
+            setContent({
+              title: "",
+              videoUrl: "",
+              pdfUrl: "",
+              assignment: "",
+              startDate: "",
+            });
+          }
         }
       } catch (e) {
         console.error(e);
       }
-      setLoading(false);
     };
     fetchCurrentContent();
+    return () => {
+      isMounted = false;
+    };
   }, [weekNum, selectedCourse]);
 
   return (
@@ -646,7 +639,6 @@ const AdminContentManager = () => {
                       style={inputStyle(isDarkMode)}
                     />
                   </div>
-
                   <div>
                     <label style={labelStyle}>Lecture PDF (Upload)</label>
                     <div style={{ position: "relative" }}>
