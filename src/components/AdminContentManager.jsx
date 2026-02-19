@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from "react";
-import { db, auth, storage } from "../firebaseConfig";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { db, auth } from "../firebaseConfig";
 import {
   doc,
   setDoc,
   serverTimestamp,
   getDoc,
-  updateDoc,
   deleteDoc,
   collection,
   query,
@@ -37,9 +35,10 @@ import {
   Timer,
   Trash2,
   History,
-  Upload,
+  Link as LinkIcon,
 } from "lucide-react";
 
+// 1. STYLING COMPONENTS (HOISTED)
 const modeBtnStyle = (active, color) => ({
   padding: "12px 24px",
   borderRadius: "15px",
@@ -63,22 +62,31 @@ const AdminContentManager = () => {
   const [loading, setLoading] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [deploymentMode, setDeploymentMode] = useState("manual");
-  const [uploadProgress, setUploadProgress] = useState(0);
 
   const [selectedCourse, setSelectedCourse] = useState("web_dev");
   const [weekNum, setWeekNum] = useState(1);
   const [activeTab, setActiveTab] = useState("curriculum");
   const [updateHistory, setUpdateHistory] = useState([]);
-  const [pdfFile, setPdfFile] = useState(null);
 
   const [content, setContent] = useState({
     title: "",
     videoUrl: "",
-    pdfUrl: "",
+    pdfNode: "",
     assignment: "",
     startDate: "",
-    examQuestions: "", // Sabon sashi don Exams
   });
+
+  // EXAM STATE: 30 Questions
+  const [examData, setExamData] = useState(
+    Array.from({ length: 30 }, (_, i) => ({
+      id: i + 1,
+      question: "",
+      optionA: "",
+      optionB: "",
+      optionC: "",
+      correctAnswer: "A",
+    })),
+  );
 
   const availableCourses = [
     { id: "cyber_security", name: "Cyber Security" },
@@ -144,12 +152,9 @@ const AdminContentManager = () => {
     const regExp =
       /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
     const match = url.match(regExp);
-    if (match && match[7].length === 11) {
-      return match[7];
-    } else {
-      const shortsMatch = url.match(/shorts\/([a-zA-Z0-9_-]{11})/);
-      return shortsMatch ? shortsMatch[1] : url;
-    }
+    if (match && match[7].length === 11) return match[7];
+    const shortsMatch = url.match(/shorts\/([a-zA-Z0-9_-]{11})/);
+    return shortsMatch ? shortsMatch[1] : url;
   };
 
   const getDocRef = () =>
@@ -177,117 +182,45 @@ const AdminContentManager = () => {
     return () => unsub();
   }, []);
 
-  const handleLogout = async () => {
-    if (window.confirm("CRITICAL: Terminate Content Management Session?")) {
-      await signOut(auth);
-      navigate("/admin-gateway");
-    }
-  };
-
-  const handleFileUpload = async (file) => {
-    return new Promise((resolve, reject) => {
-      const storageRef = ref(
-        storage,
-        `curriculum/${selectedCourse}/week_${weekNum}/${Date.now()}_${file.name}`,
-      );
-      const uploadTask = uploadBytesResumable(storageRef, file);
-      uploadTask.on(
-        "state_changed",
-        (snapshot) => {
-          const progress =
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-        },
-        (error) => {
-          console.error("Storage Error:", error);
-          reject(error);
-        },
-        () => {
-          getDownloadURL(uploadTask.snapshot.ref).then((url) => resolve(url));
-        },
-      );
-    });
-  };
-
   const handleUpdate = async (e) => {
     if (e) e.preventDefault();
     setLoading(true);
 
     try {
-      let finalPdfUrl = content.pdfUrl || "";
-      if (pdfFile) {
-        finalPdfUrl = await handleFileUpload(pdfFile);
-      }
-
-      const cleanVideoID = extractVideoID(content.videoUrl);
-      const finalStartDate =
-        deploymentMode === "manual" ? new Date() : new Date(content.startDate);
-
       const payload = {
         ...content,
-        pdfUrl: finalPdfUrl,
-        videoId: cleanVideoID,
-        startDate: finalStartDate,
-        deploymentMode: deploymentMode,
-        courseId: selectedCourse,
+        videoId: extractVideoID(content.videoUrl),
+        startDate:
+          deploymentMode === "manual"
+            ? new Date()
+            : new Date(content.startDate),
+        exams: weekNum === 12 || weekNum === 24 ? examData : null,
         updatedAt: serverTimestamp(),
       };
 
-      // GYARA: Mun maida shi "await" don tabbatar bayanan sun tafi
       await setDoc(getDocRef(), payload, { merge: true });
       await addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
         course: selectedCourse,
-        title:
-          content.title ||
-          (weekNum % 12 === 0 ? "Semester Exam" : "Module Update"),
+        title: content.title || "Module Update",
         mode: deploymentMode,
         timestamp: serverTimestamp(),
-        action: "UPDATE/DEPLOY",
+        action: "SYNC_COMPLETE",
       });
 
       setLoading(false);
-      alert(
-        `SUCCESS: ${selectedCourse.toUpperCase()} - Week ${weekNum} Synced.`,
-      );
+      alert("SUCCESS: Database Updated Successfully.");
       navigate("/student-portal");
     } catch (err) {
       setLoading(false);
-      console.error("Sync Failure:", err);
       alert("SYNC_FAILURE: " + err.message);
     }
   };
 
-  const handleDeleteWeek = async () => {
-    if (
-      window.confirm(
-        `PERMANENT DELETION: Purge Week ${weekNum} for ${selectedCourse}?`,
-      )
-    ) {
-      setLoading(true);
-      try {
-        await deleteDoc(getDocRef());
-        setContent({
-          title: "",
-          videoUrl: "",
-          pdfUrl: "",
-          assignment: "",
-          startDate: "",
-          examQuestions: "",
-        });
-        await addDoc(collection(db, "deployment_logs"), {
-          week: weekNum,
-          course: selectedCourse,
-          timestamp: serverTimestamp(),
-          action: "DELETE_NODE",
-        });
-        setLoading(false);
-        alert("DELETION_SUCCESS: Data purged.");
-      } catch (err) {
-        setLoading(false);
-        alert("DELETE_ERROR: " + err.message);
-      }
-    }
+  const updateExamQuestion = (index, field, value) => {
+    const newData = [...examData];
+    newData[index][field] = value;
+    setExamData(newData);
   };
 
   useEffect(() => {
@@ -295,26 +228,15 @@ const AdminContentManager = () => {
     const fetchCurrentContent = async () => {
       try {
         const snap = await getDoc(getDocRef());
-        if (isMounted) {
-          if (snap.exists()) {
-            const data = snap.data();
-            setContent({
-              ...data,
-              startDate: data.startDate?.toDate
-                ? data.startDate.toDate().toISOString().slice(0, 16)
-                : data.startDate || "",
-              examQuestions: data.examQuestions || "",
-            });
-          } else {
-            setContent({
-              title: "",
-              videoUrl: "",
-              pdfUrl: "",
-              assignment: "",
-              startDate: "",
-              examQuestions: "",
-            });
-          }
+        if (isMounted && snap.exists()) {
+          const data = snap.data();
+          setContent({
+            ...data,
+            startDate: data.startDate?.toDate
+              ? data.startDate.toDate().toISOString().slice(0, 16)
+              : data.startDate || "",
+          });
+          if (data.exams) setExamData(data.exams);
         }
       } catch (e) {
         console.error(e);
@@ -336,6 +258,7 @@ const AdminContentManager = () => {
         transition: "0.3s",
       }}
     >
+      {/* SIDEBAR */}
       <aside
         style={{
           width: "300px",
@@ -463,7 +386,7 @@ const AdminContentManager = () => {
             {isDarkMode ? "SPECTRUM: LIGHT" : "SPECTRUM: DARK"}
           </button>
           <button
-            onClick={handleLogout}
+            onClick={() => signOut(auth).then(() => navigate("/admin-gateway"))}
             style={{
               ...bottomBtnStyle(false),
               backgroundColor: "#dc2626",
@@ -517,17 +440,6 @@ const AdminContentManager = () => {
                   </button>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={handleDeleteWeek}
-                style={{
-                  ...bottomBtnStyle(false),
-                  color: "#dc2626",
-                  borderColor: "#dc262620",
-                }}
-              >
-                <Trash2 size={18} /> PURGE WEEK {weekNum}
-              </button>
             </header>
 
             <div
@@ -586,35 +498,126 @@ const AdminContentManager = () => {
                   gap: "25px",
                 }}
               >
-                {/* EXAM SECTION: Zai fito ne kawai a Week 12 da 24 */}
+                {/* 30 QUESTIONS EXAM SECTION */}
                 {(weekNum === 12 || weekNum === 24) && (
                   <div
                     style={{
+                      backgroundColor: "#dc262605",
                       padding: "30px",
                       borderRadius: "25px",
-                      backgroundColor: "#dc262605",
                       border: "2px solid #dc262620",
-                      marginBottom: "10px",
+                      marginBottom: "20px",
                     }}
                   >
-                    <label style={{ ...labelStyle, color: "#dc2626" }}>
-                      Exam Questions Setup (Week {weekNum})
-                    </label>
-                    <textarea
-                      value={content.examQuestions}
-                      onChange={(e) =>
-                        setContent({
-                          ...content,
-                          examQuestions: e.target.value,
-                        })
-                      }
-                      placeholder="Enter exam questions here..."
+                    <h3
                       style={{
-                        ...inputStyle(isDarkMode),
-                        height: "200px",
-                        border: "2px solid #dc262610",
+                        ...labelStyle,
+                        color: "#dc2626",
+                        marginBottom: "20px",
                       }}
-                    />
+                    >
+                      EXAMINATION PROTOCOL: 30 QUESTIONS
+                    </h3>
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "30px",
+                        maxHeight: "500px",
+                        overflowY: "auto",
+                        paddingRight: "10px",
+                      }}
+                    >
+                      {examData.map((ex, index) => (
+                        <div
+                          key={ex.id}
+                          style={{
+                            borderBottom: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+                            paddingBottom: "20px",
+                          }}
+                        >
+                          <label style={labelStyle}>Question {ex.id}</label>
+                          <input
+                            value={ex.question}
+                            onChange={(e) =>
+                              updateExamQuestion(
+                                index,
+                                "question",
+                                e.target.value,
+                              )
+                            }
+                            placeholder="Type question..."
+                            style={{
+                              ...inputStyle(isDarkMode),
+                              marginBottom: "10px",
+                            }}
+                          />
+                          <div
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "1fr 1fr 1fr",
+                              gap: "10px",
+                            }}
+                          >
+                            <input
+                              value={ex.optionA}
+                              onChange={(e) =>
+                                updateExamQuestion(
+                                  index,
+                                  "optionA",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Option A"
+                              style={inputStyle(isDarkMode)}
+                            />
+                            <input
+                              value={ex.optionB}
+                              onChange={(e) =>
+                                updateExamQuestion(
+                                  index,
+                                  "optionB",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Option B"
+                              style={inputStyle(isDarkMode)}
+                            />
+                            <input
+                              value={ex.optionC}
+                              onChange={(e) =>
+                                updateExamQuestion(
+                                  index,
+                                  "optionC",
+                                  e.target.value,
+                                )
+                              }
+                              placeholder="Option C"
+                              style={inputStyle(isDarkMode)}
+                            />
+                          </div>
+                          <select
+                            value={ex.correctAnswer}
+                            onChange={(e) =>
+                              updateExamQuestion(
+                                index,
+                                "correctAnswer",
+                                e.target.value,
+                              )
+                            }
+                            style={{
+                              ...inputStyle(isDarkMode),
+                              marginTop: "10px",
+                              color: "#2563eb",
+                            }}
+                          >
+                            <option value="A">Correct: Option A</option>
+                            <option value="B">Correct: Option B</option>
+                            <option value="C">Correct: Option C</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
@@ -625,39 +628,6 @@ const AdminContentManager = () => {
                     gap: "25px",
                   }}
                 >
-                  {deploymentMode === "auto" ? (
-                    <div>
-                      <label style={labelStyle}>Scheduled Release</label>
-                      <input
-                        type="datetime-local"
-                        value={content.startDate}
-                        onChange={(e) =>
-                          setContent({ ...content, startDate: e.target.value })
-                        }
-                        style={inputStyle(isDarkMode)}
-                        required
-                      />
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        padding: "20px",
-                        backgroundColor: "#2563eb10",
-                        borderRadius: "20px",
-                        border: "1px dashed #2563eb40",
-                      }}
-                    >
-                      <p
-                        style={{
-                          fontSize: "10px",
-                          fontWeight: 900,
-                          color: "#2563eb",
-                        }}
-                      >
-                        MANUAL STATUS: INSTANT BROADCAST
-                      </p>
-                    </div>
-                  )}
                   <div>
                     <label style={labelStyle}>Module Title</label>
                     <input
@@ -665,99 +635,54 @@ const AdminContentManager = () => {
                       onChange={(e) =>
                         setContent({ ...content, title: e.target.value })
                       }
-                      placeholder="Lesson Title"
                       style={inputStyle(isDarkMode)}
                       required
                     />
                   </div>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "25px",
-                  }}
-                >
                   <div>
-                    <label style={labelStyle}>YouTube Video ID</label>
+                    <label style={labelStyle}>YouTube Link/ID</label>
                     <input
                       value={content.videoUrl}
                       onChange={(e) =>
                         setContent({ ...content, videoUrl: e.target.value })
                       }
-                      placeholder="Link ko ID"
                       style={inputStyle(isDarkMode)}
                     />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Lecture PDF (Upload)</label>
-                    <div style={{ position: "relative" }}>
-                      <input
-                        type="file"
-                        accept=".pdf"
-                        onChange={(e) => setPdfFile(e.target.files[0])}
-                        style={{
-                          position: "absolute",
-                          opacity: 0,
-                          width: "100%",
-                          height: "100%",
-                          cursor: "pointer",
-                          zIndex: 2,
-                        }}
-                      />
-                      <div
-                        style={{
-                          ...inputStyle(isDarkMode),
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          borderColor: pdfFile ? "#2563eb" : "",
-                        }}
-                      >
-                        <Upload size={16} />
-                        <span style={{ fontSize: "12px", opacity: 0.7 }}>
-                          {pdfFile ? pdfFile.name : "Select PDF File"}
-                        </span>
-                      </div>
-                    </div>
-                    {uploadProgress > 0 && uploadProgress < 100 && (
-                      <div
-                        style={{
-                          width: "100%",
-                          height: "4px",
-                          backgroundColor: "#e2e8f0",
-                          marginTop: "8px",
-                          borderRadius: "10px",
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${uploadProgress}%`,
-                            height: "100%",
-                            backgroundColor: "#2563eb",
-                            transition: "0.3s",
-                          }}
-                        ></div>
-                      </div>
-                    )}
                   </div>
                 </div>
 
                 <div>
-                  <label style={labelStyle}>Assignment/Description</label>
+                  <label style={labelStyle}>Lecture PDF Node Link</label>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      value={content.pdfNode}
+                      onChange={(e) =>
+                        setContent({ ...content, pdfNode: e.target.value })
+                      }
+                      placeholder="Paste Server Link or File Node ID"
+                      style={{ ...inputStyle(isDarkMode), paddingLeft: "50px" }}
+                    />
+                    <LinkIcon
+                      size={18}
+                      style={{
+                        position: "absolute",
+                        left: "20px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        opacity: 0.5,
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Assignment Briefing</label>
                   <textarea
                     value={content.assignment}
                     onChange={(e) =>
                       setContent({ ...content, assignment: e.target.value })
                     }
-                    style={{
-                      ...inputStyle(isDarkMode),
-                      height: "120px",
-                      resize: "none",
-                    }}
-                    placeholder="Tasks for students..."
+                    style={{ ...inputStyle(isDarkMode), height: "120px" }}
                   />
                 </div>
 
@@ -765,9 +690,7 @@ const AdminContentManager = () => {
                   {loading ? (
                     <RefreshCcw className="animate-spin" />
                   ) : (
-                    <>
-                      <Save size={20} /> SYNC TO PRODUCTION
-                    </>
+                    "SYNC TO PRODUCTION"
                   )}
                 </button>
               </form>
@@ -775,7 +698,6 @@ const AdminContentManager = () => {
           </div>
         )}
 
-        {/* LOGS TAB & LIBRARY TAB remain unchanged as per your original code */}
         {activeTab === "history" && (
           <div className="animate-in slide-in-from-right duration-500">
             <h2
@@ -787,64 +709,43 @@ const AdminContentManager = () => {
             >
               SYSTEM <span style={{ color: "#2563eb" }}>LOGS</span>
             </h2>
-            <div
-              style={{ display: "flex", flexDirection: "column", gap: "15px" }}
-            >
-              {updateHistory.map((log) => (
-                <div
-                  key={log.id}
-                  style={{
-                    padding: "25px",
-                    borderRadius: "25px",
-                    backgroundColor: isDarkMode ? "#0f172a" : "white",
-                    border: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <div>
-                    <h4
-                      style={{
-                        fontWeight: 900,
-                        fontSize: "14px",
-                        color:
-                          log.action === "DELETE_NODE" ? "#dc2626" : "#2563eb",
-                      }}
-                    >
-                      {log.action}
-                    </h4>
-                    <p style={{ fontSize: "12px", fontWeight: 700 }}>
-                      {log.course?.toUpperCase()} | Week {log.week} -{" "}
-                      {log.title}
-                    </p>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <p
-                      style={{
-                        fontSize: "10px",
-                        fontWeight: 900,
-                        opacity: 0.5,
-                      }}
-                    >
-                      {log.timestamp?.toDate().toLocaleString() || "..."}
-                    </p>
-                    <span
-                      style={{
-                        fontSize: "8px",
-                        padding: "4px 8px",
-                        backgroundColor: "#2563eb10",
-                        borderRadius: "5px",
-                        color: "#2563eb",
-                        fontWeight: 900,
-                      }}
-                    >
-                      {log.mode?.toUpperCase()}
-                    </span>
-                  </div>
+            {updateHistory.map((log) => (
+              <div
+                key={log.id}
+                style={{
+                  padding: "25px",
+                  borderRadius: "25px",
+                  backgroundColor: isDarkMode ? "#0f172a" : "white",
+                  border: `1px solid ${isDarkMode ? "#1e293b" : "#e2e8f0"}`,
+                  marginBottom: "15px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <div>
+                  <h4
+                    style={{
+                      fontWeight: 900,
+                      fontSize: "14px",
+                      color: "#2563eb",
+                    }}
+                  >
+                    {log.action}
+                  </h4>
+                  <p style={{ fontSize: "12px", fontWeight: 700 }}>
+                    {log.course?.toUpperCase()} | Week {log.week} - {log.title}
+                  </p>
                 </div>
-              ))}
-            </div>
+                <div style={{ textAlign: "right" }}>
+                  <p
+                    style={{ fontSize: "10px", fontWeight: 900, opacity: 0.5 }}
+                  >
+                    {log.timestamp?.toDate().toLocaleString() || "..."}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
 
@@ -908,7 +809,7 @@ const AdminContentManager = () => {
   );
 };
 
-// TERMINAL STYLES (Kept exactly as original)
+// STYLES
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
@@ -957,10 +858,6 @@ const submitBtnStyle = {
   textTransform: "uppercase",
   letterSpacing: "2px",
   cursor: "pointer",
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: "15px",
   boxShadow: "0 15px 30px -10px rgba(0,0,0,0.4)",
 };
 const bottomBtnStyle = (dark) => ({
