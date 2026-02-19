@@ -172,7 +172,6 @@ const AdminContentManager = () => {
 
   const handleFileUpload = async (file) => {
     return new Promise((resolve, reject) => {
-      // GYARA: Tabbatar an samar da sunan file mai kyau don gujewa kuskure
       const storageRef = ref(
         storage,
         `curriculum/${selectedCourse}/week_${weekNum}/${Date.now()}_${file.name}`,
@@ -200,20 +199,24 @@ const AdminContentManager = () => {
   };
 
   const handleUpdate = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+    if (loading) return; // Prevent double trigger
+
     setLoading(true);
-    setUploadProgress(0); // Reset progress
 
     try {
       let finalPdfUrl = content.pdfUrl || "";
 
+      // 1. Process File Upload if exists
       if (pdfFile) {
         finalPdfUrl = await handleFileUpload(pdfFile);
       }
 
+      // 2. Define Start Date
       const finalStartDate =
         deploymentMode === "manual" ? new Date() : new Date(content.startDate);
 
+      // 3. Update Course Settings
       const payload = {
         ...content,
         pdfUrl: finalPdfUrl,
@@ -226,6 +229,7 @@ const AdminContentManager = () => {
 
       await setDoc(getDocRef(), payload, { merge: true });
 
+      // 4. Log the action
       await addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
         course: selectedCourse,
@@ -235,20 +239,18 @@ const AdminContentManager = () => {
         action: "UPDATE/DEPLOY",
       });
 
+      // 5. Success Feedback
+      setLoading(false); // Kashe loading kafin alert domin kada ya tsaya
       alert(
-        `SUCCESS: ${selectedCourse.toUpperCase()} - Week ${weekNum} Synchronization Complete.`,
+        `SUCCESS: ${selectedCourse.toUpperCase()} - Week ${weekNum} Sync Complete.`,
       );
 
-      setPdfFile(null);
-      setUploadProgress(0);
-
-      // UMURNI: KAI TSAYE DASHBOARD NA DALIBI
+      // 6. Direct Navigation
       navigate("/student-portal");
     } catch (err) {
+      setLoading(false);
       console.error("Sync Failure:", err);
       alert("SYNC_FAILURE: " + err.message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -644,6 +646,7 @@ const AdminContentManager = () => {
                       style={inputStyle(isDarkMode)}
                     />
                   </div>
+
                   <div>
                     <label style={labelStyle}>Lecture PDF (Upload)</label>
                     <div style={{ position: "relative" }}>
@@ -675,7 +678,7 @@ const AdminContentManager = () => {
                         </span>
                       </div>
                     </div>
-                    {uploadProgress > 0 && (
+                    {uploadProgress > 0 && uploadProgress < 100 && (
                       <div
                         style={{
                           width: "100%",
