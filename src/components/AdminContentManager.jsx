@@ -140,6 +140,15 @@ const AdminContentManager = () => {
     },
   ];
 
+  // SABON GYARA: Function dake tace YouTube ID daga kowane irin link
+  const extractVideoID = (url) => {
+    if (!url) return "";
+    const regExp =
+      /^.*((youtu.be\/)|(v\/)|(\/u\/\w\/)|(embed\/)|(watch\?))\??v?=?([^#&?]*).*/;
+    const match = url.match(regExp);
+    return match && match[7].length === 11 ? match[7] : url;
+  };
+
   const getDocRef = () =>
     doc(db, "course_settings", `${selectedCourse}_week_${weekNum}`);
 
@@ -206,23 +215,25 @@ const AdminContentManager = () => {
         finalPdfUrl = await handleFileUpload(pdfFile);
       }
 
+      // TACE VIDEO ID KAFIN TURASHI CLOUD
+      const cleanVideoID = extractVideoID(content.videoUrl);
+
       const finalStartDate =
         deploymentMode === "manual" ? new Date() : new Date(content.startDate);
 
       const payload = {
         ...content,
         pdfUrl: finalPdfUrl,
-        videoId: content.videoUrl,
+        videoId: cleanVideoID, // Muna tura tsaftataccen ID kawai
         startDate: finalStartDate,
         deploymentMode: deploymentMode,
         courseId: selectedCourse,
         updatedAt: serverTimestamp(),
       };
 
-      // GYARA: Kashe loading nan take kafin mu shiga Firestore
+      // Kashe loading nan take don bawa UI damar wucewa
       setLoading(false);
 
-      // Async Operations (Background)
       setDoc(getDocRef(), payload, { merge: true });
       addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
@@ -234,7 +245,7 @@ const AdminContentManager = () => {
       });
 
       alert(
-        `SUCCESS: ${selectedCourse.toUpperCase()} Synchronization Complete.`,
+        `SUCCESS: ${selectedCourse.toUpperCase()} Node Synced Successfully.`,
       );
       navigate("/student-portal");
     } catch (err) {
@@ -636,7 +647,7 @@ const AdminContentManager = () => {
                       onChange={(e) =>
                         setContent({ ...content, videoUrl: e.target.value })
                       }
-                      placeholder="dQw4w9WgXcQ"
+                      placeholder="e.g. dQw4w9WgXcQ ko Cikakken Link"
                       style={inputStyle(isDarkMode)}
                     />
                   </div>
