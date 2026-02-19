@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { auth, db } from "../firebaseConfig";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { LogIn, ShieldCheck, Loader2, ShieldAlert, X } from "lucide-react"; // Na ƙara X a nan
+import { LogIn, ShieldCheck, Loader2, ShieldAlert, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const StaffLogin = () => {
@@ -77,20 +77,24 @@ const StaffLogin = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-6 font-sans">
+    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-6 font-sans relative">
+      {/* UMURNI: CLOSE BUTTON INTEGRATION (An dan saukar da shi zuwa top-16) */}
+      <button
+        type="button"
+        onClick={() => navigate("/")}
+        className="absolute top-16 right-10 p-3 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all duration-300 group z-50"
+      >
+        <X
+          size={32}
+          strokeWidth={3}
+          className="group-hover:rotate-90 transition-transform duration-300"
+        />
+      </button>
+
       <form
         onSubmit={handleLogin}
         className="bg-white p-10 rounded-[3rem] shadow-2xl max-w-md w-full border border-gray-100 relative"
       >
-        {/* UMURNI: CLOSE BUTTON INTEGRATION */}
-        <button
-          type="button"
-          onClick={() => navigate("/")}
-          className="absolute top-8 right-8 p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all duration-300"
-        >
-          <X size={24} strokeWidth={3} />
-        </button>
-
         <div className="flex justify-center mb-6">
           <div className="p-4 bg-red-50 text-red-600 rounded-3xl animate-bounce">
             <ShieldCheck size={40} />
@@ -111,7 +115,7 @@ const StaffLogin = () => {
           <input
             type="email"
             placeholder="Institutional Email"
-            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 font-bold"
+            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 font-bold text-slate-900"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
@@ -119,14 +123,15 @@ const StaffLogin = () => {
           <input
             type="password"
             placeholder="Security Key"
-            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600"
+            className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 font-bold text-slate-900"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
           />
           <button
+            type="submit"
             disabled={loading}
-            className="w-full py-5 bg-red-600 text-white rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 hover:bg-red-700 transition-all"
+            className="w-full py-5 bg-red-600 text-white rounded-2xl font-black text-xs uppercase flex items-center justify-center gap-2 hover:bg-red-700 transition-all shadow-lg shadow-red-900/20"
           >
             {loading ? (
               <Loader2 className="animate-spin" />

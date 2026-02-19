@@ -11,6 +11,7 @@ import {
   limit,
   onSnapshot,
   addDoc,
+  deleteDoc, // UMURNI: Don goge bayanai
 } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useNavigate } from "react-router-dom";
@@ -187,13 +188,11 @@ const AdminContentManager = () => {
   const handleUpdate = async (e) => {
     if (e) e.preventDefault();
     setLoading(true);
-
     try {
       const isExamWeek = weekNum === 12 || weekNum === 24;
-
       const payload = {
         title: content.title || (isExamWeek ? "Official Examination" : ""),
-        startDate: new Date(content.startDate), // Scheduled Unlock Time
+        startDate: new Date(content.startDate),
         updatedAt: serverTimestamp(),
         videoId: isExamWeek ? null : extractVideoID(content.videoUrl),
         pdfNode: isExamWeek ? null : content.pdfNode,
@@ -202,7 +201,6 @@ const AdminContentManager = () => {
         examRules: isExamWeek ? content.examRules : null,
         durationMinutes: isExamWeek ? 60 : null,
       };
-
       await setDoc(getDocRef(), payload, { merge: true });
       await addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
@@ -212,7 +210,6 @@ const AdminContentManager = () => {
         timestamp: serverTimestamp(),
         action: isExamWeek ? "EXAM_DEPLOY" : "SYNC_COMPLETE",
       });
-
       setLoading(false);
       alert(
         isExamWeek
@@ -223,6 +220,54 @@ const AdminContentManager = () => {
     } catch (err) {
       setLoading(false);
       alert("SYNC_FAILURE: " + err.message);
+    }
+  };
+
+  // UMURNI: Function don goge karatun week
+  const handleDeleteContent = async () => {
+    const confirmDelete = window.confirm(
+      `SURE_PROTOCOL: Shin ka tabbata kana so ka goge dukkan karatun ${selectedCourse.replace("_", " ").toUpperCase()} Week ${weekNum}?`,
+    );
+    if (!confirmDelete) return;
+
+    setLoading(true);
+    try {
+      await deleteDoc(getDocRef()); // Goge dukkan bayanan sati daga Firestore
+      await addDoc(collection(db, "deployment_logs"), {
+        week: weekNum,
+        course: selectedCourse,
+        title: "Content Deleted",
+        mode: "manual",
+        timestamp: serverTimestamp(),
+        action: "NODE_DELETED",
+      });
+
+      // Reset local state bayan an goge
+      setContent({
+        title: "",
+        videoUrl: "",
+        pdfNode: "",
+        assignment: "",
+        startDate: "",
+        examRules:
+          "1. No external resources.\n2. 60 Minutes duration.\n3. One attempt only.",
+      });
+      setExamData(
+        Array.from({ length: 50 }, (_, i) => ({
+          id: i + 1,
+          question: "",
+          optionA: "",
+          optionB: "",
+          optionC: "",
+          correctAnswer: "A",
+        })),
+      );
+
+      setLoading(false);
+      alert("SUCCESS: An goge bayanan wannan satin gaba daya.");
+    } catch (err) {
+      setLoading(false);
+      alert("DELETE_FAILURE: " + err.message);
     }
   };
 
@@ -262,6 +307,27 @@ const AdminContentManager = () => {
             }
             setExamData(loadedExams);
           }
+        } else {
+          // Reset idan babu komai a firestore
+          setContent({
+            title: "",
+            videoUrl: "",
+            pdfNode: "",
+            assignment: "",
+            startDate: "",
+            examRules:
+              "1. No external resources.\n2. 60 Minutes duration.\n3. One attempt only.",
+          });
+          setExamData(
+            Array.from({ length: 50 }, (_, i) => ({
+              id: i + 1,
+              question: "",
+              optionA: "",
+              optionB: "",
+              optionC: "",
+              correctAnswer: "A",
+            })),
+          );
         }
       } catch (e) {
         console.error(e);
@@ -456,7 +522,6 @@ const AdminContentManager = () => {
                 boxShadow: "0 40px 80px -20px rgba(0,0,0,0.2)",
               }}
             >
-              {/* UMURNI: Set time for EVERY week including 12 and 24 */}
               <div
                 style={{
                   marginBottom: "40px",
@@ -482,17 +547,6 @@ const AdminContentManager = () => {
                   style={inputStyle(isDarkMode)}
                   required
                 />
-                <p
-                  style={{
-                    fontSize: "10px",
-                    fontWeight: "bold",
-                    marginTop: "10px",
-                    opacity: 0.6,
-                  }}
-                >
-                  Warning: Week {weekNum} will remain locked until this precise
-                  time.
-                </p>
               </div>
 
               <div
@@ -569,7 +623,6 @@ const AdminContentManager = () => {
                         SECURE EXAM PROTOCOL (50 QUESTIONS / 1 HOUR)
                       </h3>
                     </div>
-                    <label style={labelStyle}>Exam Instructions (Rules)</label>
                     <textarea
                       value={content.examRules}
                       onChange={(e) =>
@@ -610,7 +663,6 @@ const AdminContentManager = () => {
                                 e.target.value,
                               )
                             }
-                            placeholder="Type question..."
                             style={{
                               ...inputStyle(isDarkMode),
                               marginBottom: "10px",
@@ -715,7 +767,6 @@ const AdminContentManager = () => {
                       </div>
                     </div>
                     <div>
-                      {/* UMURNI: PDF Secure link entry */}
                       <label style={labelStyle}>
                         <FileText
                           size={14}
@@ -729,7 +780,7 @@ const AdminContentManager = () => {
                           onChange={(e) =>
                             setContent({ ...content, pdfNode: e.target.value })
                           }
-                          placeholder="Paste Secure PDF Storage Link"
+                          placeholder="Paste Link"
                           style={{
                             ...inputStyle(isDarkMode),
                             paddingLeft: "50px",
@@ -759,21 +810,52 @@ const AdminContentManager = () => {
                     </div>
                   </>
                 )}
-                <button
-                  type="submit"
-                  disabled={loading}
+
+                {/* ACTIONS SECTION */}
+                <div
                   style={{
-                    ...submitBtnStyle,
-                    backgroundColor:
-                      weekNum === 12 || weekNum === 24 ? "#dc2626" : "#2563eb",
+                    display: "grid",
+                    gridTemplateColumns: "1fr 80px",
+                    gap: "15px",
+                    marginTop: "20px",
                   }}
                 >
-                  {loading ? (
-                    <RefreshCcw className="animate-spin" />
-                  ) : (
-                    "SYNC TO PRODUCTION"
-                  )}
-                </button>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    style={{
+                      ...submitBtnStyle,
+                      backgroundColor:
+                        weekNum === 12 || weekNum === 24
+                          ? "#dc2626"
+                          : "#2563eb",
+                    }}
+                  >
+                    {loading ? (
+                      <RefreshCcw className="animate-spin" />
+                    ) : (
+                      "SYNC TO PRODUCTION"
+                    )}
+                  </button>
+
+                  {/* UMURNI: Maballin Goge Karatu */}
+                  <button
+                    type="button"
+                    onClick={handleDeleteContent}
+                    disabled={loading}
+                    style={{
+                      ...submitBtnStyle,
+                      backgroundColor: "#ef4444",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      padding: "0",
+                    }}
+                    title="Delete this Week"
+                  >
+                    <Trash2 size={24} />
+                  </button>
+                </div>
               </form>
             </div>
           </div>
@@ -809,7 +891,8 @@ const AdminContentManager = () => {
                     style={{
                       fontWeight: 900,
                       fontSize: "14px",
-                      color: "#2563eb",
+                      color:
+                        log.action === "NODE_DELETED" ? "#ef4444" : "#2563eb",
                     }}
                   >
                     {log.action}
@@ -830,6 +913,7 @@ const AdminContentManager = () => {
           </div>
         )}
 
+        {/* RESEARCH REPO PRESERVED */}
         {activeTab === "library" && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {libraryLinks.map((lib, i) => (

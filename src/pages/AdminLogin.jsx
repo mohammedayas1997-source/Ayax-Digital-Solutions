@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { auth, db } from "../firebaseConfig";
 import { signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import { ShieldCheck, Loader2, ShieldAlert, X } from "lucide-react"; // Na ƙara X a nan
+import { ShieldCheck, Loader2, ShieldAlert, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const StaffLogin = () => {
@@ -85,17 +85,18 @@ const StaffLogin = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 px-6 font-sans relative">
-      {/* UMURNI: CLOSE BUTTON INTEGRATION */}
+      {/* UMURNI: CLOSE BUTTON INTEGRATION (An dan saukar da shi kasa zuwa top-16) */}
       <button
         type="button"
         onClick={() => navigate("/")}
-        className="absolute top-10 right-10 p-3 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all duration-300 group"
+        className="absolute top-16 right-10 p-3 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all duration-300 group z-50"
       >
         <X
-          size={28}
+          size={32}
           strokeWidth={3}
           className="group-hover:rotate-90 transition-transform duration-300"
         />
+        <span className="sr-only">Close Portal</span>
       </button>
 
       <form
@@ -125,8 +126,8 @@ const StaffLogin = () => {
             </label>
             <input
               type="email"
-              placeholder="e.g. admin@ayax.com"
-              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 font-bold transition-all"
+              placeholder="admin@ayax.com"
+              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 font-bold transition-all text-slate-900"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -140,7 +141,7 @@ const StaffLogin = () => {
             <input
               type="password"
               placeholder="••••••••"
-              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 font-bold transition-all"
+              className="w-full p-4 bg-gray-50 border border-gray-200 rounded-2xl outline-none focus:ring-2 focus:ring-red-600 font-bold transition-all text-slate-900"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required

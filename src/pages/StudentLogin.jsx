@@ -13,7 +13,7 @@ import {
   Loader2,
   UserCheck,
   KeyRound,
-  X, // Na shigo da X icon
+  X,
 } from "lucide-react";
 
 const StudentLogin = () => {
@@ -94,12 +94,17 @@ const StudentLogin = () => {
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-6 selection:bg-blue-600 selection:text-white font-sans relative">
-      {/* UMURNI: CLOSE BUTTON INTEGRATION */}
+      {/* UMURNI: CLOSE BUTTON INTEGRATION (An dan saukar da shi zuwa top-16) */}
       <button
+        type="button"
         onClick={() => navigate("/")}
-        className="absolute top-10 right-10 p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all duration-300"
+        className="absolute top-16 right-10 p-3 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all duration-300 group z-50"
       >
-        <X size={28} strokeWidth={3} />
+        <X
+          size={32}
+          strokeWidth={3}
+          className="group-hover:rotate-90 transition-transform duration-300"
+        />
       </button>
 
       <div className="max-w-md w-full relative">
@@ -125,7 +130,7 @@ const StudentLogin = () => {
               type="email"
               placeholder="e.g. abubakar@ayax.com"
               required
-              className="w-full p-6 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all font-medium text-sm shadow-sm lowercase"
+              className="w-full p-6 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all font-medium text-sm shadow-sm lowercase text-slate-900"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
@@ -148,13 +153,14 @@ const StudentLogin = () => {
               type="password"
               placeholder="••••••••"
               required
-              className="w-full p-6 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all font-medium text-sm shadow-sm"
+              className="w-full p-6 bg-gray-50 border-2 border-transparent rounded-2xl outline-none focus:border-blue-600 focus:bg-white transition-all font-medium text-sm shadow-sm text-slate-900"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
 
           <button
+            type="submit"
             disabled={loading}
             className="w-full py-6 bg-blue-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.4em] flex items-center justify-center gap-3 hover:bg-blue-700 transition-all shadow-xl shadow-blue-100 disabled:opacity-50 active:scale-95 mt-4"
           >
