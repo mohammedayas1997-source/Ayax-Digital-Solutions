@@ -205,6 +205,9 @@ const StudentPortal = () => {
         });
         setWeeksData(data);
       },
+      (error) => {
+        console.error("Course Settings Error:", error);
+      },
     );
     return () => unsubWeeks();
   }, []);
@@ -218,28 +221,36 @@ const StudentPortal = () => {
       try {
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
+
         if (userSnap.exists()) {
           const data = userSnap.data();
           setStudentData({ id: user.uid, ...data });
           if (data.selectedCourseId) setSelectedCourseId(data.selectedCourseId);
+
           const courseStartDate = new Date("2026-01-01");
           const diffTime = new Date() - courseStartDate;
           const weekCount =
             Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
           setCurrentWeek(weekCount > 24 ? 24 : weekCount < 1 ? 1 : weekCount);
+
           await updateDoc(userRef, {
             lastOnline: serverTimestamp(),
             status: "Active",
             currentActivity: "Browsing Portal",
           });
+        } else {
+          // GYARA: Idan babu user data, dole mu kashe loading don nuna course selection
+          console.warn("User document not found in Firestore.");
         }
+
         const examRef = doc(db, `students/${user.uid}/exams/midterm`);
         const examSnap = await getDoc(examRef);
         if (examSnap.exists() && examSnap.data().status === "passed")
           setHasPassedMidterm(true);
       } catch (error) {
-        console.error("Portal Error:", error);
+        console.error("Portal Initialization Error:", error);
       } finally {
+        // GYARA: Tabbatar cewa loading ya tsaya ko da an samu error
         setLoading(false);
       }
     });
@@ -289,13 +300,29 @@ const StudentPortal = () => {
   const handleInitialCourseSelection = async (courseId) => {
     setLoading(true);
     try {
-      await updateDoc(doc(db, "users", auth.currentUser.uid), {
+      // GYARA: Amfani da setDoc maimakon updateDoc idan document din babu shi
+      const userRef = doc(db, "users", auth.currentUser.uid);
+      const userSnap = await getDoc(userRef);
+
+      const selectionData = {
         selectedCourseId: courseId,
         courseSelectionDate: serverTimestamp(),
-      });
+      };
+
+      if (userSnap.exists()) {
+        await updateDoc(userRef, selectionData);
+      } else {
+        // Idan sabon user ne da bashi da record
+        await setDoc(userRef, {
+          fullName: auth.currentUser.displayName || "Student",
+          email: auth.currentUser.email,
+          ...selectionData,
+        });
+      }
       setSelectedCourseId(courseId);
     } catch (err) {
-      alert("Selection Error");
+      console.error(err);
+      alert("Selection Error: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -316,9 +343,9 @@ const StudentPortal = () => {
     if (!newPrivateMsg.trim()) return;
     await addDoc(collection(db, "private_chats"), {
       text: newPrivateMsg,
-      sender: studentData.fullName,
+      sender: studentData?.fullName || "Student",
       senderRole: "student",
-      studentId: studentData.id,
+      studentId: studentData?.id,
       createdAt: serverTimestamp(),
     });
     setNewPrivateMsg("");
@@ -342,7 +369,9 @@ const StudentPortal = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center font-black text-blue-600 bg-slate-950">
         <Loader2 className="animate-spin mb-4" size={48} />
-        <p className="tracking-widest animate-pulse">INITIALIZING SYSTEMS...</p>
+        <p className="tracking-widest animate-pulse uppercase">
+          Syncing Security Protocols...
+        </p>
       </div>
     );
 
@@ -469,8 +498,6 @@ const StudentPortal = () => {
                       <CheckCircle size={10} className="text-emerald-500" />
                     )}
                   </div>
-
-                  {/* UMURNI: NUNA DATE DA TIME DA EXAM LABELS */}
                   <div className="mt-1 ml-9 flex flex-col gap-0.5">
                     {weekSet?.startDate && (
                       <span
@@ -527,7 +554,7 @@ const StudentPortal = () => {
               <Award className="absolute -right-10 -bottom-10 w-64 h-64 opacity-10 rotate-12" />
               <div className="relative z-10">
                 <h2 className="text-6xl font-black italic tracking-tighter mb-4 uppercase">
-                  {selectedCourseId.replace("_", " ")}
+                  {selectedCourseId?.replace("_", " ")}
                 </h2>
                 <p className="text-lg font-bold opacity-80 max-w-xl">
                   Welcome, {studentData?.fullName}. Processing node data for
@@ -676,7 +703,7 @@ const StudentPortal = () => {
           </div>
         )}
 
-        {/* Discussions and Chat tabs remain same to preserve code integrity */}
+        {/* Discussions & Chat are kept exactly as original but with data safety */}
         {activeTab === "discussions" && (
           <div className="animate-in fade-in duration-500">
             {viewState === "list" && (
