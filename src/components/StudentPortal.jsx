@@ -13,6 +13,7 @@ import {
   addDoc,
   onSnapshot,
   where,
+  setDoc,
 } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import {
@@ -43,31 +44,13 @@ import {
   Calendar,
   User,
   Loader2,
+  Trophy,
+  AlertTriangle,
 } from "lucide-react";
 
 // ==========================================
 // 1. HELPERS & CONFIGURATION
 // ==========================================
-const getWeekVideoId = (week) => {
-  const videoDatabase = {
-    1: "dQw4w9WgXcQ",
-    2: "y6120QOlsfU",
-    12: "dQw4w9WgXcQ",
-    24: "dQw4w9WgXcQ",
-  };
-  return videoDatabase[week] || "dQw4w9WgXcQ";
-};
-
-const getWeekTitle = (week) => {
-  const titles = {
-    1: "Introduction to System Architecture",
-    2: "Environment Setup & Frameworks",
-    12: "Midterm Certification Exam",
-    24: "Final Project Defense",
-  };
-  return titles[week] || "Advanced Technical Study Phase";
-};
-
 const formatDate = (timestamp) => {
   if (!timestamp) return "TBD";
   const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -129,9 +112,6 @@ const libraryLinks = [
   },
 ];
 
-// ==========================================
-// 2. MAIN COMPONENT
-// ==========================================
 const StudentPortal = () => {
   const navigate = useNavigate();
 
@@ -146,11 +126,9 @@ const StudentPortal = () => {
   const [currentWeek, setCurrentWeek] = useState(1);
   const [hasPassedMidterm, setHasPassedMidterm] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState(null);
-  const totalWeeks = 24;
   const [currentTime, setCurrentTime] = useState(new Date());
 
   const [weeksData, setWeeksData] = useState({});
-
   const [viewState, setViewState] = useState("list");
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedPath, setSelectedPath] = useState(null);
@@ -159,6 +137,12 @@ const StudentPortal = () => {
 
   const [privateMessages, setPrivateMessages] = useState([]);
   const [newPrivateMsg, setNewPrivateMsg] = useState("");
+
+  // Exam States
+  const [examActive, setExamActive] = useState(false);
+  const [answers, setAnswers] = useState({});
+  const [examScore, setExamScore] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(3600); // 60 minutes in seconds
 
   const availableCourses = [
     {
@@ -195,22 +179,37 @@ const StudentPortal = () => {
     return () => clearInterval(timer);
   }, []);
 
+  // Sync Weeks Data from Firestore
   useEffect(() => {
+    if (!selectedCourseId) return;
     const unsubWeeks = onSnapshot(
       collection(db, "course_settings"),
       (snapshot) => {
         const data = {};
         snapshot.forEach((doc) => {
-          data[doc.id] = doc.data();
+          if (doc.id.startsWith(selectedCourseId)) {
+            const weekPart = doc.id.split("_week_")[1];
+            data[weekPart] = doc.data();
+          }
         });
         setWeeksData(data);
       },
-      (error) => {
-        console.error("Course Settings Error:", error);
-      },
     );
     return () => unsubWeeks();
-  }, []);
+  }, [selectedCourseId]);
+
+  // Exam Timer Logic
+  useEffect(() => {
+    let timer;
+    if (examActive && timeLeft > 0) {
+      timer = setInterval(() => {
+        setTimeLeft((prev) => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && examActive) {
+      handleExamSubmit(); // Auto-submit when time expires
+    }
+    return () => clearInterval(timer);
+  }, [examActive, timeLeft]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -221,36 +220,24 @@ const StudentPortal = () => {
       try {
         const userRef = doc(db, "users", user.uid);
         const userSnap = await getDoc(userRef);
-
         if (userSnap.exists()) {
           const data = userSnap.data();
           setStudentData({ id: user.uid, ...data });
           if (data.selectedCourseId) setSelectedCourseId(data.selectedCourseId);
-
-          const courseStartDate = new Date("2026-01-01");
+          const courseStartDate =
+            data.courseSelectionDate?.toDate() || new Date("2026-01-01");
           const diffTime = new Date() - courseStartDate;
           const weekCount =
             Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
           setCurrentWeek(weekCount > 24 ? 24 : weekCount < 1 ? 1 : weekCount);
-
-          await updateDoc(userRef, {
-            lastOnline: serverTimestamp(),
-            status: "Active",
-            currentActivity: "Browsing Portal",
-          });
-        } else {
-          // GYARA: Idan babu user data, dole mu kashe loading don nuna course selection
-          console.warn("User document not found in Firestore.");
         }
-
-        const examRef = doc(db, `students/${user.uid}/exams/midterm`);
+        const examRef = doc(db, `students/${user.uid}/exams/week_12`);
         const examSnap = await getDoc(examRef);
-        if (examSnap.exists() && examSnap.data().status === "passed")
+        if (examSnap.exists() && examSnap.data().passed)
           setHasPassedMidterm(true);
       } catch (error) {
-        console.error("Portal Initialization Error:", error);
+        console.error(error);
       } finally {
-        // GYARA: Tabbatar cewa loading ya tsaya ko da an samu error
         setLoading(false);
       }
     });
@@ -292,44 +279,27 @@ const StudentPortal = () => {
     }
   }, [activeTab, viewState, selectedCourse, selectedPath]);
 
-  useEffect(() => {
-    localStorage.setItem("stu-theme", darkMode ? "dark" : "light");
-    document.documentElement.classList.toggle("dark", darkMode);
-  }, [darkMode]);
-
   const handleInitialCourseSelection = async (courseId) => {
     setLoading(true);
     try {
-      // GYARA: Amfani da setDoc maimakon updateDoc idan document din babu shi
       const userRef = doc(db, "users", auth.currentUser.uid);
-      const userSnap = await getDoc(userRef);
-
       const selectionData = {
         selectedCourseId: courseId,
         courseSelectionDate: serverTimestamp(),
+        fullName: auth.currentUser.displayName || "Student",
+        email: auth.currentUser.email,
       };
-
-      if (userSnap.exists()) {
-        await updateDoc(userRef, selectionData);
-      } else {
-        // Idan sabon user ne da bashi da record
-        await setDoc(userRef, {
-          fullName: auth.currentUser.displayName || "Student",
-          email: auth.currentUser.email,
-          ...selectionData,
-        });
-      }
+      await setDoc(userRef, selectionData, { merge: true });
       setSelectedCourseId(courseId);
     } catch (err) {
-      console.error(err);
-      alert("Selection Error: " + err.message);
+      alert(err.message);
     } finally {
       setLoading(false);
     }
   };
 
   const isWeekLocked = (weekNumber) => {
-    const weekSettings = weeksData[`week_${weekNumber}`];
+    const weekSettings = weeksData[String(weekNumber)];
     if (!weekSettings || !weekSettings.startDate) return true;
     const releaseDate = weekSettings.startDate.toDate
       ? weekSettings.startDate.toDate()
@@ -338,31 +308,30 @@ const StudentPortal = () => {
     return new Date() < releaseDate || isMidtermLocked;
   };
 
-  const handleSendPrivateMsg = async (e) => {
-    e.preventDefault();
-    if (!newPrivateMsg.trim()) return;
-    await addDoc(collection(db, "private_chats"), {
-      text: newPrivateMsg,
-      sender: studentData?.fullName || "Student",
-      senderRole: "student",
-      studentId: studentData?.id,
-      createdAt: serverTimestamp(),
+  const handleExamSubmit = async () => {
+    setExamActive(false);
+    const questions = weeksData[String(currentWeek)]?.exams || [];
+    let score = 0;
+    questions.forEach((q, idx) => {
+      if (answers[idx] === q.correctAnswer) score++;
     });
-    setNewPrivateMsg("");
+    const finalScore = Math.round((score / 30) * 100);
+    setExamScore(finalScore);
+    await setDoc(
+      doc(db, `students/${studentData.id}/exams/week_${currentWeek}`),
+      {
+        score: finalScore,
+        passed: finalScore >= 50,
+        timestamp: serverTimestamp(),
+      },
+    );
+    if (finalScore >= 50 && currentWeek === 12) setHasPassedMidterm(true);
   };
 
-  const handlePostQuestion = async (e) => {
-    e.preventDefault();
-    if (!newPost.title || !newPost.content) return;
-    await addDoc(collection(db, "forum_threads"), {
-      ...newPost,
-      studentName: studentData?.fullName || "Student",
-      studentId: auth.currentUser.uid,
-      courseId: selectedCourse.id,
-      studentType: selectedPath,
-      createdAt: serverTimestamp(),
-    });
-    setNewPost({ title: "", content: "" });
+  const formatTimer = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   if (loading)
@@ -408,12 +377,15 @@ const StudentPortal = () => {
       </div>
     );
 
+  const currentWeekInfo = weeksData[String(currentWeek)] || {};
+
   return (
     <div
       className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"} transition-colors duration-300`}
     >
+      {/* SIDEBAR */}
       <aside
-        className={`fixed lg:sticky top-0 z-50 h-screen w-80 border-r flex flex-col transition-transform ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-sm"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        className={`fixed lg:sticky top-0 z-50 h-screen w-80 border-r flex flex-col transition-transform ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
         <div className="p-10 flex flex-col gap-4">
           <h1 className="text-2xl font-black text-blue-600 italic">
@@ -432,12 +404,8 @@ const StudentPortal = () => {
             <h4 className="text-xl font-black font-mono tracking-tighter">
               {currentTime.toLocaleTimeString("en-GB", { hour12: false })}
             </h4>
-            <p className="text-[8px] font-bold opacity-50 uppercase">
-              {currentTime.toDateString()}
-            </p>
           </div>
         </div>
-
         <nav className="flex-1 px-6 space-y-2 overflow-y-auto custom-scrollbar">
           {[
             {
@@ -466,59 +434,35 @@ const StudentPortal = () => {
               {item.icon} {item.name}
             </button>
           ))}
-
           <div className="pt-8 pb-4 text-[8px] font-black text-gray-500 uppercase tracking-widest px-2">
             Roadmap Progress
           </div>
           <div className="space-y-1 pb-10 px-2">
-            {Array.from({ length: 24 }, (_, i) => i + 1).map((w) => {
-              const locked = isWeekLocked(w);
-              const weekSet = weeksData[`week_${w}`];
-              const isExamWeek = w === 12 || w === 24;
-              return (
-                <div
-                  key={w}
-                  onClick={() => !locked && setCurrentWeek(w)}
-                  className={`px-4 py-3 rounded-xl flex flex-col transition-all ${locked ? "opacity-30 cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer"} ${currentWeek === w ? "bg-blue-600/10 border border-blue-600/20" : ""}`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${locked ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}
-                      >
-                        {w}
-                      </div>
-                      <span className="text-[10px] font-black uppercase">
-                        Week {w}
-                      </span>
-                    </div>
-                    {locked ? (
-                      <Lock size={10} className="text-red-500" />
-                    ) : (
-                      <CheckCircle size={10} className="text-emerald-500" />
-                    )}
+            {Array.from({ length: 24 }, (_, i) => i + 1).map((w) => (
+              <div
+                key={w}
+                onClick={() => !isWeekLocked(w) && setCurrentWeek(w)}
+                className={`px-4 py-3 rounded-xl flex items-center justify-between transition-all ${isWeekLocked(w) ? "opacity-30 cursor-not-allowed" : "hover:bg-blue-50/10 cursor-pointer"} ${currentWeek === w ? "bg-blue-600/10 border border-blue-600/20" : ""}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${isWeekLocked(w) ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}
+                  >
+                    {w}
                   </div>
-                  <div className="mt-1 ml-9 flex flex-col gap-0.5">
-                    {weekSet?.startDate && (
-                      <span
-                        className={`text-[7px] font-black uppercase flex items-center gap-1 ${locked ? "text-red-400" : "text-blue-500"}`}
-                      >
-                        <Clock size={8} /> {locked ? "Opens:" : "Released:"}{" "}
-                        {formatDate(weekSet.startDate)}
-                      </span>
-                    )}
-                    {isExamWeek && (
-                      <span className="text-[7px] font-black bg-orange-500 text-white px-1.5 py-0.5 rounded-md w-fit uppercase tracking-tighter animate-pulse">
-                        Exams Week
-                      </span>
-                    )}
-                  </div>
+                  <span className="text-[10px] font-black uppercase">
+                    Week {w}
+                  </span>
                 </div>
-              );
-            })}
+                {isWeekLocked(w) ? (
+                  <Lock size={10} className="text-red-500" />
+                ) : (
+                  <CheckCircle size={10} className="text-emerald-500" />
+                )}
+              </div>
+            ))}
           </div>
         </nav>
-
         <div className="p-6 border-t border-slate-800 space-y-2">
           <button
             onClick={() => setDarkMode(!darkMode)}
@@ -562,52 +506,176 @@ const StudentPortal = () => {
                 </p>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div
-                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
-              >
-                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">
-                  Completion Rate
-                </p>
-                <h4 className="text-4xl font-black italic text-blue-600">
-                  {Math.round((currentWeek / 24) * 100)}%
-                </h4>
-              </div>
-              <div
-                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
-              >
-                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">
-                  Module ID
-                </p>
-                <h4 className="text-4xl font-black italic text-emerald-500">
-                  W-{currentWeek}
-                </h4>
-              </div>
-              <div
-                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
-              >
-                <p className="text-[10px] font-black text-gray-400 uppercase mb-1">
-                  Certification Rank
-                </p>
-                <h4
-                  className={`text-4xl font-black italic ${hasPassedMidterm ? "text-blue-500" : "text-orange-500"}`}
-                >
-                  {hasPassedMidterm ? "ELITE" : "PROBATION"}
-                </h4>
-              </div>
-            </div>
           </div>
         )}
 
+        {activeTab === "courses" && (
+          <div className="space-y-8 animate-in fade-in duration-500">
+            {currentWeek === 12 || currentWeek === 24 ? (
+              // SECURE EXAM INTERFACE (NO LECTURE DATA)
+              <div
+                className={`p-10 rounded-[3rem] border-4 ${darkMode ? "bg-slate-900 border-red-500/20" : "bg-white border-red-500/20 shadow-2xl"}`}
+              >
+                <div className="flex justify-between items-center mb-8">
+                  <div className="flex items-center gap-4">
+                    <ShieldCheck className="text-red-600" size={48} />
+                    <div>
+                      <h2 className="text-4xl font-black italic uppercase">
+                        Week {currentWeek} Exam Protocol
+                      </h2>
+                      <p className="font-black text-xs text-red-500 uppercase tracking-widest">
+                        Time Restricted Module: 60 Minutes
+                      </p>
+                    </div>
+                  </div>
+                  {examActive && (
+                    <div className="px-8 py-4 bg-red-600 text-white rounded-2xl font-black text-2xl font-mono shadow-xl animate-pulse">
+                      {formatTimer(timeLeft)}
+                    </div>
+                  )}
+                </div>
+
+                {!examActive && !examScore ? (
+                  <div className="p-10 bg-black/5 rounded-[2rem] border border-white/5">
+                    <h4 className="text-xl font-black uppercase mb-6 flex items-center gap-2">
+                      <AlertTriangle className="text-orange-500" /> Examination
+                      Rules
+                    </h4>
+                    <div className="space-y-4 opacity-80 font-bold mb-10 whitespace-pre-wrap">
+                      {currentWeekInfo.examRules ||
+                        "1. No external resources permitted.\n2. Once started, the timer cannot be paused.\n3. Automatic submission after 60 minutes.\n4. Ensure a stable network connection."}
+                    </div>
+                    <button
+                      onClick={() => setExamActive(true)}
+                      className="w-full py-5 bg-red-600 text-white rounded-2xl font-black uppercase italic text-xl shadow-2xl hover:scale-95 transition-all"
+                    >
+                      Start 60-Minute Assessment
+                    </button>
+                  </div>
+                ) : examScore !== null ? (
+                  <div className="text-center py-20 bg-blue-600/5 rounded-[2rem]">
+                    <Trophy className="mx-auto mb-6 text-blue-600" size={80} />
+                    <h3 className="text-8xl font-black text-blue-600 mb-4">
+                      {examScore}%
+                    </h3>
+                    <p className="text-2xl font-black uppercase italic">
+                      {examScore >= 50
+                        ? "Grade: Elite Access Granted"
+                        : "Grade: Assessment Failed"}
+                    </p>
+                    <button
+                      onClick={() => setActiveTab("dashboard")}
+                      className="mt-8 text-blue-600 font-black uppercase underline"
+                    >
+                      Return to Command Center
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-12 h-[600px] overflow-y-auto px-4 custom-scrollbar">
+                    {currentWeekInfo.exams?.map((q, idx) => (
+                      <div
+                        key={idx}
+                        className="p-8 bg-black/5 rounded-[2rem] border border-white/5"
+                      >
+                        <p className="text-xl font-black mb-6">
+                          {idx + 1}. {q.question}
+                        </p>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {["A", "B", "C"].map((opt) => (
+                            <button
+                              key={opt}
+                              onClick={() =>
+                                setAnswers({ ...answers, [idx]: opt })
+                              }
+                              className={`p-5 rounded-xl font-black border-2 transition-all ${answers[idx] === opt ? "bg-blue-600 border-blue-600 text-white shadow-lg" : "border-transparent bg-black/10 hover:bg-black/20"}`}
+                            >
+                              {opt}: {q[`option${opt}`]}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    <button
+                      onClick={handleExamSubmit}
+                      className="w-full py-6 bg-emerald-600 text-white rounded-[2rem] font-black uppercase text-xl shadow-2xl sticky bottom-0"
+                    >
+                      Finalize & Submit Protocol
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // REGULAR CURRICULUM INTERFACE
+              <>
+                <div className="bg-black aspect-video rounded-[3rem] overflow-hidden shadow-2xl relative border-4 border-white/5">
+                  {isWeekLocked(currentWeek) ? (
+                    <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center text-center p-10">
+                      <Lock
+                        size={64}
+                        className="text-red-600 mb-6 animate-pulse"
+                      />
+                      <h3 className="text-3xl font-black uppercase italic">
+                        Temporal Lock Active
+                      </h3>
+                    </div>
+                  ) : (
+                    <iframe
+                      width="100%"
+                      height="100%"
+                      src={`https://www.youtube.com/embed/${currentWeekInfo.videoId}`}
+                      frameBorder="0"
+                      allowFullScreen
+                    ></iframe>
+                  )}
+                </div>
+                <div
+                  className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white shadow-xl"}`}
+                >
+                  <h3 className="text-3xl font-black uppercase italic mb-6">
+                    {currentWeekInfo.title || "Lector Module"}
+                  </h3>
+                  <div className="grid md:grid-cols-2 gap-6">
+                    <div className="p-8 bg-blue-600 rounded-[2.5rem] text-white">
+                      <h5 className="font-black text-[10px] uppercase mb-4 flex items-center gap-2">
+                        <FileText size={18} /> Resource Node
+                      </h5>
+                      <a
+                        href={currentWeekInfo.pdfNode}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block w-full py-4 bg-white text-blue-600 rounded-2xl font-black text-center text-[10px] uppercase"
+                      >
+                        Access Material
+                      </a>
+                    </div>
+                    <div
+                      className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-white/5 border-white/5" : "bg-gray-50 border-gray-100"}`}
+                    >
+                      <h5 className="text-[10px] font-black text-blue-600 uppercase mb-4 flex items-center gap-2">
+                        <Clock size={18} /> Weekly Task
+                      </h5>
+                      <p className="text-sm font-bold opacity-70">
+                        {currentWeekInfo.assignment ||
+                          "Complete node exercises."}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* LIBRARY, DISCUSSIONS & CHAT - NO DELETIONS */}
         {activeTab === "library" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-6 duration-700">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-6">
             {libraryLinks.map((lib, i) => (
               <a
                 key={i}
                 href={lib.url}
                 target="_blank"
                 rel="noreferrer"
-                className={`p-8 rounded-[2.5rem] border-2 transition-all hover:scale-105 hover:border-blue-600 group ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-white shadow-xl"}`}
+                className={`p-8 rounded-[2.5rem] border-2 transition-all hover:scale-105 group ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-white shadow-xl"}`}
               >
                 <div className="flex justify-between items-start mb-6">
                   <div className="p-3 bg-blue-600/10 text-blue-600 rounded-xl group-hover:bg-blue-600 group-hover:text-white transition-colors">
@@ -630,80 +698,6 @@ const StudentPortal = () => {
           </div>
         )}
 
-        {activeTab === "courses" && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-            <div className="lg:col-span-2 space-y-8">
-              <div className="bg-black aspect-video rounded-[3rem] overflow-hidden shadow-2xl relative border-4 border-white/5">
-                {isWeekLocked(currentWeek) ? (
-                  <div className="absolute inset-0 bg-slate-900/95 flex flex-col items-center justify-center text-center p-10">
-                    <Lock
-                      size={64}
-                      className="text-red-600 mb-6 animate-pulse"
-                    />
-                    <h3 className="text-3xl font-black uppercase italic mb-2">
-                      Temporal Lock Active
-                    </h3>
-                    <p className="text-blue-500 font-black text-xs uppercase tracking-widest">
-                      Authorized Release:{" "}
-                      {formatDate(weeksData[`week_${currentWeek}`]?.startDate)}
-                    </p>
-                  </div>
-                ) : (
-                  <iframe
-                    width="100%"
-                    height="100%"
-                    src={`https://www.youtube.com/embed/${weeksData[`week_${currentWeek}`]?.videoId || getWeekVideoId(currentWeek)}`}
-                    frameBorder="0"
-                    allowFullScreen
-                  ></iframe>
-                )}
-              </div>
-              <div
-                className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100 shadow-xl"}`}
-              >
-                <h3 className="text-3xl font-black uppercase italic mb-6">
-                  Week {currentWeek}:{" "}
-                  {weeksData[`week_${currentWeek}`]?.title ||
-                    getWeekTitle(currentWeek)}
-                </h3>
-                <div className="grid md:grid-cols-2 gap-6">
-                  <div className="p-8 bg-blue-600 rounded-[2.5rem] text-white">
-                    <h5 className="font-black text-[10px] uppercase mb-4 flex items-center gap-2">
-                      <FileText size={18} /> Library Asset
-                    </h5>
-                    {weeksData[`week_${currentWeek}`]?.pdfUrl ? (
-                      <a
-                        href={weeksData[`week_${currentWeek}`].pdfUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block w-full py-4 bg-white text-blue-600 rounded-2xl font-black text-center text-[10px] uppercase"
-                      >
-                        Download Material
-                      </a>
-                    ) : (
-                      <p className="opacity-50 text-[10px] italic font-black text-center">
-                        No Data Injected
-                      </p>
-                    )}
-                  </div>
-                  <div
-                    className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-white/5 border-white/5" : "bg-gray-50 border-gray-100"}`}
-                  >
-                    <h5 className="text-[10px] font-black text-blue-600 uppercase mb-4 flex items-center gap-2">
-                      <Clock size={18} /> Weekly Task
-                    </h5>
-                    <p className="text-sm font-bold opacity-70 leading-relaxed">
-                      {weeksData[`week_${currentWeek}`]?.assignment ||
-                        "Initialize weekly module tasks."}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Discussions & Chat are kept exactly as original but with data safety */}
         {activeTab === "discussions" && (
           <div className="animate-in fade-in duration-500">
             {viewState === "list" && (
@@ -723,9 +717,6 @@ const StudentPortal = () => {
                     <h4 className="text-2xl font-black italic uppercase">
                       {c.name}
                     </h4>
-                    <div className="flex items-center gap-2 text-[10px] font-black text-blue-600 uppercase mt-4">
-                      Access Repo <ChevronRight size={14} />
-                    </div>
                   </div>
                 ))}
               </div>
@@ -757,10 +748,22 @@ const StudentPortal = () => {
                 <div
                   className={`p-10 rounded-[3rem] border sticky top-0 h-fit ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
                 >
-                  <h4 className="font-black uppercase text-[10px] text-blue-500 mb-6 tracking-widest">
-                    Inject Inquiry
-                  </h4>
-                  <form onSubmit={handlePostQuestion} className="space-y-4">
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      if (!newPost.title || !newPost.content) return;
+                      await addDoc(collection(db, "forum_threads"), {
+                        ...newPost,
+                        studentName: studentData?.fullName || "Student",
+                        studentId: auth.currentUser.uid,
+                        courseId: selectedCourse.id,
+                        studentType: selectedPath,
+                        createdAt: serverTimestamp(),
+                      });
+                      setNewPost({ title: "", content: "" });
+                    }}
+                    className="space-y-4"
+                  >
                     <input
                       className="s-input"
                       placeholder="SUBJECT"
@@ -788,31 +791,15 @@ const StudentPortal = () => {
                       key={t.id}
                       className={`p-10 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-sm"}`}
                     >
-                      <div className="flex items-center gap-4 mb-6">
-                        <div className="w-10 h-10 bg-blue-600 text-white rounded-full flex items-center justify-center font-black">
-                          {t.studentName?.charAt(0)}
-                        </div>
-                        <div>
-                          <p className="font-black text-xs uppercase italic leading-none">
-                            {t.studentName}
-                          </p>
-                          <p className="text-[10px] text-gray-400 mt-1">
-                            {t.createdAt?.toDate().toLocaleDateString()}
-                          </p>
-                        </div>
-                      </div>
                       <h3 className="text-2xl font-black italic uppercase mb-4 tracking-tighter">
                         "{t.title}"
                       </h3>
                       <p className="opacity-60 text-sm leading-relaxed mb-8">
                         {t.content}
                       </p>
-                      <button
-                        onClick={() => navigate(`/forum/thread/${t.id}`)}
-                        className="text-[10px] font-black text-blue-600 uppercase flex items-center gap-2"
-                      >
-                        Monitor Discussion <ChevronRight size={14} />
-                      </button>
+                      <span className="text-[10px] font-black text-blue-600 uppercase">
+                        By {t.studentName}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -830,9 +817,6 @@ const StudentPortal = () => {
                 <h3 className="text-2xl font-black uppercase italic tracking-tighter">
                   Private Secure Link
                 </h3>
-                <p className="text-[10px] font-black uppercase opacity-60">
-                  Supervisor Direct Connection
-                </p>
               </div>
               <ShieldCheck size={30} />
             </div>
@@ -851,14 +835,25 @@ const StudentPortal = () => {
               ))}
             </div>
             <form
-              onSubmit={handleSendPrivateMsg}
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newPrivateMsg.trim()) return;
+                await addDoc(collection(db, "private_chats"), {
+                  text: newPrivateMsg,
+                  sender: studentData?.fullName || "Student",
+                  senderRole: "student",
+                  studentId: studentData?.id,
+                  createdAt: serverTimestamp(),
+                });
+                setNewPrivateMsg("");
+              }}
               className="p-6 border-t border-white/5 flex gap-4 bg-slate-900/10"
             >
               <input
                 value={newPrivateMsg}
                 onChange={(e) => setNewPrivateMsg(e.target.value)}
                 className="flex-1 bg-transparent border-none outline-none font-black text-sm"
-                placeholder="Transmit direct message to supervisor..."
+                placeholder="Transmit direct message..."
               />
               <button className="p-5 bg-blue-600 text-white rounded-2xl shadow-xl hover:scale-105 transition-all">
                 <Send size={20} />

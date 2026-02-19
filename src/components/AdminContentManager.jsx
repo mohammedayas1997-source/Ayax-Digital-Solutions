@@ -5,7 +5,6 @@ import {
   setDoc,
   serverTimestamp,
   getDoc,
-  deleteDoc,
   collection,
   query,
   orderBy,
@@ -36,6 +35,7 @@ import {
   Trash2,
   History,
   Link as LinkIcon,
+  AlertOctagon,
 } from "lucide-react";
 
 // 1. STYLING COMPONENTS (HOISTED)
@@ -74,11 +74,13 @@ const AdminContentManager = () => {
     pdfNode: "",
     assignment: "",
     startDate: "",
+    examRules:
+      "1. No external resources.\n2. 60 Minutes duration.\n3. One attempt only.", // Default Rules
   });
 
-  // EXAM STATE: 30 Questions
+  // UMURNI: EXAM STATE expanded to 50 Questions
   const [examData, setExamData] = useState(
-    Array.from({ length: 30 }, (_, i) => ({
+    Array.from({ length: 50 }, (_, i) => ({
       id: i + 1,
       question: "",
       optionA: "",
@@ -187,29 +189,39 @@ const AdminContentManager = () => {
     setLoading(true);
 
     try {
+      const isExamWeek = weekNum === 12 || weekNum === 24;
+
       const payload = {
-        ...content,
-        videoId: extractVideoID(content.videoUrl),
+        title: content.title,
         startDate:
           deploymentMode === "manual"
             ? new Date()
             : new Date(content.startDate),
-        exams: weekNum === 12 || weekNum === 24 ? examData : null,
         updatedAt: serverTimestamp(),
+        videoId: isExamWeek ? null : extractVideoID(content.videoUrl),
+        pdfNode: isExamWeek ? null : content.pdfNode,
+        assignment: isExamWeek ? null : content.assignment,
+        exams: isExamWeek ? examData : null,
+        examRules: isExamWeek ? content.examRules : null,
+        durationMinutes: isExamWeek ? 60 : null,
       };
 
       await setDoc(getDocRef(), payload, { merge: true });
       await addDoc(collection(db, "deployment_logs"), {
         week: weekNum,
         course: selectedCourse,
-        title: content.title || "Module Update",
+        title: content.title || "Deployment",
         mode: deploymentMode,
         timestamp: serverTimestamp(),
-        action: "SYNC_COMPLETE",
+        action: isExamWeek ? "EXAM_DEPLOY" : "SYNC_COMPLETE",
       });
 
       setLoading(false);
-      alert("SUCCESS: Database Updated Successfully.");
+      alert(
+        isExamWeek
+          ? "EXAM DEPLOYED: 50 Questions Active."
+          : "SUCCESS: Node Synced.",
+      );
       navigate("/student-portal");
     } catch (err) {
       setLoading(false);
@@ -235,8 +247,26 @@ const AdminContentManager = () => {
             startDate: data.startDate?.toDate
               ? data.startDate.toDate().toISOString().slice(0, 16)
               : data.startDate || "",
+            examRules:
+              data.examRules ||
+              "1. No external resources.\n2. 60 Minutes duration.\n3. One attempt only.",
           });
-          if (data.exams) setExamData(data.exams);
+          // Ensure we load 50 questions correctly if they exist
+          if (data.exams) {
+            const loadedExams = [...data.exams];
+            // If existing data has fewer than 50, fill the rest
+            while (loadedExams.length < 50) {
+              loadedExams.push({
+                id: loadedExams.length + 1,
+                question: "",
+                optionA: "",
+                optionB: "",
+                optionC: "",
+                correctAnswer: "A",
+              });
+            }
+            setExamData(loadedExams);
+          }
         }
       } catch (e) {
         console.error(e);
@@ -258,7 +288,6 @@ const AdminContentManager = () => {
         transition: "0.3s",
       }}
     >
-      {/* SIDEBAR */}
       <aside
         style={{
           width: "300px",
@@ -410,36 +439,16 @@ const AdminContentManager = () => {
                 alignItems: "flex-end",
               }}
             >
-              <div>
-                <h1
-                  style={{
-                    fontSize: "42px",
-                    fontWeight: 900,
-                    fontStyle: "italic",
-                  }}
-                >
-                  {weekNum % 12 === 0 ? "EXAM" : "CURRICULUM"}{" "}
-                  <span style={{ color: "#2563eb" }}>NODE</span>
-                </h1>
-                <div
-                  style={{ display: "flex", gap: "15px", marginTop: "20px" }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => setDeploymentMode("manual")}
-                    style={modeBtnStyle(deploymentMode === "manual", "#2563eb")}
-                  >
-                    <Zap size={16} /> MANUAL PUSH
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeploymentMode("auto")}
-                    style={modeBtnStyle(deploymentMode === "auto", "#8b5cf6")}
-                  >
-                    <Timer size={16} /> AUTO SCHEDULE
-                  </button>
-                </div>
-              </div>
+              <h1
+                style={{
+                  fontSize: "42px",
+                  fontWeight: 900,
+                  fontStyle: "italic",
+                }}
+              >
+                {weekNum === 12 || weekNum === 24 ? "EXAM" : "CURRICULUM"}{" "}
+                <span style={{ color: "#2563eb" }}>NODE</span>
+              </h1>
             </header>
 
             <div
@@ -498,32 +507,53 @@ const AdminContentManager = () => {
                   gap: "25px",
                 }}
               >
-                {/* 30 QUESTIONS EXAM SECTION */}
-                {(weekNum === 12 || weekNum === 24) && (
+                {weekNum === 12 || weekNum === 24 ? (
                   <div
                     style={{
-                      backgroundColor: "#dc262605",
                       padding: "30px",
                       borderRadius: "25px",
+                      backgroundColor: "#dc262605",
                       border: "2px solid #dc262620",
-                      marginBottom: "20px",
                     }}
                   >
-                    <h3
+                    <div
                       style={{
-                        ...labelStyle,
-                        color: "#dc2626",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
                         marginBottom: "20px",
                       }}
                     >
-                      EXAMINATION PROTOCOL: 30 QUESTIONS
-                    </h3>
+                      <AlertOctagon color="#dc2626" />
+                      <h3
+                        style={{
+                          ...labelStyle,
+                          color: "#dc2626",
+                          marginBottom: 0,
+                        }}
+                      >
+                        SECURE EXAM PROTOCOL (50 QUESTIONS / 1 HOUR)
+                      </h3>
+                    </div>
+                    <label style={labelStyle}>Exam Instructions (Rules)</label>
+                    <textarea
+                      value={content.examRules}
+                      onChange={(e) =>
+                        setContent({ ...content, examRules: e.target.value })
+                      }
+                      style={{
+                        ...inputStyle(isDarkMode),
+                        height: "100px",
+                        marginBottom: "20px",
+                        border: "1px dashed #dc262640",
+                      }}
+                    />
                     <div
                       style={{
                         display: "flex",
                         flexDirection: "column",
                         gap: "30px",
-                        maxHeight: "500px",
+                        maxHeight: "600px",
                         overflowY: "auto",
                         paddingRight: "10px",
                       }}
@@ -568,7 +598,7 @@ const AdminContentManager = () => {
                                   e.target.value,
                                 )
                               }
-                              placeholder="Option A"
+                              placeholder="A"
                               style={inputStyle(isDarkMode)}
                             />
                             <input
@@ -580,7 +610,7 @@ const AdminContentManager = () => {
                                   e.target.value,
                                 )
                               }
-                              placeholder="Option B"
+                              placeholder="B"
                               style={inputStyle(isDarkMode)}
                             />
                             <input
@@ -592,7 +622,7 @@ const AdminContentManager = () => {
                                   e.target.value,
                                 )
                               }
-                              placeholder="Option C"
+                              placeholder="C"
                               style={inputStyle(isDarkMode)}
                             />
                           </div>
@@ -619,74 +649,84 @@ const AdminContentManager = () => {
                       ))}
                     </div>
                   </div>
+                ) : (
+                  <>
+                    <div
+                      style={{
+                        display: "grid",
+                        gridTemplateColumns: "1fr 1fr",
+                        gap: "25px",
+                      }}
+                    >
+                      <div>
+                        <label style={labelStyle}>Module Title</label>
+                        <input
+                          value={content.title}
+                          onChange={(e) =>
+                            setContent({ ...content, title: e.target.value })
+                          }
+                          style={inputStyle(isDarkMode)}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>YouTube Link/ID</label>
+                        <input
+                          value={content.videoUrl}
+                          onChange={(e) =>
+                            setContent({ ...content, videoUrl: e.target.value })
+                          }
+                          style={inputStyle(isDarkMode)}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Lecture PDF Node Link</label>
+                      <div style={{ position: "relative" }}>
+                        <input
+                          value={content.pdfNode}
+                          onChange={(e) =>
+                            setContent({ ...content, pdfNode: e.target.value })
+                          }
+                          placeholder="Paste Server Link"
+                          style={{
+                            ...inputStyle(isDarkMode),
+                            paddingLeft: "50px",
+                          }}
+                        />
+                        <LinkIcon
+                          size={18}
+                          style={{
+                            position: "absolute",
+                            left: "20px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            opacity: 0.5,
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Assignment Briefing</label>
+                      <textarea
+                        value={content.assignment}
+                        onChange={(e) =>
+                          setContent({ ...content, assignment: e.target.value })
+                        }
+                        style={{ ...inputStyle(isDarkMode), height: "120px" }}
+                      />
+                    </div>
+                  </>
                 )}
-
-                <div
+                <button
+                  type="submit"
+                  disabled={loading}
                   style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: "25px",
+                    ...submitBtnStyle,
+                    backgroundColor:
+                      weekNum === 12 || weekNum === 24 ? "#dc2626" : "#2563eb",
                   }}
                 >
-                  <div>
-                    <label style={labelStyle}>Module Title</label>
-                    <input
-                      value={content.title}
-                      onChange={(e) =>
-                        setContent({ ...content, title: e.target.value })
-                      }
-                      style={inputStyle(isDarkMode)}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>YouTube Link/ID</label>
-                    <input
-                      value={content.videoUrl}
-                      onChange={(e) =>
-                        setContent({ ...content, videoUrl: e.target.value })
-                      }
-                      style={inputStyle(isDarkMode)}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Lecture PDF Node Link</label>
-                  <div style={{ position: "relative" }}>
-                    <input
-                      value={content.pdfNode}
-                      onChange={(e) =>
-                        setContent({ ...content, pdfNode: e.target.value })
-                      }
-                      placeholder="Paste Server Link or File Node ID"
-                      style={{ ...inputStyle(isDarkMode), paddingLeft: "50px" }}
-                    />
-                    <LinkIcon
-                      size={18}
-                      style={{
-                        position: "absolute",
-                        left: "20px",
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        opacity: 0.5,
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label style={labelStyle}>Assignment Briefing</label>
-                  <textarea
-                    value={content.assignment}
-                    onChange={(e) =>
-                      setContent({ ...content, assignment: e.target.value })
-                    }
-                    style={{ ...inputStyle(isDarkMode), height: "120px" }}
-                  />
-                </div>
-
-                <button type="submit" disabled={loading} style={submitBtnStyle}>
                   {loading ? (
                     <RefreshCcw className="animate-spin" />
                   ) : (
@@ -750,7 +790,7 @@ const AdminContentManager = () => {
         )}
 
         {activeTab === "library" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {libraryLinks.map((lib, i) => (
               <a
                 key={i}
@@ -809,7 +849,7 @@ const AdminContentManager = () => {
   );
 };
 
-// STYLES
+// HELPER STYLES
 const navStyle = (active, dark) => ({
   display: "flex",
   alignItems: "center",
