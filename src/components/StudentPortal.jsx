@@ -111,39 +111,6 @@ const libraryLinks = [
     cat: "Courses",
   },
 ];
-// 1. Sauya handleExamSubmit zuwa wannan domin samar da cikakken sakamako
-const handleExamSubmit = async () => {
-  setExamActive(false);
-  const questions = weeksData[String(currentWeek)]?.exams || [];
-  let correctCount = 0;
-
-  // Lissafa maki
-  questions.forEach((q, idx) => {
-    if (answers[idx] === q.correctAnswer) correctCount++;
-  });
-
-  const totalQuestions = questions.length; // Yanzu zai dauka ko 50 ne
-  const finalScore = Math.round((correctCount / totalQuestions) * 100);
-
-  // Adana cikakken sakamakon a Firebase
-  const resultData = {
-    score: finalScore,
-    correctAnswers: correctCount,
-    totalQuestions: totalQuestions,
-    passed: finalScore >= 50,
-    timeCompleted: serverTimestamp(),
-    courseId: selectedCourseId,
-    week: currentWeek,
-  };
-
-  await setDoc(
-    doc(db, `students/${studentData.id}/exams/week_${currentWeek}`),
-    resultData,
-  );
-
-  setExamScore(resultData); // Ajiye dukkan object din maimakon score kawai
-  if (finalScore >= 50 && currentWeek === 12) setHasPassedMidterm(true);
-};
 
 const StudentPortal = () => {
   const navigate = useNavigate();
@@ -175,7 +142,7 @@ const StudentPortal = () => {
   const [examActive, setExamActive] = useState(false);
   const [answers, setAnswers] = useState({});
   const [examScore, setExamScore] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(3600); // 60 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(3600); // 60 minutes
 
   const availableCourses = [
     {
@@ -212,7 +179,6 @@ const StudentPortal = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Sync Weeks Data from Firestore
   useEffect(() => {
     if (!selectedCourseId) return;
     const unsubWeeks = onSnapshot(
@@ -231,15 +197,12 @@ const StudentPortal = () => {
     return () => unsubWeeks();
   }, [selectedCourseId]);
 
-  // Exam Timer Logic
   useEffect(() => {
     let timer;
     if (examActive && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
+      timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     } else if (timeLeft === 0 && examActive) {
-      handleExamSubmit(); // Auto-submit when time expires
+      handleExamSubmit();
     }
     return () => clearInterval(timer);
   }, [examActive, timeLeft]);
@@ -344,20 +307,26 @@ const StudentPortal = () => {
   const handleExamSubmit = async () => {
     setExamActive(false);
     const questions = weeksData[String(currentWeek)]?.exams || [];
-    let score = 0;
+    let correctCount = 0;
     questions.forEach((q, idx) => {
-      if (answers[idx] === q.correctAnswer) score++;
+      if (answers[idx] === q.correctAnswer) correctCount++;
     });
-    const finalScore = Math.round((score / 30) * 100);
-    setExamScore(finalScore);
+    const totalQuestions = questions.length;
+    const finalScore = Math.round((correctCount / totalQuestions) * 100);
+    const resultData = {
+      score: finalScore,
+      correctAnswers: correctCount,
+      totalQuestions,
+      passed: finalScore >= 50,
+      timeCompleted: serverTimestamp(),
+      courseId: selectedCourseId,
+      week: currentWeek,
+    };
     await setDoc(
       doc(db, `students/${studentData.id}/exams/week_${currentWeek}`),
-      {
-        score: finalScore,
-        passed: finalScore >= 50,
-        timestamp: serverTimestamp(),
-      },
+      resultData,
     );
+    setExamScore(resultData);
     if (finalScore >= 50 && currentWeek === 12) setHasPassedMidterm(true);
   };
 
@@ -416,7 +385,6 @@ const StudentPortal = () => {
     <div
       className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-gray-50 text-slate-900"} transition-colors duration-300`}
     >
-      {/* SIDEBAR */}
       <aside
         className={`fixed lg:sticky top-0 z-50 h-screen w-80 border-r flex flex-col transition-transform ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-gray-100"} ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
       >
@@ -479,9 +447,9 @@ const StudentPortal = () => {
               >
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-6 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${isWeekLocked(w) ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}
+                    className={`px-2 h-6 rounded-lg flex items-center justify-center text-[9px] font-black ${w === 12 || w === 24 ? "bg-red-600 text-white min-w-[70px]" : isWeekLocked(w) ? "bg-red-100 text-red-600" : "bg-emerald-100 text-emerald-600"}`}
                   >
-                    {w}
+                    {w === 12 || w === 24 ? "EXAMS WEEK" : w}
                   </div>
                   <span className="text-[10px] font-black uppercase">
                     Week {w}
@@ -524,6 +492,7 @@ const StudentPortal = () => {
             AYAX PORTAL
           </h2>
         </header>
+
         {activeTab === "dashboard" && (
           <div className="space-y-10 animate-in fade-in duration-700">
             <div className="bg-blue-600 p-16 rounded-[4rem] text-white shadow-2xl relative overflow-hidden group">
@@ -540,10 +509,10 @@ const StudentPortal = () => {
             </div>
           </div>
         )}
+
         {activeTab === "courses" && (
           <div className="space-y-8 animate-in fade-in duration-500">
             {currentWeek === 12 || currentWeek === 24 ? (
-              // SECURE EXAM INTERFACE (NO LECTURE DATA)
               <div
                 className={`p-10 rounded-[3rem] border-4 ${darkMode ? "bg-slate-900 border-red-500/20" : "bg-white border-red-500/20 shadow-2xl"}`}
               >
@@ -584,22 +553,62 @@ const StudentPortal = () => {
                     </button>
                   </div>
                 ) : examScore !== null ? (
-                  <div className="text-center py-20 bg-blue-600/5 rounded-[2rem]">
-                    <Trophy className="mx-auto mb-6 text-blue-600" size={80} />
-                    <h3 className="text-8xl font-black text-blue-600 mb-4">
-                      {examScore}%
-                    </h3>
-                    <p className="text-2xl font-black uppercase italic">
-                      {examScore >= 50
-                        ? "Grade: Elite Access Granted"
-                        : "Grade: Assessment Failed"}
+                  <div className="text-center py-16 bg-blue-600/5 rounded-[3rem] border-2 border-blue-600/10 animate-in zoom-in duration-500">
+                    <Trophy
+                      className="mx-auto mb-8 text-yellow-500 animate-bounce"
+                      size={100}
+                    />
+                    <h2 className="text-3xl font-black uppercase italic mb-2">
+                      Performance Report
+                    </h2>
+                    <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mb-10 text-center">
+                      Week {currentWeek} Official Assessment
                     </p>
-                    <button
-                      onClick={() => setActiveTab("dashboard")}
-                      className="mt-8 text-blue-600 font-black uppercase underline"
-                    >
-                      Return to Command Center
-                    </button>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto px-6 mb-12">
+                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
+                        <p className="text-[10px] font-black text-gray-400 uppercase mb-2">
+                          Final Grade
+                        </p>
+                        <h4
+                          className={`text-6xl font-black italic ${examScore.passed ? "text-blue-600" : "text-red-600"}`}
+                        >
+                          {examScore.score}%
+                        </h4>
+                      </div>
+                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
+                        <p className="text-[10px] font-black text-gray-400 uppercase mb-2">
+                          Accuracy
+                        </p>
+                        <h4 className="text-5xl font-black italic text-emerald-500">
+                          {examScore.correctAnswers}/{examScore.totalQuestions}
+                        </h4>
+                      </div>
+                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
+                        <p className="text-[10px] font-black text-gray-400 uppercase mb-2">
+                          Status
+                        </p>
+                        <h4
+                          className={`text-3xl font-black italic uppercase ${examScore.passed ? "text-blue-600" : "text-red-600"}`}
+                        >
+                          {examScore.passed ? "Authorized" : "Denied"}
+                        </h4>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-center gap-4">
+                      <p className="text-sm font-bold opacity-60 italic">
+                        Sakamakonka an adana shi a cikin rumbun ajiyar mu
+                        (Secure Database).
+                      </p>
+                      <button
+                        onClick={() => {
+                          setActiveTab("dashboard");
+                          setExamScore(null);
+                        }}
+                        className="px-12 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase italic shadow-2xl hover:scale-105 transition-all"
+                      >
+                        Return to Dashboard
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-12 h-[600px] overflow-y-auto px-4 custom-scrollbar">
@@ -636,7 +645,6 @@ const StudentPortal = () => {
                 )}
               </div>
             ) : (
-              // REGULAR CURRICULUM INTERFACE
               <>
                 <div className="bg-black aspect-video rounded-[3rem] overflow-hidden shadow-2xl relative border-4 border-white/5">
                   {isWeekLocked(currentWeek) ? (
@@ -696,70 +704,7 @@ const StudentPortal = () => {
             )}
           </div>
         )}
-        ) : examScore !== null ? (
-        <div className="text-center py-16 bg-blue-600/5 rounded-[3rem] border-2 border-blue-600/10 animate-in zoom-in duration-500">
-          <Trophy
-            className="mx-auto mb-8 text-yellow-500 animate-bounce"
-            size={100}
-          />
 
-          <h2 className="text-3xl font-black uppercase italic mb-2">
-            Performance Report
-          </h2>
-          <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mb-10 text-center">
-            Week {currentWeek} Official Assessment
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto px-6 mb-12">
-            <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
-              <p className="text-[10px] font-black text-gray-400 uppercase mb-2">
-                Final Grade
-              </p>
-              <h4
-                className={`text-6xl font-black italic ${examScore.passed ? "text-blue-600" : "text-red-600"}`}
-              >
-                {examScore.score}%
-              </h4>
-            </div>
-
-            <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
-              <p className="text-[10px] font-black text-gray-400 uppercase mb-2">
-                Accuracy
-              </p>
-              <h4 className="text-5xl font-black italic text-emerald-500">
-                {examScore.correctAnswers}/{examScore.totalQuestions}
-              </h4>
-            </div>
-
-            <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
-              <p className="text-[10px] font-black text-gray-400 uppercase mb-2">
-                Status
-              </p>
-              <h4
-                className={`text-3xl font-black italic uppercase ${examScore.passed ? "text-blue-600" : "text-red-600"}`}
-              >
-                {examScore.passed ? "Authorized" : "Denied"}
-              </h4>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-sm font-bold opacity-60 italic">
-              Sakamakonka an adana shi a cikin rumbun ajiyar mu (Secure
-              Database).
-            </p>
-            <button
-              onClick={() => {
-                setActiveTab("dashboard");
-                setExamScore(null);
-              }}
-              className="px-12 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase italic shadow-2xl hover:scale-105 transition-all"
-            >
-              Return to Dashboard
-            </button>
-          </div>
-        </div>
-        ) : ({/* LIBRARY, DISCUSSIONS & CHAT - NO DELETIONS */}
         {activeTab === "library" && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-6">
             {libraryLinks.map((lib, i) => (
@@ -790,6 +735,7 @@ const StudentPortal = () => {
             ))}
           </div>
         )}
+
         {activeTab === "discussions" && (
           <div className="animate-in fade-in duration-500">
             {viewState === "list" && (
@@ -899,6 +845,7 @@ const StudentPortal = () => {
             )}
           </div>
         )}
+
         {activeTab === "chat" && (
           <div
             className={`h-[80vh] flex flex-col rounded-[3.5rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-2xl"}`}
