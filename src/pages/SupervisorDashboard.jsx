@@ -1,6 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { db, auth } from "../firebaseConfig";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { db, auth, storage } from "../firebaseConfig";
+import {
+  onAuthStateChanged,
+  signOut,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+} from "firebase/auth";
 import {
   collection,
   onSnapshot,
@@ -11,7 +17,9 @@ import {
   doc,
   orderBy,
   getDoc,
+  updateDoc,
 } from "firebase/firestore";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useNavigate } from "react-router-dom";
 import {
   Users,
@@ -26,6 +34,14 @@ import {
   History,
   Lock,
   ExternalLink,
+  Wallet,
+  Settings,
+  Camera,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCcw,
+  UploadCloud,
+  ChevronRight,
 } from "lucide-react";
 
 const SupervisorDashboard = () => {
@@ -44,11 +60,19 @@ const SupervisorDashboard = () => {
   const [dmText, setDmText] = useState("");
   const [systemLogs, setSystemLogs] = useState([]);
 
+  // SETTINGS & IDENTITY STATES
   const [isDarkMode, setIsDarkMode] = useState(
     () => localStorage.getItem("super-theme") === "dark",
   );
-  const [supervisorName, setSupervisorName] = useState("Supervisor");
+  const [supervisorData, setSupervisorData] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [passwords, setPasswords] = useState({
+    current: "",
+    new: "",
+    confirm: "",
+  });
+  const [settingsMsg, setSettingsMsg] = useState({ type: "", text: "" });
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const availableCourses = [
     "Cyber security",
@@ -60,7 +84,6 @@ const SupervisorDashboard = () => {
     "advanced Digital Marketing",
   ];
 
-  // E-LIBRARY DATA ASSETS
   const libraryLinks = [
     {
       name: "O'Reilly Open Books",
@@ -114,9 +137,11 @@ const SupervisorDashboard = () => {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const userDoc = await getDoc(doc(db, "users", user.uid));
-        if (userDoc.exists())
-          setSupervisorName(userDoc.data().fullName || "Supervisor");
+        const userRef = doc(db, "users", user.uid);
+        onSnapshot(userRef, (snap) => {
+          if (snap.exists())
+            setSupervisorData({ id: user.uid, ...snap.data() });
+        });
         setAuthLoading(false);
       } else {
         navigate("/admin-gateway");
@@ -144,7 +169,7 @@ const SupervisorDashboard = () => {
     const unsubForum = onSnapshot(
       query(
         collection(db, "forum_threads"),
-        where("course", "==", selectedCourse),
+        where("courseId", "==", selectedCourse),
         orderBy("createdAt", "desc"),
       ),
       (snap) =>
@@ -166,6 +191,19 @@ const SupervisorDashboard = () => {
     };
   }, [selectedCourse]);
 
+  // FORUM REPLIES LISTENER
+  useEffect(() => {
+    if (!activeThread) return;
+    const unsubReplies = onSnapshot(
+      query(
+        collection(db, `forum_threads/${activeThread.id}/replies`),
+        orderBy("createdAt", "asc"),
+      ),
+      (snap) => setReplies(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+    );
+    return () => unsubReplies();
+  }, [activeThread]);
+
   // PRIVATE MESSAGE LISTENER
   useEffect(() => {
     if (!selectedStudentForDM) return;
@@ -180,12 +218,57 @@ const SupervisorDashboard = () => {
     return () => unsub();
   }, [selectedStudentForDM]);
 
+  // --- SETTINGS PROTOCOLS ---
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setIsUpdating(true);
+    try {
+      const storageRef = ref(
+        storage,
+        `supervisors/${supervisorData.id}_${Date.now()}`,
+      );
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      await updateDoc(doc(db, "users", supervisorData.id), { photoURL: url });
+      setSettingsMsg({ type: "success", text: "Identity image updated." });
+    } catch (err) {
+      setSettingsMsg({ type: "error", text: "Upload failed." });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handlePasswordUpdate = async (e) => {
+    e.preventDefault();
+    if (passwords.new !== passwords.confirm)
+      return setSettingsMsg({ type: "error", text: "Passwords mismatch." });
+    setIsUpdating(true);
+    try {
+      const cred = EmailAuthProvider.credential(
+        auth.currentUser.email,
+        passwords.current,
+      );
+      await reauthenticateWithCredential(auth.currentUser, cred);
+      await updatePassword(auth.currentUser, passwords.new);
+      setSettingsMsg({
+        type: "success",
+        text: "Security credentials updated.",
+      });
+      setPasswords({ current: "", new: "", confirm: "" });
+    } catch (err) {
+      setSettingsMsg({ type: "error", text: "Current password invalid." });
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
   const handleSendDM = async (e) => {
     e.preventDefault();
     if (!dmText.trim()) return;
     await addDoc(collection(db, "private_chats"), {
       text: dmText,
-      sender: supervisorName,
+      sender: supervisorData.fullName || "Supervisor",
       senderRole: "supervisor",
       studentId: selectedStudentForDM.id,
       createdAt: serverTimestamp(),
@@ -198,7 +281,7 @@ const SupervisorDashboard = () => {
     if (!reply.trim()) return;
     await addDoc(collection(db, `forum_threads/${activeThread.id}/replies`), {
       text: reply,
-      sender: supervisorName,
+      sender: supervisorData.fullName || "Supervisor",
       role: "supervisor",
       createdAt: serverTimestamp(),
     });
@@ -242,15 +325,8 @@ const SupervisorDashboard = () => {
             <h2
               className={`text-3xl font-bold mt-8 ${isDarkMode ? "text-white" : "text-slate-900"}`}
             >
-              Welcome, {supervisorName}
+              Welcome, {supervisorData?.fullName}
             </h2>
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className="mt-4 flex items-center gap-2 font-black text-[10px] uppercase text-blue-600"
-            >
-              {isDarkMode ? <Sun size={14} /> : <Moon size={14} />} Toggle
-              Spectrum
-            </button>
           </div>
           <div className="grid grid-cols-1 gap-4 max-h-[70vh] overflow-y-auto pr-2">
             {availableCourses.map((course) => (
@@ -277,7 +353,7 @@ const SupervisorDashboard = () => {
     >
       {/* SIDEBAR */}
       <aside
-        className={`w-72 border-r p-8 flex flex-col sticky top-0 h-screen ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
+        className={`w-80 border-r p-8 flex flex-col sticky top-0 h-screen ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
       >
         <div
           className="flex items-center gap-3 mb-10 cursor-pointer"
@@ -320,14 +396,43 @@ const SupervisorDashboard = () => {
             onClick={() => setActiveTab("history")}
             className={`t-nav ${activeTab === "history" ? "t-active" : ""}`}
           >
-            <History size={18} /> System History
+            <History size={18} /> System Logs
+          </button>
+          <button
+            onClick={() => setActiveTab("settings")}
+            className={`t-nav ${activeTab === "settings" ? "t-active" : ""}`}
+          >
+            <Settings size={18} /> Settings
           </button>
         </nav>
 
-        <div className="space-y-4 pt-10 border-t border-slate-800">
+        {/* SALARY MODULE */}
+        <div className="mb-6 p-6 bg-blue-600 rounded-3xl text-white shadow-xl shadow-blue-500/20">
+          <div className="flex items-center gap-2 mb-2">
+            <Wallet size={16} />
+            <span className="text-[10px] font-black uppercase opacity-60 tracking-widest">
+              Monthly Allowance
+            </span>
+          </div>
+          <div className="text-2xl font-black tracking-tighter">
+            ₦{supervisorData?.salary?.toLocaleString() || "0.00"}
+          </div>
+          <p className="text-[8px] font-bold uppercase mt-2 opacity-50">
+            Auto-credited every 30 days
+          </p>
+        </div>
+
+        <div className="space-y-4 pt-4 border-t border-slate-800">
+          <button
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className="w-full flex items-center justify-center gap-3 p-4 bg-slate-800/50 rounded-2xl font-black uppercase text-[10px] tracking-widest"
+          >
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />} Switch
+            Spectrum
+          </button>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-3 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl active:scale-95 transition-all"
+            className="w-full flex items-center justify-center gap-3 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all"
           >
             <LogOut size={18} /> Logout Terminal
           </button>
@@ -340,141 +445,111 @@ const SupervisorDashboard = () => {
           <h1 className="text-4xl font-black italic uppercase tracking-tighter">
             {activeTab.replace("_", " ")} Node
           </h1>
-          <button
-            onClick={() => setSelectedCourse(null)}
-            className={`px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest ${isDarkMode ? "bg-white text-slate-900" : "bg-slate-900 text-white"}`}
-          >
-            Change Department
-          </button>
+          <div className="px-6 py-3 bg-blue-600/10 rounded-2xl text-blue-600 font-black text-xs uppercase tracking-widest border border-blue-600/20">
+            {selectedCourse}
+          </div>
         </header>
 
-        {/* E-LIBRARY SECTION */}
-        {activeTab === "library" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {libraryLinks.map((lib, i) => (
-              <a
-                key={i}
-                href={lib.url}
-                target="_blank"
-                rel="noreferrer"
-                className={`p-8 rounded-[2.5rem] border transition-all hover:-translate-y-2 ${isDarkMode ? "bg-slate-900 border-white/5 hover:border-blue-600" : "bg-white border-slate-200 shadow-xl hover:border-blue-600"}`}
+        {/* SETTINGS MODULE */}
+        {activeTab === "settings" && (
+          <div className="max-w-4xl space-y-12 animate-in fade-in duration-500">
+            {settingsMsg.text && (
+              <div
+                className={`p-4 rounded-2xl flex items-center gap-3 font-black text-xs uppercase border ${settingsMsg.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-red-500/10 border-red-500/20 text-red-500"}`}
               >
-                <div className="text-[10px] font-black text-blue-600 uppercase mb-2">
-                  {lib.cat}
-                </div>
-                <h3 className="font-black text-xl mb-4">{lib.name}</h3>
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500">
-                  Access Books <ExternalLink size={12} />
-                </div>
-              </a>
-            ))}
-          </div>
-        )}
-
-        {/* PRIVATE MESSAGING SECTION (DM) */}
-        {activeTab === "dm" && (
-          <div className="flex gap-8 h-[75vh]">
-            <div
-              className={`w-1/3 rounded-[2.5rem] border flex flex-col ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
-            >
-              <div className="p-6 font-black uppercase text-[10px] opacity-50 border-b border-slate-800">
-                Student Directory
+                {settingsMsg.type === "success" ? (
+                  <CheckCircle2 size={18} />
+                ) : (
+                  <AlertCircle size={18} />
+                )}{" "}
+                {settingsMsg.text}
               </div>
-              <div className="overflow-y-auto flex-1">
-                {students.map((s) => (
-                  <div
-                    key={s.id}
-                    onClick={() => setSelectedStudentForDM(s)}
-                    className={`p-6 border-b border-slate-800 cursor-pointer transition-all ${selectedStudentForDM?.id === s.id ? "bg-blue-600 text-white" : "hover:bg-blue-600/10"}`}
-                  >
-                    <p className="font-black uppercase text-sm">
-                      {s.studentName}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div
-              className={`flex-1 rounded-[2.5rem] border flex flex-col overflow-hidden ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
-            >
-              {selectedStudentForDM ? (
-                <>
-                  <div className="p-8 border-b border-slate-800">
-                    <h3 className="font-black italic uppercase text-blue-600">
-                      Secure Direct Line: {selectedStudentForDM.studentName}
-                    </h3>
-                  </div>
-                  <div className="flex-1 p-8 overflow-y-auto flex flex-col space-y-4">
-                    {privateMessages.map((m) => (
-                      <div
-                        key={m.id}
-                        className={`max-w-[70%] p-5 rounded-3xl font-bold text-sm ${m.senderRole === "supervisor" ? "bg-blue-600 text-white self-end" : "bg-slate-800 text-white self-start"}`}
-                      >
-                        {m.text}
-                        <div className="text-[8px] opacity-50 mt-2 uppercase">
-                          {m.sender}
-                        </div>
+            )}
+            <div className="grid md:grid-cols-3 gap-12">
+              <div className="space-y-6">
+                <div className="relative group">
+                  <div className="w-full aspect-square rounded-[3rem] overflow-hidden border-4 border-blue-600/20 bg-slate-800 flex items-center justify-center relative">
+                    {supervisorData?.photoURL ? (
+                      <img
+                        src={supervisorData.photoURL}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Users size={60} className="text-slate-700" />
+                    )}
+                    {isUpdating && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                        <RefreshCcw className="animate-spin text-white" />
                       </div>
-                    ))}
+                    )}
                   </div>
-                  <form
-                    onSubmit={handleSendDM}
-                    className="p-6 border-t border-slate-800 flex gap-4"
-                  >
+                  <label className="absolute -bottom-4 -right-4 p-4 bg-blue-600 text-white rounded-2xl shadow-xl cursor-pointer hover:scale-110 transition-all">
+                    <Camera size={20} />
                     <input
-                      value={dmText}
-                      onChange={(e) => setDmText(e.target.value)}
-                      placeholder="Type private message..."
-                      className="flex-1 bg-transparent outline-none font-black text-sm"
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleImageUpload}
                     />
-                    <button className="p-4 bg-blue-600 text-white rounded-2xl">
-                      <Send size={20} />
-                    </button>
-                  </form>
-                </>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center opacity-30">
-                  <Lock size={60} />
-                  <p className="font-black uppercase text-xs mt-4">
-                    Select Student for Private Link
-                  </p>
+                  </label>
                 </div>
-              )}
+              </div>
+              <div className="md:col-span-2">
+                <form
+                  onSubmit={handlePasswordUpdate}
+                  className={`p-10 rounded-[2.5rem] border space-y-6 ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl border-slate-100"}`}
+                >
+                  <input
+                    type="password"
+                    placeholder="CURRENT PASSWORD"
+                    required
+                    className="s-input"
+                    value={passwords.current}
+                    onChange={(e) =>
+                      setPasswords({ ...passwords, current: e.target.value })
+                    }
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="password"
+                      placeholder="NEW PASSWORD"
+                      required
+                      className="s-input"
+                      value={passwords.new}
+                      onChange={(e) =>
+                        setPasswords({ ...passwords, new: e.target.value })
+                      }
+                    />
+                    <input
+                      type="password"
+                      placeholder="CONFIRM NEW"
+                      required
+                      className="s-input"
+                      value={passwords.confirm}
+                      onChange={(e) =>
+                        setPasswords({ ...passwords, confirm: e.target.value })
+                      }
+                    />
+                  </div>
+                  <button
+                    disabled={isUpdating}
+                    className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3"
+                  >
+                    {isUpdating ? (
+                      <RefreshCcw className="animate-spin" />
+                    ) : (
+                      <>
+                        <UploadCloud size={16} /> Update Security Credentials
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
             </div>
           </div>
         )}
 
-        {/* SYSTEM HISTORY SECTION */}
-        {activeTab === "history" && (
-          <div
-            className={`rounded-[2.5rem] border overflow-hidden ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
-          >
-            <table className="w-full text-left">
-              <thead>
-                <tr className="text-[10px] font-black uppercase text-slate-500 border-b border-slate-800 bg-slate-800/20">
-                  <th className="p-6">Action Event</th>
-                  <th className="p-6">Details</th>
-                  <th className="p-6">Timestamp</th>
-                </tr>
-              </thead>
-              <tbody>
-                {systemLogs.map((log) => (
-                  <tr key={log.id} className="border-b border-slate-800/10">
-                    <td className="p-6 text-blue-600 font-black uppercase text-[10px]">
-                      {log.action}
-                    </td>
-                    <td className="p-6 font-bold text-sm">{log.details}</td>
-                    <td className="p-6 text-[10px] opacity-40">
-                      {log.timestamp?.toDate().toLocaleString()}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* ORIGINAL FORUM INTERFACE */}
+        {/* FORUM INTERFACE */}
         {activeTab === "forum" && (
           <div className="flex gap-8 h-[75vh]">
             <div
@@ -559,7 +634,79 @@ const SupervisorDashboard = () => {
           </div>
         )}
 
-        {/* STUDENT ROSTER */}
+        {/* REST OF ORIGINAL MODULES (Students, History, Library) REMAINED UNTOUCHED AS REQUESTED */}
+        {activeTab === "dm" && (
+          <div className="flex gap-8 h-[75vh]">
+            <div
+              className={`w-1/3 rounded-[2.5rem] border flex flex-col ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+            >
+              <div className="p-6 font-black uppercase text-[10px] opacity-50 border-b border-slate-800">
+                Student Directory
+              </div>
+              <div className="overflow-y-auto flex-1">
+                {students.map((s) => (
+                  <div
+                    key={s.id}
+                    onClick={() => setSelectedStudentForDM(s)}
+                    className={`p-6 border-b border-slate-800 cursor-pointer transition-all ${selectedStudentForDM?.id === s.id ? "bg-blue-600 text-white" : "hover:bg-blue-600/10"}`}
+                  >
+                    <p className="font-black uppercase text-sm">
+                      {s.studentName}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div
+              className={`flex-1 rounded-[2.5rem] border flex flex-col overflow-hidden ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+            >
+              {selectedStudentForDM ? (
+                <>
+                  <div className="p-8 border-b border-slate-800">
+                    <h3 className="font-black italic uppercase text-blue-600">
+                      Secure Direct Line: {selectedStudentForDM.studentName}
+                    </h3>
+                  </div>
+                  <div className="flex-1 p-8 overflow-y-auto flex flex-col space-y-4">
+                    {privateMessages.map((m) => (
+                      <div
+                        key={m.id}
+                        className={`max-w-[70%] p-5 rounded-3xl font-bold text-sm ${m.senderRole === "supervisor" ? "bg-blue-600 text-white self-end" : "bg-slate-800 text-white self-start"}`}
+                      >
+                        {m.text}
+                        <div className="text-[8px] opacity-50 mt-2 uppercase">
+                          {m.sender}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <form
+                    onSubmit={handleSendDM}
+                    className="p-6 border-t border-slate-800 flex gap-4"
+                  >
+                    <input
+                      value={dmText}
+                      onChange={(e) => setDmText(e.target.value)}
+                      placeholder="Type private message..."
+                      className="flex-1 bg-transparent outline-none font-black text-sm"
+                    />
+                    <button className="p-4 bg-blue-600 text-white rounded-2xl">
+                      <Send size={20} />
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center opacity-30">
+                  <Lock size={60} />
+                  <p className="font-black uppercase text-xs mt-4">
+                    Select Student for Private Link
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         {activeTab === "students" && (
           <div
             className={`rounded-[3rem] border overflow-hidden ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-sm"}`}
@@ -600,11 +747,64 @@ const SupervisorDashboard = () => {
             </table>
           </div>
         )}
+
+        {activeTab === "history" && (
+          <div
+            className={`rounded-[2.5rem] border overflow-hidden ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+          >
+            <table className="w-full text-left">
+              <thead>
+                <tr className="text-[10px] font-black uppercase text-slate-500 border-b border-slate-800 bg-slate-800/20">
+                  <th className="p-6">Action Event</th>
+                  <th className="p-6">Details</th>
+                  <th className="p-6">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody>
+                {systemLogs.map((log) => (
+                  <tr key={log.id} className="border-b border-slate-800/10">
+                    <td className="p-6 text-blue-600 font-black uppercase text-[10px]">
+                      {log.action}
+                    </td>
+                    <td className="p-6 font-bold text-sm">{log.details}</td>
+                    <td className="p-6 text-[10px] opacity-40">
+                      {log.timestamp?.toDate().toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {activeTab === "library" && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {libraryLinks.map((lib, i) => (
+              <a
+                key={i}
+                href={lib.url}
+                target="_blank"
+                rel="noreferrer"
+                className={`p-8 rounded-[2.5rem] border transition-all hover:-translate-y-2 ${isDarkMode ? "bg-slate-900 border-white/5 hover:border-blue-600" : "bg-white border-slate-200 shadow-xl hover:border-blue-600"}`}
+              >
+                <div className="text-[10px] font-black text-blue-600 uppercase mb-2">
+                  {lib.cat}
+                </div>
+                <h3 className="font-black text-xl mb-4">{lib.name}</h3>
+                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500">
+                  Access Books <ExternalLink size={12} />
+                </div>
+              </a>
+            ))}
+          </div>
+        )}
       </main>
 
       <style>{`
         .t-nav { width: 100%; display: flex; align-items: center; gap: 15px; padding: 18px 25px; border-radius: 20px; font-weight: 900; font-size: 11px; text-transform: uppercase; color: #64748b; transition: 0.3s; border:none; background:none; cursor:pointer; }
         .t-active { background: #2563eb !important; color: white !important; box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4); }
+        .s-input { width: 100%; padding: 1.25rem; background: ${isDarkMode ? "#1e293b" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.5rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
+        .s-input:focus { border-color: #2563eb; background: ${isDarkMode ? "#0f172a" : "white"}; }
         ::-webkit-scrollbar { width: 5px; }
         ::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
         .text-shadow-glow { text-shadow: 0 0 15px rgba(37, 99, 235, 0.4); }
