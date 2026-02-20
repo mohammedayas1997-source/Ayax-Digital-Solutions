@@ -573,7 +573,7 @@ const awaitingIdCount = students.filter(s => s.paymentStatus === "Form_Paid" && 
               ))}
             </div>
           </>
-        ) : (
+      
           {/* Widget: ID Dispatch Intelligence */}
 <div className={`p-6 rounded-[2.5rem] border-2 border-dashed border-purple-500/20 flex items-center gap-4 ${darkMode ? 'bg-slate-900' : 'bg-white shadow-xl'}`}>
   <div className="p-3 bg-purple-500/10 text-purple-500 rounded-xl">
@@ -590,15 +590,15 @@ const awaitingIdCount = students.filter(s => s.paymentStatus === "Form_Paid" && 
   </div>
 </div>
 
-{/* Widget: Tuition Payments (Yanzu 50k ne) */}
-<div className={`p-6 rounded-[2.5rem] border-2 border-dashed border-amber-500/20 flex items-center gap-4 ${darkMode ? 'bg-slate-900' : 'bg-white shadow-xl'}`}>
-  <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl"><CreditCard size={24} /></div>
-  <div>
-    <p className="text-[8px] font-black uppercase opacity-40">Tuition Verified</p>
-    <h2 className="text-lg font-black text-amber-500">{tuitionPaidCount} Students</h2>
-    <p className="text-[7px] font-bold opacity-50 italic">Rate: ₦50,000 per student</p>
+  {/* Widget: Tuition Payments (Yanzu 50k ne) */}
+  <div className={`p-6 rounded-[2.5rem] border-2 border-dashed border-amber-500/20 flex items-center gap-4 ${darkMode ? 'bg-slate-900' : 'bg-white shadow-xl'}`}>
+    <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl"><CreditCard size={24} /></div>
+    <div>
+      <p className="text-[8px] font-black uppercase opacity-40">Tuition Verified</p>
+      <h2 className="text-lg font-black text-amber-500">{tuitionPaidCount} Students</h2>
+      <p className="text-[7px] font-bold opacity-50 italic">Rate: ₦50,000 per student</p>
+    </div>
   </div>
-</div>
 
           <div className="flex-1 flex flex-col items-center justify-center opacity-20 text-center">
             <ShieldAlert size={80} className="animate-pulse" />
