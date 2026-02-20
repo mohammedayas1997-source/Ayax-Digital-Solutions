@@ -1,6 +1,13 @@
 import React, { useState, useEffect } from "react";
-import { db, auth } from "../firebaseConfig";
-import { signOut, onAuthStateChanged } from "firebase/auth";
+import { db, auth, storage } from "../firebaseConfig"; // Added storage for profile images
+import {
+  signOut,
+  onAuthStateChanged,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+} from "firebase/auth";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   collection,
   getDocs,
@@ -46,6 +53,12 @@ import {
   Loader2,
   Trophy,
   AlertTriangle,
+  Camera,
+  RefreshCcw,
+  Settings,
+  UploadCloud,
+  CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 // ==========================================
@@ -138,11 +151,22 @@ const StudentPortal = () => {
   const [privateMessages, setPrivateMessages] = useState([]);
   const [newPrivateMsg, setNewPrivateMsg] = useState("");
 
+  // Settings States
+  const [passwords, setPasswords] = useState({
+    current: "",
+    new: "",
+    confirm: "",
+  });
+  const [settingsMessage, setSettingsMessage] = useState({
+    type: "",
+    text: "",
+  });
+
   // Exam States
   const [examActive, setExamActive] = useState(false);
   const [answers, setAnswers] = useState({});
   const [examScore, setExamScore] = useState(null);
-  const [timeLeft, setTimeLeft] = useState(3600); // 60 minutes in seconds
+  const [timeLeft, setTimeLeft] = useState(3600);
 
   const availableCourses = [
     {
@@ -179,7 +203,7 @@ const StudentPortal = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Sync Weeks Data from Firestore
+  // Sync Weeks Data
   useEffect(() => {
     if (!selectedCourseId) return;
     const unsubWeeks = onSnapshot(
@@ -202,11 +226,9 @@ const StudentPortal = () => {
   useEffect(() => {
     let timer;
     if (examActive && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
+      timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
     } else if (timeLeft === 0 && examActive) {
-      handleExamSubmit(); // Auto-submit when time expires
+      handleExamSubmit();
     }
     return () => clearInterval(timer);
   }, [examActive, timeLeft]);
@@ -219,22 +241,28 @@ const StudentPortal = () => {
       }
       try {
         const userRef = doc(db, "users", user.uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          const data = userSnap.data();
-          setStudentData({ id: user.uid, ...data });
-          if (data.selectedCourseId) setSelectedCourseId(data.selectedCourseId);
-          const courseStartDate =
-            data.courseSelectionDate?.toDate() || new Date("2026-01-01");
-          const diffTime = new Date() - courseStartDate;
-          const weekCount =
-            Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
-          setCurrentWeek(weekCount > 24 ? 24 : weekCount < 1 ? 1 : weekCount);
-        }
+        // Real-time listener for user data to catch profile photo updates immediately
+        const unsubUser = onSnapshot(userRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            setStudentData({ id: user.uid, ...data });
+            if (data.selectedCourseId)
+              setSelectedCourseId(data.selectedCourseId);
+            const courseStartDate =
+              data.courseSelectionDate?.toDate() || new Date("2026-01-01");
+            const diffTime = new Date() - courseStartDate;
+            const weekCount =
+              Math.floor(diffTime / (1000 * 60 * 60 * 24 * 7)) + 1;
+            setCurrentWeek(weekCount > 24 ? 24 : weekCount < 1 ? 1 : weekCount);
+          }
+        });
+
         const examRef = doc(db, `students/${user.uid}/exams/week_12`);
         const examSnap = await getDoc(examRef);
         if (examSnap.exists() && examSnap.data().passed)
           setHasPassedMidterm(true);
+
+        return () => unsubUser();
       } catch (error) {
         console.error(error);
       } finally {
@@ -279,6 +307,77 @@ const StudentPortal = () => {
     }
   }, [activeTab, viewState, selectedCourse, selectedPath]);
 
+  // --- SETTINGS PROTOCOLS ---
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      setSettingsMessage({
+        type: "error",
+        text: "File size exceeds 2MB limit.",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const storageRef = ref(
+        storage,
+        `profiles/${studentData.id}_${Date.now()}`,
+      );
+      await uploadBytes(storageRef, file);
+      const downloadURL = await getDownloadURL(storageRef);
+
+      await updateDoc(doc(db, "users", studentData.id), {
+        photoURL: downloadURL,
+        lastUpdated: serverTimestamp(),
+      });
+
+      setSettingsMessage({
+        type: "success",
+        text: "Profile identity updated.",
+      });
+    } catch (err) {
+      setSettingsMessage({ type: "error", text: "Identity upload failed." });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordUpdate = async (e) => {
+    e.preventDefault();
+    if (passwords.new !== passwords.confirm) {
+      setSettingsMessage({
+        type: "error",
+        text: "New passwords do not match.",
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const credential = EmailAuthProvider.credential(
+        auth.currentUser.email,
+        passwords.current,
+      );
+      await reauthenticateWithCredential(auth.currentUser, credential);
+      await updatePassword(auth.currentUser, passwords.new);
+
+      setSettingsMessage({
+        type: "success",
+        text: "Security credentials updated.",
+      });
+      setPasswords({ current: "", new: "", confirm: "" });
+    } catch (err) {
+      setSettingsMessage({
+        type: "error",
+        text: "Security re-auth failed. Check current password.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleInitialCourseSelection = async (courseId) => {
     setLoading(true);
     try {
@@ -312,20 +411,15 @@ const StudentPortal = () => {
     setExamActive(false);
     const questions = weeksData[String(currentWeek)]?.exams || [];
     let correctCount = 0;
-
-    // Lissafa maki
     questions.forEach((q, idx) => {
       if (answers[idx] === q.correctAnswer) correctCount++;
     });
+    const finalScore = Math.round((correctCount / questions.length) * 100);
 
-    const totalQuestions = questions.length;
-    const finalScore = Math.round((correctCount / totalQuestions) * 100);
-
-    // Adana cikakken sakamakon a Firebase
     const resultData = {
       score: finalScore,
       correctAnswers: correctCount,
-      totalQuestions: totalQuestions,
+      totalQuestions: questions.length,
       passed: finalScore >= 50,
       timeCompleted: serverTimestamp(),
       courseId: selectedCourseId,
@@ -336,8 +430,7 @@ const StudentPortal = () => {
       doc(db, `students/${studentData.id}/exams/week_${currentWeek}`),
       resultData,
     );
-
-    setExamScore(resultData); // Ajiye dukkan object din
+    setExamScore(resultData);
     if (finalScore >= 50 && currentWeek === 12) setHasPassedMidterm(true);
   };
 
@@ -434,6 +527,11 @@ const StudentPortal = () => {
             },
             { id: "library", name: "E-Library", icon: <BookOpen size={18} /> },
             { id: "chat", name: "Supervisor Direct", icon: <User size={18} /> },
+            {
+              id: "settings",
+              name: "Account Settings",
+              icon: <Settings size={18} />,
+            }, // Added Settings Tab
           ].map((item) => (
             <button
               key={item.id}
@@ -476,7 +574,6 @@ const StudentPortal = () => {
                       <CheckCircle size={10} className="text-emerald-500" />
                     )}
                   </div>
-                  {/* UMURNI: Nuna date da time da aka tura a kowane icon */}
                   {!isWeekLocked(w) && weekInfo?.updatedAt && (
                     <div className="flex items-center gap-2 mt-2 opacity-50">
                       <Clock size={10} className="text-blue-500" />
@@ -536,6 +633,123 @@ const StudentPortal = () => {
           </div>
         )}
 
+        {/* --- SETTINGS TAB UI --- */}
+        {activeTab === "settings" && (
+          <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-700">
+            <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 pb-8">
+              <div className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg">
+                <ShieldCheck size={28} />
+              </div>
+              <div>
+                <h1 className="text-3xl font-black uppercase italic tracking-tighter">
+                  Security <span className="text-blue-600">& Profile</span>
+                </h1>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                  Operational settings for UID: {studentData?.id}
+                </p>
+              </div>
+            </div>
+
+            {settingsMessage.text && (
+              <div
+                className={`p-5 rounded-2xl flex items-center gap-3 font-black text-[10px] uppercase border animate-in zoom-in ${settingsMessage.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-red-500/10 border-red-500/20 text-red-500"}`}
+              >
+                {settingsMessage.type === "success" ? (
+                  <CheckCircle2 size={18} />
+                ) : (
+                  <AlertCircle size={18} />
+                )}
+                {settingsMessage.text}
+              </div>
+            )}
+
+            <div className="grid md:grid-cols-3 gap-12">
+              <div className="space-y-6">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-blue-600">
+                  Profile Identity
+                </h3>
+                <div className="relative">
+                  <div className="w-full aspect-square rounded-[3rem] overflow-hidden border-4 border-white/10 shadow-2xl bg-slate-800 flex items-center justify-center relative">
+                    {studentData?.photoURL ? (
+                      <img
+                        src={studentData.photoURL}
+                        className="w-full h-full object-cover"
+                        alt="Profile"
+                      />
+                    ) : (
+                      <User size={60} className="text-slate-700" />
+                    )}
+                  </div>
+                  <label className="absolute -bottom-4 -right-4 p-4 bg-blue-600 text-white rounded-2xl shadow-xl cursor-pointer hover:scale-110 transition-all">
+                    <Camera size={20} />
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      disabled={loading}
+                    />
+                  </label>
+                </div>
+              </div>
+
+              <div className="md:col-span-2 space-y-8">
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-blue-600">
+                  Password Encryption
+                </h3>
+                <form
+                  onSubmit={handlePasswordUpdate}
+                  className={`p-10 rounded-[2.5rem] border shadow-xl space-y-6 ${darkMode ? "bg-slate-900 border-white/5" : "bg-white border-gray-100"}`}
+                >
+                  <input
+                    type="password"
+                    placeholder="CURRENT PASSWORD"
+                    required
+                    className="s-input"
+                    value={passwords.current}
+                    onChange={(e) =>
+                      setPasswords({ ...passwords, current: e.target.value })
+                    }
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <input
+                      type="password"
+                      placeholder="NEW PASSWORD"
+                      required
+                      className="s-input"
+                      value={passwords.new}
+                      onChange={(e) =>
+                        setPasswords({ ...passwords, new: e.target.value })
+                      }
+                    />
+                    <input
+                      type="password"
+                      placeholder="CONFIRM NEW"
+                      required
+                      className="s-input"
+                      value={passwords.confirm}
+                      onChange={(e) =>
+                        setPasswords({ ...passwords, confirm: e.target.value })
+                      }
+                    />
+                  </div>
+                  <button
+                    disabled={loading}
+                    className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3"
+                  >
+                    {loading ? (
+                      <RefreshCcw className="animate-spin" />
+                    ) : (
+                      <UploadCloud size={16} />
+                    )}{" "}
+                    Update Credentials
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
         {activeTab === "courses" && (
           <div className="space-y-8 animate-in fade-in duration-500">
             {currentWeek === 12 || currentWeek === 24 ? (
@@ -560,7 +774,6 @@ const StudentPortal = () => {
                     </div>
                   )}
                 </div>
-
                 {!examActive && !examScore ? (
                   <div className="p-10 bg-black/5 rounded-[2rem] border border-white/5">
                     <h4 className="text-xl font-black uppercase mb-6 flex items-center gap-2">
@@ -569,66 +782,52 @@ const StudentPortal = () => {
                     </h4>
                     <div className="space-y-4 opacity-80 font-bold mb-10 whitespace-pre-wrap">
                       {currentWeekInfo.examRules ||
-                        "1. No external resources permitted.\n2. Once started, the timer cannot be paused.\n3. Automatic submission after 60 minutes.\n4. Ensure a stable network connection."}
+                        "Standard examination protocols apply."}
                     </div>
                     <button
                       onClick={() => setExamActive(true)}
-                      className="w-full py-5 bg-red-600 text-white rounded-2xl font-black uppercase italic text-xl shadow-2xl hover:scale-95 transition-all"
+                      className="w-full py-5 bg-red-600 text-white rounded-2xl font-black uppercase italic text-xl shadow-2xl"
                     >
                       Start 60-Minute Assessment
                     </button>
                   </div>
                 ) : examScore !== null ? (
-                  <div className="text-center py-16 bg-blue-600/5 rounded-[3rem] border-2 border-blue-600/10 animate-in zoom-in duration-500">
+                  <div className="text-center py-16 animate-in zoom-in">
                     <Trophy
-                      className="mx-auto mb-8 text-yellow-500 animate-bounce"
+                      className="mx-auto mb-8 text-yellow-500"
                       size={100}
                     />
-                    <h2 className="text-3xl font-black uppercase italic mb-2">
+                    <h2 className="text-3xl font-black uppercase italic mb-12">
                       Performance Report
                     </h2>
-                    <p className="text-gray-500 font-bold uppercase text-[10px] tracking-widest mb-10 text-center">
-                      Week {currentWeek} Official Assessment
-                    </p>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto px-6 mb-12">
-                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
-                        <p className="text-[10px] font-black text-gray-400 uppercase mb-2">
-                          Final Grade
+                      <div className="p-8 bg-blue-600 rounded-[2rem] text-white">
+                        <p className="text-[10px] font-black uppercase mb-2">
+                          Grade
                         </p>
-                        <h4
-                          className={`text-6xl font-black italic ${examScore.passed ? "text-blue-600" : "text-red-600"}`}
-                        >
+                        <h4 className="text-6xl font-black italic">
                           {examScore.score}%
                         </h4>
                       </div>
-                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
+                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] border">
                         <p className="text-[10px] font-black text-gray-400 uppercase mb-2">
                           Accuracy
                         </p>
-                        <h4 className="text-5xl font-black italic text-emerald-500">
+                        <h4 className="text-5xl font-black text-emerald-500">
                           {examScore.correctAnswers}/{examScore.totalQuestions}
                         </h4>
                       </div>
-                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] shadow-xl border border-blue-600/5">
+                      <div className="p-8 bg-white dark:bg-slate-900 rounded-[2rem] border">
                         <p className="text-[10px] font-black text-gray-400 uppercase mb-2">
                           Status
                         </p>
                         <h4
-                          className={`text-3xl font-black italic uppercase ${examScore.passed ? "text-blue-600" : "text-red-600"}`}
+                          className={`text-3xl font-black uppercase ${examScore.passed ? "text-blue-600" : "text-red-600"}`}
                         >
                           {examScore.passed ? "Authorized" : "Denied"}
                         </h4>
                       </div>
                     </div>
-                    <button
-                      onClick={() => {
-                        setActiveTab("dashboard");
-                        setExamScore(null);
-                      }}
-                      className="px-12 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase italic shadow-2xl hover:scale-105 transition-all"
-                    >
-                      Return to Dashboard
-                    </button>
                   </div>
                 ) : (
                   <div className="space-y-12 h-[600px] overflow-y-auto px-4 custom-scrollbar">
@@ -647,7 +846,7 @@ const StudentPortal = () => {
                               onClick={() =>
                                 setAnswers({ ...answers, [idx]: opt })
                               }
-                              className={`p-5 rounded-xl font-black border-2 transition-all ${answers[idx] === opt ? "bg-blue-600 border-blue-600 text-white shadow-lg" : "border-transparent bg-black/10 hover:bg-black/20"}`}
+                              className={`p-5 rounded-xl font-black border-2 transition-all ${answers[idx] === opt ? "bg-blue-600 border-blue-600 text-white" : "border-transparent bg-black/10"}`}
                             >
                               {opt}: {q[`option${opt}`]}
                             </button>
@@ -657,7 +856,7 @@ const StudentPortal = () => {
                     ))}
                     <button
                       onClick={handleExamSubmit}
-                      className="w-full py-6 bg-emerald-600 text-white rounded-[2rem] font-black uppercase text-xl shadow-2xl sticky bottom-0"
+                      className="w-full py-6 bg-emerald-600 text-white rounded-[2rem] font-black uppercase text-xl sticky bottom-0"
                     >
                       Finalize & Submit Protocol
                     </button>
@@ -708,7 +907,7 @@ const StudentPortal = () => {
                       </a>
                     </div>
                     <div
-                      className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-white/5 border-white/5" : "bg-gray-50 border-gray-100"}`}
+                      className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-white/5" : "bg-gray-50"}`}
                     >
                       <h5 className="text-[10px] font-black text-blue-600 uppercase mb-4 flex items-center gap-2">
                         <Clock size={18} /> Weekly Task
@@ -725,6 +924,7 @@ const StudentPortal = () => {
           </div>
         )}
 
+        {/* --- LIBRARY TAB --- */}
         {activeTab === "library" && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-6">
             {libraryLinks.map((lib, i) => (
@@ -733,7 +933,7 @@ const StudentPortal = () => {
                 href={lib.url}
                 target="_blank"
                 rel="noreferrer"
-                className={`p-8 rounded-[2.5rem] border-2 transition-all hover:scale-105 group ${darkMode ? "bg-slate-900 border-slate-800 shadow-2xl" : "bg-white border-white shadow-xl"}`}
+                className={`p-8 rounded-[2.5rem] border-2 transition-all hover:scale-105 group ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-white shadow-xl"}`}
               >
                 <div className="flex justify-between items-start mb-6">
                   <div className="p-3 bg-blue-600/10 text-blue-600 rounded-xl group-hover:bg-blue-600 transition-colors">
@@ -754,6 +954,7 @@ const StudentPortal = () => {
           </div>
         )}
 
+        {/* --- DISCUSSIONS TAB --- */}
         {activeTab === "discussions" && (
           <div className="animate-in fade-in duration-500">
             {viewState === "list" && (
@@ -784,7 +985,7 @@ const StudentPortal = () => {
                     setSelectedPath("Path 1");
                     setViewState("forum");
                   }}
-                  className="p-16 bg-blue-600 text-white rounded-[4rem] font-black italic text-5xl uppercase shadow-2xl hover:scale-105 transition-all"
+                  className="p-16 bg-blue-600 text-white rounded-[4rem] font-black italic text-5xl uppercase shadow-2xl"
                 >
                   Path 1
                 </button>
@@ -793,7 +994,7 @@ const StudentPortal = () => {
                     setSelectedPath("Path 2");
                     setViewState("forum");
                   }}
-                  className="p-16 bg-slate-900 text-white rounded-[4rem] font-black italic text-5xl uppercase shadow-2xl hover:scale-105 transition-all"
+                  className="p-16 bg-slate-900 text-white rounded-[4rem] font-black italic text-5xl uppercase shadow-2xl"
                 >
                   Path 2
                 </button>
@@ -864,16 +1065,15 @@ const StudentPortal = () => {
           </div>
         )}
 
+        {/* --- CHAT TAB --- */}
         {activeTab === "chat" && (
           <div
             className={`h-[80vh] flex flex-col rounded-[3.5rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-2xl"}`}
           >
             <div className="p-8 bg-blue-600 text-white flex justify-between items-center shadow-lg">
-              <div>
-                <h3 className="text-2xl font-black uppercase italic tracking-tighter">
-                  Private Secure Link
-                </h3>
-              </div>
+              <h3 className="text-2xl font-black uppercase italic tracking-tighter">
+                Private Secure Link
+              </h3>
               <ShieldCheck size={30} />
             </div>
             <div className="flex-1 p-8 overflow-y-auto space-y-4 flex flex-col custom-scrollbar">
