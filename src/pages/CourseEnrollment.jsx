@@ -128,8 +128,12 @@ const CourseEnrollment = () => {
     if (!passportImage) { alert("Please upload your Passport photograph!"); return; }
     
     setLoading(true);
-    const formData = new FormData(e.target);
-    const capturedEmail = formData.get("email"); // Mun dauko email dashi
+    const formData = new FormData(e.currentTarget); // Amfani da currentTarget ya fi kyau
+    const capturedEmail = formData.get("email"); 
+    const studentName = formData.get("name");
+    const studentPhone = formData.get("phone");
+    const studentCourse = formData.get("course");
+    const studentAddress = formData.get("address");
 
     try {
       const passportRef = ref(storage, `passports/${Date.now()}_passport`);
@@ -137,10 +141,10 @@ const CourseEnrollment = () => {
       const passportURL = await getDownloadURL(pSnapshot.ref);
 
       const docRef = await addDoc(collection(db, "course_applications"), {
-        studentName: formData.get("name"),
+        studentName: studentName,
         email: capturedEmail,
-        phone: formData.get("phone"),
-        course: formData.get("course"),
+        phone: studentPhone,
+        course: studentCourse,
         country: selectedCountry,
         passportUrl: passportURL,
         paymentMethod: paymentMethod,
@@ -149,13 +153,13 @@ const CourseEnrollment = () => {
       });
 
       if (paymentMethod === "USDT") {
-        alert(`APPLICATION SUBMITTED: Transfer $${USDT_AMOUNT} USDT to the provided address. Manual verification required.`);
+        alert(`APPLICATION SUBMITTED: Transfer $${USDT_AMOUNT} USDT to the provided address.`);
         navigate("/payment-success", { state: { method: "USDT", amount: USDT_AMOUNT } });
       } else {
-        // PAYSTACK PROTOCOL - GYARA: Mun tabbatar capturedEmail yana da value
-        const handler = window.PaystackPop.setup({
+        // PAYSTACK PROTOCOL - AN GYARA SCOPE DIN VARIABLE ANAN
+        const paystackHandler = window.PaystackPop.setup({
           key: pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7
-          email: capturedEmail, 
+          email: String(capturedEmail), // Tabbatar da cewa String ne
           amount: 5000 * 100, 
           currency: "NGN",
           callback: async (response) => {
@@ -171,14 +175,14 @@ const CourseEnrollment = () => {
             setLoading(false);
           }
         });
-        handler.openIframe();
+        paystackHandler.openIframe();
       }
     } catch (err) {
+      console.error(err);
       alert("Submission failed.");
       setLoading(false);
     }
   };
-
   return (
     <div className="pt-32 pb-20 bg-slate-50 min-h-screen px-6 font-sans">
       <div className="max-w-4xl mx-auto bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden border border-slate-100 relative">
