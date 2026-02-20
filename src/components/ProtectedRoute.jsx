@@ -20,6 +20,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
 
           if (userDoc.exists()) {
             const userData = userDoc.data();
+            // Check for suspension
             if (
               userData.status === "suspended" ||
               userData.status === "inactive"
@@ -34,6 +35,7 @@ const ProtectedRoute = ({ children, requiredRole }) => {
               setUser(currentUser);
             }
           } else {
+            // If user exists in Auth but not in Firestore 'users' collection
             setUser(currentUser);
             setRole(null);
           }
@@ -79,25 +81,21 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     return <Navigate to={loginPath} state={{ from: location }} replace />;
   }
 
-  // --- REFINED RBAC LOGIC: STOP THE BOUNCING ---
+  // --- ROLE BASED ACCESS CONTROL (RBAC) ---
   if (requiredRole) {
     const isSuperAdmin = role === "super-admin";
     const isAdminGeneral = role === "admin" || role === "AdminContentManager";
 
-    // 1. Check if the user has permission for THIS specific route
-    const hasAccessToCurrentPage =
+    // Grant access if user is SuperAdmin or matches the required role
+    const hasAccess =
       isSuperAdmin ||
       role === requiredRole ||
       (requiredRole === "admin" && isAdminGeneral);
 
-    if (!hasAccessToCurrentPage) {
-      // ONLY redirect if they actually don't have access.
-      // If an AdminContentManager is on an "admin" page, hasAccessToCurrentPage is TRUE.
-
+    if (!hasAccess) {
+      // Direct users to their appropriate dashboard if they try to access a forbidden area
       let redirectPath = "/student-portal";
       if (isSuperAdmin) redirectPath = "/super-admin";
-      else if (role === "AdminContentManager")
-        redirectPath = "/admin-secret-portal";
       else if (role === "admin") redirectPath = "/admin-dashboard";
       else if (role === "supervisor") redirectPath = "/supervisor-dashboard";
 
@@ -105,7 +103,6 @@ const ProtectedRoute = ({ children, requiredRole }) => {
     }
   }
 
-  // If they have access, just return the children. No Navigate call = No bouncing.
   return children;
 };
 
