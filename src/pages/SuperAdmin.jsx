@@ -790,13 +790,7 @@ const SuperAdmin = () => {
           >
             <Users size={18} /> Admissions
           </button>
-          <button
-            onClick={() => setSelectedStudentInfo(s)}
-            className="p-3 bg-slate-800 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all"
-            title="View Full Profile"
-          >
-            <Eye size={16} />
-          </button>
+          
           <button
             onClick={() => setActiveTab("academic")}
             className={`nav-link ${activeTab === "academic" ? "active-nav" : ""}`}
@@ -994,6 +988,65 @@ const SuperAdmin = () => {
 
         {/* Nemo inda sauran tabs dinka suke */}
         {activeTab === "chat_monitor" && renderChatMonitor()}
+
+
+        <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="p-4 bg-amber-100 text-amber-600 rounded-2xl">
+              <Award size={24} />
+            </div>
+            <div>
+              <h3 className="text-xl font-black uppercase italic tracking-tighter">
+                Manual Certification
+              </h3>
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
+                Authority Override Terminal
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            {systemUsers
+              .filter((u) => u.role === "student")
+              .map((student) => (
+                <div
+                  key={student.id} // Tabbatar ka yi amfani da student.id maimakon student.uid
+                  className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-blue-200 transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-xs uppercase">
+                      {student.fullName?.charAt(0)}
+                    </div>
+                    <div>
+                      <h4 className="font-black text-slate-900 text-sm uppercase italic">
+                        {student.fullName}
+                      </h4>
+                      <p className="text-[8px] font-bold text-slate-400 uppercase">
+                        {student.email}
+                      </p>
+                    </div>
+                  </div>
+
+                  {student.certificateId ? (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                      <CheckCircle size={14} />
+                      <span className="text-[9px] font-black uppercase italic">
+                        Issued
+                      </span>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => issueManualCertificate(student.uid)}
+                      disabled={loading}
+                      className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg active:scale-95"
+                    >
+                      Issue Manually
+                    </button>
+                  )}
+                </div>
+              ))}
+          </div>
+        </div>
 
         {/* HISTORY LOGS TAB */}
         {activeTab === "history" && (
@@ -1357,6 +1410,9 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
+        {renderStudentProfileModal()}
+
+        {activeTab === "chat_monitor" && renderChatMonitor()}
 
         {/* ADMISSIONS */}
         {activeTab === "students" && (
@@ -1382,6 +1438,13 @@ const SuperAdmin = () => {
                     <th className="p-6 text-[10px] font-black uppercase text-center">
                       Actions
                     </th>
+                    <button
+                      onClick={() => setSelectedStudentInfo(s)}
+                      className="p-3 bg-slate-800 text-white rounded-xl shadow-lg hover:bg-blue-600 transition-all"
+                      title="View Full Profile"
+                    >
+                      <Eye size={16} />
+                    </button>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50/10">
@@ -1457,64 +1520,6 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
-
-        <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100">
-          <div className="flex items-center gap-4 mb-8">
-            <div className="p-4 bg-amber-100 text-amber-600 rounded-2xl">
-              <Award size={24} />
-            </div>
-            <div>
-              <h3 className="text-xl font-black uppercase italic tracking-tighter">
-                Manual Certification
-              </h3>
-              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                Authority Override Terminal
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            {systemUsers
-              .filter((u) => u.role === "student")
-              .map((student) => (
-                <div
-                  key={student.id} // Tabbatar ka yi amfani da student.id maimakon student.uid
-                  className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl border border-slate-100 hover:border-blue-200 transition-all"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-xs uppercase">
-                      {student.fullName?.charAt(0)}
-                    </div>
-                    <div>
-                      <h4 className="font-black text-slate-900 text-sm uppercase italic">
-                        {student.fullName}
-                      </h4>
-                      <p className="text-[8px] font-bold text-slate-400 uppercase">
-                        {student.email}
-                      </p>
-                    </div>
-                  </div>
-
-                  {student.certificateId ? (
-                    <div className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                      <CheckCircle size={14} />
-                      <span className="text-[9px] font-black uppercase italic">
-                        Issued
-                      </span>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => issueManualCertificate(student.uid)}
-                      disabled={loading}
-                      className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-slate-900 transition-all shadow-lg active:scale-95"
-                    >
-                      Issue Manually
-                    </button>
-                  )}
-                </div>
-              ))}
-          </div>
-        </div>
 
         {/* ACCESS CONTROL */}
         {activeTab === "users" && (
@@ -1674,7 +1679,7 @@ const SuperAdmin = () => {
           </div>
         )}
       </div>
-      {renderStudentProfileModal()}
+      
 
       <style>{`
         .nav-link { width: 100%; display: flex; align-items: center; gap: 15px; padding: 20px 25px; border-radius: 24px; font-weight: 800; font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.1em; transition: 0.4s; }
