@@ -38,6 +38,11 @@ import {
   ExternalLink,
   Wallet,
   TrendingUp,
+  Award,
+  UserCheck,
+  ShieldAlert,
+  FileText,
+  Zap,
 } from "lucide-react";
 
 const AdminDashboard = () => {
@@ -51,7 +56,13 @@ const AdminDashboard = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // 1. REAL-TIME DATA ENGINE
+  // SUPERVISOR PROTOCOL DATA
+  const SUPERVISOR_INFO = {
+    email: "supervisor@ayaxacademy.com",
+    phone: "2348000000000", // Replace with actual
+  };
+
+  // 1. REAL-TIME DATA ENGINE (CORE STREAMS)
   useEffect(() => {
     const unsubStudents = onSnapshot(
       collection(db, "course_applications"),
@@ -98,7 +109,7 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  // 2. Chat Monitoring Engine
+  // 2. CHAT SURVEILLANCE ENGINE
   useEffect(() => {
     if (!selectedChat) return;
     const q = query(
@@ -112,7 +123,7 @@ const AdminDashboard = () => {
     return () => unsub();
   }, [selectedChat]);
 
-  // 3. ADMINISTRATIVE ACTIONS
+  // 3. ADMINISTRATIVE MASTER ACTIONS
   const logActivity = async (action, details) => {
     await addDoc(collection(db, "admin_logs"), {
       action,
@@ -124,277 +135,334 @@ const AdminDashboard = () => {
 
   const togglePortal = async () => {
     const newStatus = !portalStatus;
-    await setDoc(doc(db, "system_settings", "portal_control"), {
-      isOpen: newStatus,
-    });
+    await setDoc(
+      doc(db, "system_settings", "portal_control"),
+      { isOpen: newStatus },
+      { merge: true },
+    );
     logActivity(
       "PORTAL_TOGGLE",
-      `Portal status changed to ${newStatus ? "OPEN" : "CLOSED"}`,
+      `Portal system state: ${newStatus ? "ACTIVE" : "LOCKDOWN"}`,
     );
   };
 
-  const dispatchIdToStudent = async (student) => {
-    const randomSuffix = Math.random()
-      .toString(36)
-      .substring(2, 6)
-      .toUpperCase();
-    const newId = `AYX-2026-${randomSuffix}`;
-    const courseLink = `https://ayaxacademy.com/courses`;
+  // 4. AUTOMATIC ID GENERATION & MULTI-CHANNEL DISPATCH
+  const handleAutomaticIDDispatch = async (student) => {
+    if (student.paymentStatus !== "Form_Paid") {
+      alert("ERROR: No payment proof found for this student.");
+      return;
+    }
 
-    const message = `Hello ${student.studentName},
-    
-Your Form payment has been verified. Here is your Student Access ID: ${newId}.
-    
-Please visit this link: ${courseLink} to complete the payment for your selected course (${student.course}).
-    
-Regards, Ayax Academy.`;
+    setLoading(true);
+    const generatedID = `AYX-2026-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const courseLink = `https://ayaxacademy.com/portal`;
+
+    const emailSubject = encodeURIComponent(
+      "Admission Approved - Student ID Assigned",
+    );
+    const messageBody = `Hello ${student.studentName},%0D%0A%0D%0AYour Form payment is verified.%0D%0AYour Student ID: ${generatedID}%0D%0APortal Link: ${courseLink}%0D%0A%0D%0ARegards, Ayax Academy.`;
 
     try {
+      // Update Database
       await updateDoc(doc(db, "course_applications", student.id), {
-        studentId: newId,
+        studentId: generatedID,
+        status: "Admitted",
+        idAssignedAt: serverTimestamp(),
       });
 
-      const encodedMsg = encodeURIComponent(message);
-      const whatsappUrl = `https://wa.me/${student.phone}?text=${encodedMsg}`;
-      window.open(whatsappUrl, "_blank");
-
-      logActivity(
-        "ID_DISPATCHED",
-        `Generated ID ${newId} and opened WhatsApp for ${student.studentName}`,
+      // Dispatch Email
+      window.open(
+        `mailto:${student.email}?subject=${emailSubject}&body=${messageBody}`,
+        "_blank",
       );
-      alert(`ID ${newId} has been generated and dispatch protocol initiated.`);
+
+      // Dispatch WhatsApp
+      const waMsg = encodeURIComponent(
+        `Hello ${student.studentName}, Admission Confirmed! ID: ${generatedID}. Portal: ${courseLink}`,
+      );
+      window.open(`https://wa.me/${student.phone}?text=${waMsg}`, "_blank");
+
+      await logActivity(
+        "AUTO_ID_DISPATCH",
+        `Generated & Dispatched ID ${generatedID} to ${student.studentName}`,
+      );
+      alert(`SUCCESS: ID ${generatedID} sent to Email and WhatsApp.`);
     } catch (err) {
-      alert("Error during ID dispatch.");
+      alert("CRITICAL ERROR: ID dispatch failed.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleAdmission = async (id, name, currentStatus) => {
-    const newStatus = currentStatus === "Admitted" ? "Pending" : "Admitted";
-    await updateDoc(doc(db, "course_applications", id), { status: newStatus });
-    logActivity(
-      "ADMISSION_CHANGE",
-      `Student ${name} status set to ${newStatus}`,
+  // 5. DIRECT CERTIFICATE ISSUANCE
+  const issueCertificate = async (student) => {
+    const certSerial = `AYX-CERT-${Date.now()}`;
+    try {
+      await updateDoc(doc(db, "course_applications", student.id), {
+        certStatus: "Issued",
+        certSerial: certSerial,
+        certDate: serverTimestamp(),
+      });
+
+      const msg = encodeURIComponent(
+        `Congratulations ${student.studentName}! Your certificate ${certSerial} is ready in your portal.`,
+      );
+      window.open(`https://wa.me/${student.phone}?text=${msg}`, "_blank");
+
+      await logActivity(
+        "CERT_ISSUE",
+        `Certificate ${certSerial} issued to ${student.studentName}`,
+      );
+      alert("Certificate Protocol Executed.");
+    } catch (err) {
+      alert("Certificate Error.");
+    }
+  };
+
+  // 6. DIRECT USER/SUPERVISOR MESSAGING
+  const directMessage = (target, mode) => {
+    const contact = target === "supervisor" ? SUPERVISOR_INFO : target;
+    const text = encodeURIComponent(
+      "URGENT: Administrative update from Ayax Academy Global Controller.",
     );
-  };
 
-  const handleLogout = async () => {
-    if (
-      window.confirm(
-        "Are you sure you want to logout from the Admin Dashboard?",
-      )
-    ) {
-      await signOut(auth);
-      window.location.href = "/login";
+    if (mode === "email") {
+      window.open(
+        `mailto:${contact.email}?subject=System Alert&body=${text}`,
+        "_blank",
+      );
+    } else {
+      window.open(
+        `https://wa.me/${contact.phone || contact.phone}?text=${text}`,
+        "_blank",
+      );
     }
   };
 
-  // SUPER ADMIN INTELLIGENCE CALCULATIONS
   const formPaidCount = students.filter(
     (s) => s.paymentStatus === "Form_Paid",
   ).length;
-  const idGeneratedCount = students.filter((s) => s.studentId).length;
   const totalRevenue = formPaidCount * 5000;
 
   return (
     <div
-      className={`min-h-screen flex font-sans transition-colors duration-500 ${darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"}`}
+      className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"}`}
     >
       {/* SIDEBAR */}
       <aside
-        className={`w-72 border-r flex flex-col transition-colors duration-500 ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-xl"}`}
+        className={`w-80 border-r flex flex-col ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-2xl"}`}
       >
-        <div className="p-8">
-          <h2 className="text-2xl font-black italic tracking-tighter text-blue-600">
-            AYAX ADMIN
+        <div className="p-10 text-center">
+          <h2 className="text-3xl font-black italic tracking-tighter text-blue-600">
+            AYAX GLOBAL
           </h2>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-50 mt-1">
-            Control Console
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] opacity-40 mt-2">
+            Control Infrastructure
           </p>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2">
+        <nav className="flex-1 px-6 space-y-3">
           {[
             {
               id: "overview",
-              icon: <LayoutDashboard size={18} />,
-              label: "Overview",
+              icon: <LayoutDashboard size={20} />,
+              label: "Command Center",
             },
             {
               id: "admissions",
-              icon: <Users size={18} />,
-              label: "Admissions",
+              icon: <Users size={20} />,
+              label: "Admission Flow",
             },
             {
               id: "surveillance",
-              icon: <Eye size={18} />,
-              label: "Chat Monitor",
+              icon: <Eye size={20} />,
+              label: "Chat Intelligence",
             },
-            { id: "history", icon: <History size={18} />, label: "Audit Logs" },
+            {
+              id: "history",
+              icon: <History size={20} />,
+              label: "System Logs",
+            },
           ].map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}
-              className={`w-full flex items-center gap-4 p-4 rounded-2xl font-black text-xs uppercase tracking-widest transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-lg" : "hover:bg-blue-500/10 opacity-60"}`}
+              className={`w-full flex items-center gap-5 p-5 rounded-[1.5rem] font-black text-xs uppercase transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-xl scale-105" : "hover:bg-blue-500/10 opacity-60"}`}
             >
               {item.icon} {item.label}
             </button>
           ))}
+
+          <div className="mt-12 p-6 bg-slate-500/5 rounded-3xl border border-slate-500/10">
+            <p className="text-[9px] font-black uppercase opacity-50 mb-4 tracking-widest text-center">
+              Supervisor Comms
+            </p>
+            <div className="flex justify-around">
+              <button
+                onClick={() => directMessage("supervisor", "email")}
+                className="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:text-blue-500 transition-colors"
+              >
+                <Mail size={18} />
+              </button>
+              <button
+                onClick={() => directMessage("supervisor", "whatsapp")}
+                className="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:text-emerald-500 transition-colors"
+              >
+                <MessageSquare size={18} />
+              </button>
+            </div>
+          </div>
         </nav>
 
-        <div className="p-6 border-t border-slate-800/10 space-y-4">
+        <div className="p-8 space-y-4">
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className="w-full flex items-center justify-between p-3 bg-slate-500/10 rounded-xl"
+            className="w-full py-4 flex items-center justify-center gap-4 bg-slate-500/10 rounded-2xl"
           >
-            <span className="text-[10px] font-black uppercase tracking-widest">
+            {darkMode ? (
+              <Sun size={20} className="text-yellow-400" />
+            ) : (
+              <Moon size={20} className="text-blue-500" />
+            )}
+            <span className="font-black text-[10px] uppercase">
               {darkMode ? "Light Mode" : "Dark Mode"}
             </span>
-            {darkMode ? (
-              <Sun size={16} className="text-yellow-400" />
-            ) : (
-              <Moon size={16} className="text-blue-500" />
-            )}
           </button>
           <button
-            onClick={handleLogout}
-            className="w-full flex items-center gap-4 p-4 text-red-500 font-black text-xs uppercase hover:bg-red-500/10 rounded-2xl transition-all border border-transparent hover:border-red-500/20"
+            onClick={() => auth.signOut()}
+            className="w-full py-5 bg-red-600/10 text-red-600 rounded-2xl font-black text-[10px] uppercase border border-red-600/20 hover:bg-red-600 hover:text-white transition-all"
           >
-            <LogOut size={18} /> Logout System
+            <LogOut size={20} className="inline mr-2" /> Shutdown Session
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 flex flex-col overflow-hidden h-screen">
-        <header className="h-24 border-b flex items-center justify-between px-10 bg-white/5 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-10">
+      {/* MAIN CONSOLE */}
+      <main className="flex-1 flex flex-col h-screen overflow-hidden">
+        <header className="h-28 border-b flex items-center justify-between px-12 bg-white/5 backdrop-blur-3xl shrink-0">
+          <div className="flex items-center gap-12">
             <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase opacity-40">
-                Total Revenue
+              <span className="text-[10px] font-black uppercase opacity-40 text-emerald-500">
+                Gross Revenue (Verified)
               </span>
-              <div className="flex items-center gap-2 text-emerald-500 font-black text-xl tracking-tighter">
-                <Wallet size={18} /> ₦{totalRevenue.toLocaleString()}
+              <div className="text-3xl font-black tracking-tighter text-emerald-500">
+                ₦{totalRevenue.toLocaleString()}
               </div>
             </div>
-            <div className="w-[1px] h-10 bg-slate-500/10"></div>
+            <div className="w-[1px] h-12 bg-slate-500/20"></div>
             <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase opacity-40">
-                Form Paid
+              <span className="text-[10px] font-black uppercase opacity-40 text-blue-500">
+                Registered Talent
               </span>
-              <div className="flex items-center gap-2 text-blue-500 font-black text-xl tracking-tighter">
-                <TrendingUp size={18} /> {formPaidCount}
-              </div>
-            </div>
-            <div className="w-[1px] h-10 bg-slate-500/10"></div>
-            <div className="flex flex-col">
-              <span className="text-[9px] font-black uppercase opacity-40">
-                IDs Dispatched
-              </span>
-              <div className="flex items-center gap-2 text-purple-500 font-black text-xl tracking-tighter">
-                <Fingerprint size={18} /> {idGeneratedCount}
+              <div className="text-3xl font-black tracking-tighter text-blue-500">
+                {students.length}
               </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3 bg-slate-500/5 px-6 py-3 rounded-2xl border border-slate-500/10">
               <div
-                className={`w-3 h-3 rounded-full animate-pulse ${portalStatus ? "bg-emerald-500" : "bg-red-500"}`}
+                className={`w-3 h-3 rounded-full ${portalStatus ? "bg-emerald-500 shadow-[0_0_15px_#10b981]" : "bg-red-500 shadow-[0_0_15px_#ef4444]"}`}
               ></div>
-              <h3 className="text-[10px] font-black uppercase tracking-widest">
-                Portal: {portalStatus ? "Live" : "Locked"}
-              </h3>
+              <span className="text-[11px] font-black uppercase">
+                Portal: {portalStatus ? "Active" : "Locked"}
+              </span>
             </div>
             <button
               onClick={togglePortal}
-              className={`px-6 py-2 rounded-xl font-black text-[10px] uppercase transition-all shadow-lg ${portalStatus ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
+              className={`px-10 py-4 rounded-2xl font-black text-[10px] uppercase transition-all shadow-2xl ${portalStatus ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
             >
-              {portalStatus ? "Initiate Lockdown" : "Open Portal"}
+              {portalStatus ? "Initiate Lockdown" : "Open System Access"}
             </button>
           </div>
         </header>
 
-        <div className="flex-1 p-10 overflow-y-auto">
+        <div className="flex-1 p-12 overflow-y-auto">
           {activeTab === "admissions" && (
             <div
-              className={`rounded-[2.5rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
             >
               <table className="w-full text-left">
-                <thead className="bg-slate-500/5 text-[10px] font-black uppercase tracking-[0.2em] opacity-50">
+                <thead className="bg-slate-500/5 text-[11px] font-black uppercase tracking-widest opacity-60">
                   <tr>
-                    <th className="p-6">Student</th>
-                    <th className="p-6">Payment Status</th>
-                    <th className="p-6">Access ID & Notify</th>
-                    <th className="p-6">Status</th>
-                    <th className="p-6 text-center">Protocol</th>
+                    <th className="p-8">Student Identity</th>
+                    <th className="p-8">Financial Clearance</th>
+                    <th className="p-8">Credentialing</th>
+                    <th className="p-8 text-center">Global Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/10">
+                <tbody className="divide-y divide-slate-800/10 font-bold">
                   {students.map((s) => (
                     <tr
                       key={s.id}
-                      className="hover:bg-slate-500/5 transition-colors"
+                      className="hover:bg-slate-500/5 transition-all"
                     >
-                      <td className="p-6 flex items-center gap-4">
-                        <img
-                          src={s.passportUrl}
-                          className="w-10 h-10 rounded-xl object-cover border-2 border-blue-600/20 shadow-sm"
-                        />
-                        <div>
-                          <p className="font-black text-sm">{s.studentName}</p>
-                          <p className="text-[9px] font-bold text-blue-500 uppercase">
-                            {s.course}
-                          </p>
+                      <td className="p-8">
+                        <div className="flex items-center gap-5">
+                          <img
+                            src={s.passportUrl}
+                            className="w-14 h-14 rounded-[1.2rem] object-cover border-2 border-blue-600/30"
+                          />
+                          <div>
+                            <p className="text-sm font-black uppercase tracking-tight">
+                              {s.studentName}
+                            </p>
+                            <p className="text-[10px] text-blue-500 uppercase">
+                              {s.course}
+                            </p>
+                          </div>
                         </div>
                       </td>
-                      <td className="p-6">
-                        {s.paymentStatus === "Form_Paid" ? (
-                          <div className="flex items-center gap-2 text-emerald-500 font-black text-[10px] uppercase bg-emerald-500/5 px-3 py-1 rounded-lg border border-emerald-500/20 w-fit">
-                            <CheckCircle size={14} /> Paid (₦5K)
-                          </div>
-                        ) : (
-                          <div className="text-red-500 font-black text-[10px] uppercase opacity-40 italic">
-                            Unpaid
-                          </div>
-                        )}
+                      <td className="p-8">
+                        <span
+                          className={`px-4 py-2 rounded-xl text-[10px] uppercase border ${s.paymentStatus === "Form_Paid" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" : "bg-red-500/10 text-red-500 border-red-500/30"}`}
+                        >
+                          {s.paymentStatus}
+                        </span>
                       </td>
-                      <td className="p-6">
+                      <td className="p-8">
                         {s.studentId ? (
                           <div className="flex items-center gap-3">
-                            <span className="font-black text-xs text-purple-500 bg-purple-500/10 px-3 py-1 rounded-lg border border-purple-500/20 font-mono tracking-tighter italic">
+                            <Zap
+                              size={16}
+                              className="text-purple-500 fill-purple-500/20"
+                            />
+                            <span className="font-mono text-xs font-black tracking-tighter">
                               {s.studentId}
                             </span>
-                            <CheckCircle
-                              size={14}
-                              className="text-purple-500"
-                            />
                           </div>
                         ) : (
                           <button
-                            onClick={() => dispatchIdToStudent(s)}
-                            className="flex items-center gap-2 text-[9px] font-black uppercase text-amber-600 bg-amber-500/10 px-4 py-2 rounded-xl hover:bg-amber-500/20 transition-all border border-amber-500/20"
+                            onClick={() => handleAutomaticIDDispatch(s)}
+                            className="flex items-center gap-3 px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-slate-900 transition-all"
                           >
-                            <Fingerprint size={14} /> Dispatch ID
+                            <UserCheck size={16} /> Verify & Dispatch
                           </button>
                         )}
                       </td>
-                      <td className="p-6 text-[10px] font-black uppercase">
-                        <span
-                          className={`px-3 py-1 rounded-lg ${s.status === "Admitted" ? "bg-emerald-500/10 text-emerald-500" : "bg-amber-500/10 text-amber-500"}`}
-                        >
-                          {s.status || "Pending"}
-                        </span>
-                      </td>
-                      <td className="p-6 text-center">
-                        <button
-                          onClick={() =>
-                            handleAdmission(s.id, s.studentName, s.status)
-                          }
-                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all ${s.status === "Admitted" ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
-                        >
-                          {s.status === "Admitted"
-                            ? "Revoke"
-                            : "Grant Admission"}
-                        </button>
+                      <td className="p-8">
+                        <div className="flex items-center justify-center gap-3">
+                          <button
+                            onClick={() => issueCertificate(s)}
+                            className="p-4 bg-amber-500/10 text-amber-600 rounded-2xl hover:bg-amber-500 hover:text-white transition-all"
+                            title="Issue Certificate"
+                          >
+                            <Award size={20} />
+                          </button>
+                          <button
+                            onClick={() => directMessage(s, "email")}
+                            className="p-4 bg-blue-500/10 text-blue-600 rounded-2xl hover:bg-blue-500 hover:text-white transition-all"
+                          >
+                            <Mail size={20} />
+                          </button>
+                          <button
+                            onClick={() => directMessage(s, "whatsapp")}
+                            className="p-4 bg-emerald-500/10 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all"
+                          >
+                            <MessageSquare size={20} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -404,129 +472,51 @@ Regards, Ayax Academy.`;
           )}
 
           {activeTab === "overview" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div
-                className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-xl"}`}
-              >
-                <Activity className="text-blue-600 mb-4" />
-                <h4 className="metric-label">Total Applicants</h4>
-                <p className="text-4xl font-black">{students.length}</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+              <div className="stat-card">
+                <Activity className="text-blue-600 mb-6" size={32} />
+                <h4 className="metric-label">System Admissions</h4>
+                <p className="text-6xl font-black">{students.length}</p>
               </div>
-              <div
-                className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-xl"}`}
-              >
-                <CheckCircle className="text-emerald-500 mb-4" />
-                <h4 className="metric-label">Verified Payments</h4>
-                <p className="text-4xl font-black">{formPaidCount}</p>
+              <div className="stat-card">
+                <CheckCircle className="text-emerald-500 mb-6" size={32} />
+                <h4 className="metric-label">Revenue Sources</h4>
+                <p className="text-6xl font-black">{formPaidCount}</p>
               </div>
-              <div
-                className={`p-8 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-xl"}`}
-              >
-                <Fingerprint className="text-purple-500 mb-4" />
-                <h4 className="metric-label">IDs Issued</h4>
-                <p className="text-4xl font-black">{idGeneratedCount}</p>
-              </div>
-            </div>
-          )}
-
-          {activeTab === "surveillance" && (
-            <div className="flex gap-8 h-[70vh]">
-              <div
-                className={`w-80 rounded-[2.5rem] border overflow-hidden flex flex-col ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-xl"}`}
-              >
-                <div className="p-6 border-b border-slate-800/10 font-black text-xs uppercase tracking-widest">
-                  Active Threads
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                  {chats.map((chat) => (
-                    <button
-                      key={chat.studentId}
-                      onClick={() => setSelectedChat(chat)}
-                      className={`w-full text-left p-4 rounded-2xl border ${selectedChat?.studentId === chat.studentId ? "bg-blue-600 border-blue-600 text-white shadow-lg" : "hover:bg-blue-500/10 border-transparent opacity-70"}`}
-                    >
-                      <p className="font-black text-[11px] truncate uppercase">
-                        {chat.sender}
-                      </p>
-                      <p className="text-[9px] truncate opacity-80 mt-1 italic">
-                        Last: {chat.text}
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div
-                className={`flex-1 rounded-[2.5rem] border flex flex-col overflow-hidden relative ${darkMode ? "bg-slate-900 border-slate-800 shadow-inner" : "bg-slate-50 border-slate-100 shadow-2xl"}`}
-              >
-                {selectedChat ? (
-                  <>
-                    <header className="p-6 border-b border-slate-800/10 flex justify-between items-center bg-blue-600 text-white">
-                      <div>
-                        <h4 className="font-black text-sm uppercase italic">
-                          {selectedChat.sender} (Monitor)
-                        </h4>
-                        <p className="text-[9px] font-bold uppercase opacity-80 tracking-widest">
-                          Surveillance Node Active
-                        </p>
-                      </div>
-                      <ShieldCheck size={20} className="animate-pulse" />
-                    </header>
-                    <div className="flex-1 p-8 overflow-y-auto space-y-4">
-                      {messages.map((m) => (
-                        <div
-                          key={m.id}
-                          className={`flex flex-col ${m.senderRole === "student" ? "items-start" : "items-end"}`}
-                        >
-                          <div
-                            className={`max-w-[70%] p-4 rounded-2xl text-xs font-bold shadow-sm ${m.senderRole === "student" ? "bg-white text-slate-900" : "bg-emerald-600 text-white"}`}
-                          >
-                            {m.text}
-                            <p className="text-[7px] mt-2 uppercase opacity-40 font-black tracking-widest">
-                              {m.senderRole} •{" "}
-                              {m.createdAt?.toDate().toLocaleTimeString()}
-                            </p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center opacity-20 italic">
-                    <Eye size={100} className="mb-4 animate-bounce" />
-                    <p className="font-black uppercase tracking-widest">
-                      Select thread to audit conversations
-                    </p>
-                  </div>
-                )}
+              <div className="stat-card">
+                <Fingerprint className="text-purple-500 mb-6" size={32} />
+                <h4 className="metric-label">Security IDs Active</h4>
+                <p className="text-6xl font-black">
+                  {students.filter((s) => s.studentId).length}
+                </p>
               </div>
             </div>
           )}
 
           {activeTab === "history" && (
             <div
-              className={`rounded-[2.5rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
             >
               <table className="w-full text-left">
-                <thead className="bg-slate-500/5 text-[10px] font-black uppercase tracking-widest">
+                <thead className="bg-slate-500/5 text-[11px] font-black uppercase tracking-widest opacity-60">
                   <tr>
-                    <th className="p-6">Timestamp</th>
-                    <th className="p-6">Protocol Action</th>
-                    <th className="p-6">Audit Details</th>
+                    <th className="p-8">Audit Time</th>
+                    <th className="p-8">Protocol</th>
+                    <th className="p-8">Operational Data</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800/10">
+                <tbody className="divide-y divide-slate-800/10 font-bold">
                   {historyLogs.map((log) => (
                     <tr key={log.id} className="text-xs">
-                      <td className="p-6 opacity-50 font-bold">
+                      <td className="p-8 opacity-40">
                         {log.timestamp?.toDate().toLocaleString()}
                       </td>
-                      <td className="p-6">
-                        <span className="px-2 py-1 bg-blue-600/10 text-blue-600 rounded font-black uppercase text-[9px]">
+                      <td className="p-8">
+                        <span className="px-3 py-1 bg-blue-600/10 text-blue-600 rounded-lg font-black uppercase text-[10px]">
                           {log.action}
                         </span>
                       </td>
-                      <td className="p-6 font-medium italic opacity-80">
-                        {log.details}
-                      </td>
+                      <td className="p-8 italic opacity-70">{log.details}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -536,7 +526,13 @@ Regards, Ayax Academy.`;
         </div>
       </main>
 
-      <style>{` .metric-label { font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; } ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-thumb { background: rgba(37, 99, 235, 0.2); border-radius: 10px; } `}</style>
+      <style>{`
+        .metric-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.15em; }
+        .stat-card { padding: 50px; border-radius: 50px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.05); transition: transform 0.3s ease; }
+        .stat-card:hover { transform: translateY(-10px); }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
+      `}</style>
     </div>
   );
 };
