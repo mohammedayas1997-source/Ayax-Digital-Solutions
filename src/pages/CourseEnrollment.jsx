@@ -18,6 +18,9 @@ import {
   User,
   MapPin,
   Bitcoin,
+  Fingerprint, 
+  Wallet, 
+  TrendingUp,
   CreditCard,
   Copy,
   CheckCircle2
@@ -92,7 +95,11 @@ const CourseEnrollment = () => {
   const [educationList, setEducationList] = useState([{ qualification: "", institution: "", course: "", year: "" }]);
   const [selectedCountry, setSelectedCountry] = useState("Nigeria");
   const [selectedCourse, setSelectedCourse] = useState(location.state?.selectedCourse || "");
-  
+    // Tabbatar wadannan suna nan a saman return din SuperAdmin
+  const formPaidCount = students.filter(s => s.paymentStatus === "Form_Paid").length;
+  const tuitionPaidCount = students.filter(s => s.paymentStatus === "Verified").length;
+  const idGeneratedCount = students.filter(s => s.studentId).length;
+  const totalRevenue = (formPaidCount * 5000) + (tuitionPaidCount * 50000);
   const USDT_ADDRESS = "YOUR_BEP20_OR_TRC20_WALLET_ADDRESS_HERE";
   const USDT_AMOUNT = "3.50"; 
 
@@ -171,7 +178,7 @@ const CourseEnrollment = () => {
     // 2. Kira Paystack a wajen try/catch block (Wannan zai hana build error)
     if (paymentMethod === "Paystack") {
       const handler = window.PaystackPop.setup({
-        key: 'YOUR_PAYSTACK_PUBLIC_KEY', 
+        key: pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7,
         email: studentEmailForPaystack, // Yanzu esbuild zai ganshi domin yana saman function
         amount: 5000 * 100, 
         currency: "NGN",
