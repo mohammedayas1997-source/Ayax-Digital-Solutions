@@ -65,6 +65,16 @@ const SuperAdmin = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [historyLogs, setHistoryLogs] = useState([]);
 
+    // 1. Sabunta lissafin kudi zuwa ₦50,000
+  const formPaidCount = students.filter(s => s.paymentStatus === "Form_Paid").length;
+  const tuitionPaidCount = students.filter(s => s.paymentStatus === "Verified").length; 
+
+  // 1. Lissafin waɗanda aka ba wa ID
+const idGeneratedCount = students.filter(s => s.studentId).length;
+const awaitingIdCount = students.filter(s => s.paymentStatus === "Form_Paid" && !s.studentId).length;
+  // Lissafi: (Form Paid * 5,000) + (Tuition Paid * 50,000)
+  const totalRevenue = (formPaidCount * 5000) + (tuitionPaidCount * 50000);
+
   // Academic & Scheduling State
   const [lessons, setLessons] = useState([]);
   const [weeklyDates, setWeeklyDates] = useState({});
@@ -561,6 +571,32 @@ const SuperAdmin = () => {
             </div>
           </>
         ) : (
+          {/* Widget: ID Dispatch Intelligence */}
+<div className={`p-6 rounded-[2.5rem] border-2 border-dashed border-purple-500/20 flex items-center gap-4 ${darkMode ? 'bg-slate-900' : 'bg-white shadow-xl'}`}>
+  <div className="p-3 bg-purple-500/10 text-purple-500 rounded-xl">
+    <Fingerprint size={24} />
+  </div>
+  <div>
+    <p className="text-[8px] font-black uppercase opacity-40 tracking-widest">IDs Dispatched</p>
+    <h2 className="text-lg font-black text-purple-500">{idGeneratedCount} Students</h2>
+    {awaitingIdCount > 0 && (
+      <p className="text-[7px] font-bold text-amber-500 animate-pulse">
+        {awaitingIdCount} Awaiting ID
+      </p>
+    )}
+  </div>
+</div>
+
+{/* Widget: Tuition Payments (Yanzu 50k ne) */}
+<div className={`p-6 rounded-[2.5rem] border-2 border-dashed border-amber-500/20 flex items-center gap-4 ${darkMode ? 'bg-slate-900' : 'bg-white shadow-xl'}`}>
+  <div className="p-3 bg-amber-500/10 text-amber-500 rounded-xl"><CreditCard size={24} /></div>
+  <div>
+    <p className="text-[8px] font-black uppercase opacity-40">Tuition Verified</p>
+    <h2 className="text-lg font-black text-amber-500">{tuitionPaidCount} Students</h2>
+    <p className="text-[7px] font-bold opacity-50 italic">Rate: ₦50,000 per student</p>
+  </div>
+</div>
+
           <div className="flex-1 flex flex-col items-center justify-center opacity-20 text-center">
             <ShieldAlert size={80} className="animate-pulse" />
             <p className="font-black uppercase tracking-widest text-[10px] mt-4">
@@ -1309,7 +1345,7 @@ const SuperAdmin = () => {
             </table>
           </div>
         )}
-
+        
         {/* FORUM MANAGEMENT (Complete) */}
         {activeTab === "global_forum" && (
           <div className="flex gap-8 h-[75vh]">
