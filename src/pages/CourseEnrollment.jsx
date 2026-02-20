@@ -124,7 +124,7 @@ const CourseEnrollment = () => {
   return (
     <div className="pt-32 pb-20 bg-slate-50 min-h-screen px-6 font-sans">
       <div className="max-w-4xl mx-auto bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden border border-slate-100 relative">
-        {/* CLOSE BUTTON (Madaidaicin matsayi) */}
+        {/* CLOSE BUTTON */}
         <button
           onClick={() => navigate("/")}
           className="absolute top-8 right-8 z-10 p-3 bg-slate-100 hover:bg-red-500 hover:text-white text-slate-500 rounded-2xl transition-all duration-300 group shadow-sm"
@@ -235,7 +235,7 @@ const CourseEnrollment = () => {
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase ml-2">
-                  Contact Number
+                  Contact Number/WhatsApp
                 </label>
                 <input
                   name="phone"
@@ -333,15 +333,20 @@ const CourseEnrollment = () => {
                       }
                       required
                     />
-                    <input
-                      className="input-style"
-                      placeholder="Course of Study"
-                      value={edu.course}
-                      onChange={(e) =>
-                        handleEducationChange(index, "course", e.target.value)
-                      }
-                      required
-                    />
+                    
+                    {/* UMURNI: Cire Course of Study kawai idan SSCE ne */}
+                    {edu.qualification !== "SSCE" && (
+                      <input
+                        className="input-style"
+                        placeholder="Course of Study"
+                        value={edu.course}
+                        onChange={(e) =>
+                          handleEducationChange(index, "course", e.target.value)
+                        }
+                        required
+                      />
+                    )}
+
                     <input
                       className="input-style"
                       placeholder="Graduation Year"
