@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { db, storage } from "../firebaseConfig";
-import { collection, addDoc, serverTimestamp, updateDoc, doc } from "firebase/firestore";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  updateDoc,
+  doc,
+} from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   GraduationCap,
@@ -18,12 +24,9 @@ import {
   User,
   MapPin,
   Bitcoin,
-  Fingerprint, 
-  Wallet, 
-  TrendingUp,
   CreditCard,
   Copy,
-  CheckCircle2
+  CheckCircle2,
 } from "lucide-react";
 
 // MULTI-CURRENCY DATA (Africa 54 Countries - Est. Rates for NGN 5,000)
@@ -81,7 +84,7 @@ const currencyData = {
   Tunisia: { code: "TND", symbol: "DT", fee: 10 },
   Uganda: { code: "UGX", symbol: "USh", fee: 12650 },
   Zambia: { code: "ZMW", symbol: "ZK", fee: 90 },
-  Zimbabwe: { code: "ZWG", symbol: "ZiG", fee: 450 }
+  Zimbabwe: { code: "ZWG", symbol: "ZiG", fee: 450 },
 };
 
 const CourseEnrollment = () => {
@@ -92,16 +95,16 @@ const CourseEnrollment = () => {
   const [copied, setCopied] = useState(false);
   const [passportImage, setPassportImage] = useState(null);
   const [passportPreview, setPassportPreview] = useState(null);
-  const [educationList, setEducationList] = useState([{ qualification: "", institution: "", course: "", year: "" }]);
+  const [educationList, setEducationList] = useState([
+    { qualification: "", institution: "", course: "", year: "" },
+  ]);
   const [selectedCountry, setSelectedCountry] = useState("Nigeria");
-  const [selectedCourse, setSelectedCourse] = useState(location.state?.selectedCourse || "");
-    // Tabbatar wadannan suna nan a saman return din SuperAdmin
-  const formPaidCount = students.filter(s => s.paymentStatus === "Form_Paid").length;
-  const tuitionPaidCount = students.filter(s => s.paymentStatus === "Verified").length;
-  const idGeneratedCount = students.filter(s => s.studentId).length;
-  const totalRevenue = (formPaidCount * 5000) + (tuitionPaidCount * 50000);
+  const [selectedCourse, setSelectedCourse] = useState(
+    location.state?.selectedCourse || "",
+  );
+
   const USDT_ADDRESS = "YOUR_BEP20_OR_TRC20_WALLET_ADDRESS_HERE";
-  const USDT_AMOUNT = "3.50"; 
+  const USDT_AMOUNT = "3.50";
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(USDT_ADDRESS);
@@ -123,23 +126,29 @@ const CourseEnrollment = () => {
     setEducationList(list);
   };
 
-  const addEducation = () => setEducationList([...educationList, { qualification: "", institution: "", course: "", year: "" }]);
+  const addEducation = () =>
+    setEducationList([
+      ...educationList,
+      { qualification: "", institution: "", course: "", year: "" },
+    ]);
   const removeEducation = (index) => {
     const list = [...educationList];
     list.splice(index, 1);
     setEducationList(list);
   };
 
- const handleApply = async (e) => {
+  const handleApply = async (e) => {
     e.preventDefault();
-    if (!passportImage) { alert("Please upload your Passport photograph!"); return; }
-    
+    if (!passportImage) {
+      alert("Please upload your Passport photograph!");
+      return;
+    }
+
     setLoading(true);
     const form = e.currentTarget;
     const formData = new FormData(form);
-    
-    // 1. Ayya na dukkan variables a matakin sama (Top Scope)
-    const studentEmailForPaystack = formData.get("email"); 
+
+    const studentEmailForPaystack = formData.get("email");
     const studentName = formData.get("name");
 
     let docId = "";
@@ -153,101 +162,146 @@ const CourseEnrollment = () => {
         studentName: studentName,
         email: studentEmailForPaystack,
         phone: formData.get("phone"),
-        course: formData.get("course"),
+        course: selectedCourse,
         country: selectedCountry,
         passportUrl: passportURL,
         paymentMethod: paymentMethod,
+        education: educationList,
+        address: formData.get("address"),
+        currentState: formData.get("currentState"),
+        currentLGA: formData.get("currentLGA"),
+        stateOfOrigin: formData.get("stateOfOrigin"),
+        lgaOfOrigin: formData.get("lgaOfOrigin"),
         appliedAt: serverTimestamp(),
         paymentStatus: "Form_Unpaid",
       });
-      
+
       docId = docRef.id;
 
       if (paymentMethod === "USDT") {
         alert(`APPLICATION SUBMITTED: Transfer $${USDT_AMOUNT} USDT.`);
-        navigate("/payment-success", { state: { method: "USDT", amount: USDT_AMOUNT } });
-        return; // Tsaya anan idan USDT ne
+        navigate("/payment-success", {
+          state: { method: "USDT", amount: USDT_AMOUNT },
+        });
+        return;
+      }
+
+      if (paymentMethod === "Paystack") {
+        const handler = window.PaystackPop.setup({
+          key: pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7, // SAKA KEY DIN KA A NAN
+          email: studentEmailForPaystack,
+          amount: 5000 * 100,
+          currency: "NGN",
+          callback: async (response) => {
+            await updateDoc(doc(db, "course_applications", docId), {
+              paymentStatus: "Form_Paid",
+              formTransactionRef: response.reference,
+            });
+            alert("SUCCESS: Registration Fee Received.");
+            navigate("/payment-success", {
+              state: { reference: response.reference },
+            });
+          },
+          onClose: () => {
+            alert("Payment Terminated.");
+            setLoading(false);
+          },
+        });
+        handler.openIframe();
       }
     } catch (err) {
       console.error(err);
       alert("Submission failed.");
       setLoading(false);
-      return;
-    }
-
-    // 2. Kira Paystack a wajen try/catch block (Wannan zai hana build error)
-    if (paymentMethod === "Paystack") {
-      const handler = window.PaystackPop.setup({
-        key: pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7,
-        email: studentEmailForPaystack, // Yanzu esbuild zai ganshi domin yana saman function
-        amount: 5000 * 100, 
-        currency: "NGN",
-        callback: async (response) => {
-          await updateDoc(doc(db, "course_applications", docId), {
-            paymentStatus: "Form_Paid",
-            formTransactionRef: response.reference,
-          });
-          alert("SUCCESS: Registration Fee Received.");
-          navigate("/payment-success", { state: { reference: response.reference } });
-        },
-        onClose: () => {
-          alert("Payment Terminated.");
-          setLoading(false);
-        }
-      });
-      handler.openIframe();
     }
   };
-   
+
   return (
     <div className="pt-32 pb-20 bg-slate-50 min-h-screen px-6 font-sans">
       <div className="max-w-4xl mx-auto bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden border border-slate-100 relative">
-        <button onClick={() => navigate("/")} className="absolute top-8 right-8 z-10 p-3 bg-slate-100 hover:bg-red-500 hover:text-white text-slate-500 rounded-2xl transition-all group shadow-sm">
-          <X size={24} className="group-hover:rotate-90 transition-transform duration-300" />
+        <button
+          onClick={() => navigate("/")}
+          className="absolute top-8 right-8 z-10 p-3 bg-slate-100 hover:bg-red-500 hover:text-white text-slate-500 rounded-2xl transition-all group shadow-sm"
+        >
+          <X
+            size={24}
+            className="group-hover:rotate-90 transition-transform duration-300"
+          />
         </button>
 
         <div className="bg-slate-900 p-12 text-center">
           <GraduationCap className="w-16 h-16 mx-auto mb-4 text-blue-500 animate-pulse" />
-          <h1 className="text-4xl font-black uppercase text-white">Elite <span className="text-blue-500">Enrollment</span></h1>
-          <p className="text-slate-400 font-bold mt-2 uppercase text-[10px] tracking-[0.3em]">Official Admissions Portal 2026</p>
+          <h1 className="text-4xl font-black uppercase text-white">
+            Elite <span className="text-blue-500">Enrollment</span>
+          </h1>
+          <p className="text-slate-400 font-bold mt-2 uppercase text-[10px] tracking-[0.3em]">
+            Official Admissions Portal 2026
+          </p>
         </div>
 
         <form onSubmit={handleApply} className="p-8 lg:p-16 space-y-16">
-          
           <div className="space-y-6">
-            <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">Payment Gateway</h3>
+            <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">
+              Payment Gateway
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div 
+              <div
                 onClick={() => setPaymentMethod("USDT")}
                 className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all flex items-center gap-4 ${paymentMethod === "USDT" ? "border-emerald-500 bg-emerald-50" : "border-slate-100"}`}
               >
-                <div className="p-3 bg-emerald-500 text-white rounded-xl"><Bitcoin size={24} /></div>
-                <div><p className="font-black text-xs uppercase">USDT (Crypto)</p><p className="text-[10px] opacity-60">Global Payment ($)</p></div>
+                <div className="p-3 bg-emerald-500 text-white rounded-xl">
+                  <Bitcoin size={24} />
+                </div>
+                <div>
+                  <p className="font-black text-xs uppercase">USDT (Crypto)</p>
+                  <p className="text-[10px] opacity-60">Global Payment ($)</p>
+                </div>
               </div>
 
-              <div 
+              <div
                 onClick={() => setPaymentMethod("Paystack")}
                 className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all flex items-center gap-4 ${paymentMethod === "Paystack" ? "border-blue-600 bg-blue-50" : "border-slate-100"}`}
               >
-                <div className="p-3 bg-blue-600 text-white rounded-xl"><CreditCard size={24} /></div>
-                <div><p className="font-black text-xs uppercase">Paystack</p><p className="text-[10px] opacity-60">Local Cards (₦)</p></div>
+                <div className="p-3 bg-blue-600 text-white rounded-xl">
+                  <CreditCard size={24} />
+                </div>
+                <div>
+                  <p className="font-black text-xs uppercase">Paystack</p>
+                  <p className="text-[10px] opacity-60">Local Cards (₦)</p>
+                </div>
               </div>
             </div>
 
             {paymentMethod === "USDT" && (
               <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white animate-in slide-in-from-top-4 duration-500 border-b-4 border-emerald-500">
                 <div className="flex justify-between items-start mb-6">
-                    <div>
-                      <h4 className="text-emerald-400 font-black text-sm uppercase italic">Crypto Settlement</h4>
-                      <p className="text-[10px] opacity-60 mt-1 uppercase tracking-widest font-black">Transfer USDT (BEP20/TRC20)</p>
-                    </div>
-                    <div className="bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl font-black text-2xl animate-pulse">${USDT_AMOUNT}</div>
+                  <div>
+                    <h4 className="text-emerald-400 font-black text-sm uppercase italic">
+                      Crypto Settlement
+                    </h4>
+                    <p className="text-[10px] opacity-60 mt-1 uppercase tracking-widest font-black">
+                      Transfer USDT (BEP20/TRC20)
+                    </p>
+                  </div>
+                  <div className="bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl font-black text-2xl animate-pulse">
+                    ${USDT_AMOUNT}
+                  </div>
                 </div>
                 <div className="bg-white/5 p-4 rounded-2xl flex items-center justify-between border border-white/10 group hover:border-emerald-500 transition-all">
-                    <code className="text-[10px] font-bold break-all opacity-80">{USDT_ADDRESS}</code>
-                    <button type="button" onClick={copyToClipboard} className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2">
-                       {copied ? <CheckCircle2 size={18} className="text-emerald-400" /> : <Copy size={18} className="text-white/50" />}
-                    </button>
+                  <code className="text-[10px] font-bold break-all opacity-80">
+                    {USDT_ADDRESS}
+                  </code>
+                  <button
+                    type="button"
+                    onClick={copyToClipboard}
+                    className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    {copied ? (
+                      <CheckCircle2 size={18} className="text-emerald-400" />
+                    ) : (
+                      <Copy size={18} className="text-white/50" />
+                    )}
+                  </button>
                 </div>
               </div>
             )}
@@ -255,54 +309,153 @@ const CourseEnrollment = () => {
 
           <div className="flex flex-col items-center space-y-6">
             <div className="relative w-48 h-48 bg-slate-50 rounded-[2.5rem] border-4 border-dashed border-slate-200 flex items-center justify-center overflow-hidden group hover:border-blue-400">
-              {passportPreview ? <img src={passportPreview} className="w-full h-full object-cover" /> : <div className="text-center"><Camera className="text-slate-300 group-hover:text-blue-500 mx-auto" size={48} /><p className="text-[9px] font-black text-slate-400 mt-2 uppercase">Max 2MB</p></div>}
-              <input type="file" accept="image/*" required onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
+              {passportPreview ? (
+                <img
+                  src={passportPreview}
+                  className="w-full h-full object-cover"
+                  alt="Passport Preview"
+                />
+              ) : (
+                <div className="text-center">
+                  <Camera
+                    className="text-slate-300 group-hover:text-blue-500 mx-auto"
+                    size={48}
+                  />
+                  <p className="text-[9px] font-black text-slate-400 mt-2 uppercase">
+                    Max 2MB
+                  </p>
+                </div>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                required
+                onChange={handleImageChange}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
             </div>
           </div>
 
           <div className="space-y-8">
-            <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">Student Credentials</h3>
+            <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">
+              Student Credentials
+            </h3>
             <div className="grid md:grid-cols-2 gap-8">
-              <input name="name" required className="input-style" placeholder="Full Name" />
-              <input name="email" type="email" required className="input-style" placeholder="Email Address" />
-              <input name="phone" type="tel" required className="input-style" placeholder="WhatsApp Number" />
-              
+              <input
+                name="name"
+                required
+                className="input-style"
+                placeholder="Full Name"
+              />
+              <input
+                name="email"
+                type="email"
+                required
+                className="input-style"
+                placeholder="Email Address"
+              />
+              <input
+                name="phone"
+                type="tel"
+                required
+                className="input-style"
+                placeholder="WhatsApp Number"
+              />
+
               <div className="space-y-2">
-                <select name="country" required className="input-style" value={selectedCountry} onChange={(e) => setSelectedCountry(e.target.value)}>
-                  {Object.keys(currencyData).map((c) => (<option key={c} value={c}>{c.replace("_", " ")}</option>))}
+                <select
+                  name="country"
+                  required
+                  className="input-style"
+                  value={selectedCountry}
+                  onChange={(e) => setSelectedCountry(e.target.value)}
+                >
+                  {Object.keys(currencyData).map((c) => (
+                    <option key={c} value={c}>
+                      {c.replace("_", " ")}
+                    </option>
+                  ))}
                 </select>
               </div>
 
               <div className="md:col-span-2 p-6 bg-blue-600 rounded-[2rem] text-white flex justify-between items-center shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-10 -translate-y-10"></div>
-                <div className="flex items-center gap-3 relative z-10"><Globe size={24} className="opacity-70" /><span className="text-[10px] font-black uppercase tracking-widest">Local Equivalent Price</span></div>
+                <div className="flex items-center gap-3 relative z-10">
+                  <Globe size={24} className="opacity-70" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    Local Equivalent Price
+                  </span>
+                </div>
                 <div className="text-right relative z-10">
-                    <h2 className="text-3xl font-black">{currencyData[selectedCountry].symbol}{currencyData[selectedCountry].fee.toLocaleString()}</h2>
-                    <p className="text-[8px] font-bold opacity-70 uppercase tracking-tighter italic">Official Registration Rate</p>
+                  <h2 className="text-3xl font-black">
+                    {currencyData[selectedCountry].symbol}
+                    {currencyData[selectedCountry].fee.toLocaleString()}
+                  </h2>
+                  <p className="text-[8px] font-bold opacity-70 uppercase tracking-tighter italic">
+                    Official Registration Rate
+                  </p>
                 </div>
               </div>
-              
-              <select name="course" required className="input-style md:col-span-2" value={selectedCourse} onChange={(e) => setSelectedCourse(e.target.value)}>
+
+              <select
+                name="course"
+                required
+                className="input-style md:col-span-2"
+                value={selectedCourse}
+                onChange={(e) => setSelectedCourse(e.target.value)}
+              >
                 <option value="">Select Specialization</option>
                 <option value="Cyber security">Cyber security</option>
                 <option value="Data Analytics">Data Analytics</option>
-                <option value="Software Engineering">Software Engineering</option>
-                <option value="Artificial Intelligence">Artificial Intelligence</option>
-                <option value="Blockchain Technology">Blockchain Technology</option>
+                <option value="Software Engineering">
+                  Software Engineering
+                </option>
+                <option value="Artificial Intelligence">
+                  Artificial Intelligence
+                </option>
+                <option value="Blockchain Technology">
+                  Blockchain Technology
+                </option>
                 <option value="Web development">Web development</option>
-                <option value="advanced Digital Marketing">Advanced Digital Marketing</option>
+                <option value="advanced Digital Marketing">
+                  Advanced Digital Marketing
+                </option>
               </select>
             </div>
           </div>
 
           <div className="space-y-8">
-            <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">Academic History</h3>
+            <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">
+              Academic History
+            </h3>
             <div className="space-y-6">
               {educationList.map((edu, index) => (
-                <div key={index} className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 relative animate-in fade-in zoom-in duration-300">
-                  {educationList.length > 1 && <button type="button" onClick={() => removeEducation(index)} className="absolute top-6 right-6 text-red-400 hover:text-red-600"><Trash2 size={20} /></button>}
+                <div
+                  key={index}
+                  className="p-8 bg-slate-50 rounded-[2rem] border border-slate-100 relative animate-in fade-in zoom-in duration-300"
+                >
+                  {educationList.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeEducation(index)}
+                      className="absolute top-6 right-6 text-red-400 hover:text-red-600"
+                    >
+                      <Trash2 size={20} />
+                    </button>
+                  )}
                   <div className="grid md:grid-cols-2 gap-6">
-                    <select className="input-style" value={edu.qualification} onChange={(e) => handleEducationChange(index, "qualification", e.target.value)} required>
+                    <select
+                      className="input-style"
+                      value={edu.qualification}
+                      onChange={(e) =>
+                        handleEducationChange(
+                          index,
+                          "qualification",
+                          e.target.value,
+                        )
+                      }
+                      required
+                    >
                       <option value="">Select Qualification</option>
                       <option value="SSCE">SSCE</option>
                       <option value="ND/Diploma">ND / Diploma</option>
@@ -310,29 +463,103 @@ const CourseEnrollment = () => {
                       <option value="HND/Degree">HND / Degree</option>
                       <option value="Postgraduate">Postgraduate</option>
                     </select>
-                    <input className="input-style" placeholder="Institution Name" value={edu.institution} onChange={(e) => handleEducationChange(index, "institution", e.target.value)} required />
-                    {edu.qualification !== "SSCE" && <input className="input-style" placeholder="Course of Study" value={edu.course} onChange={(e) => handleEducationChange(index, "course", e.target.value)} required />}
-                    <input className="input-style" placeholder="Graduation Year" value={edu.year} onChange={(e) => handleEducationChange(index, "year", e.target.value)} required />
+                    <input
+                      className="input-style"
+                      placeholder="Institution Name"
+                      value={edu.institution}
+                      onChange={(e) =>
+                        handleEducationChange(
+                          index,
+                          "institution",
+                          e.target.value,
+                        )
+                      }
+                      required
+                    />
+                    {edu.qualification !== "SSCE" && (
+                      <input
+                        className="input-style"
+                        placeholder="Course of Study"
+                        value={edu.course}
+                        onChange={(e) =>
+                          handleEducationChange(index, "course", e.target.value)
+                        }
+                        required
+                      />
+                    )}
+                    <input
+                      className="input-style"
+                      placeholder="Graduation Year"
+                      value={edu.year}
+                      onChange={(e) =>
+                        handleEducationChange(index, "year", e.target.value)
+                      }
+                      required
+                    />
                   </div>
                 </div>
               ))}
             </div>
-            <button type="button" onClick={addEducation} className="w-full py-4 border-2 border-dashed border-blue-200 text-blue-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-black"><Plus size={16} /> Add More Credentials</button>
+            <button
+              type="button"
+              onClick={addEducation}
+              className="w-full py-4 border-2 border-dashed border-blue-200 text-blue-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
+            >
+              <Plus size={16} /> Add More Credentials
+            </button>
           </div>
 
           <div className="space-y-8">
-            <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">Resident & Origin</h3>
+            <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">
+              Resident & Origin
+            </h3>
             <div className="grid md:grid-cols-2 gap-6">
-              <input name="address" required className="input-style md:col-span-2" placeholder="Street Address" />
-              <input name="currentState" required className="input-style" placeholder="Current State" />
-              <input name="currentLGA" required className="input-style" placeholder="Current LGA" />
-              <input name="stateOfOrigin" required className="input-style" placeholder="State of Origin" />
-              <input name="lgaOfOrigin" required className="input-style" placeholder="LGA of Origin" />
+              <input
+                name="address"
+                required
+                className="input-style md:col-span-2"
+                placeholder="Street Address"
+              />
+              <input
+                name="currentState"
+                required
+                className="input-style"
+                placeholder="Current State"
+              />
+              <input
+                name="currentLGA"
+                required
+                className="input-style"
+                placeholder="Current LGA"
+              />
+              <input
+                name="stateOfOrigin"
+                required
+                className="input-style"
+                placeholder="State of Origin"
+              />
+              <input
+                name="lgaOfOrigin"
+                required
+                className="input-style"
+                placeholder="LGA of Origin"
+              />
             </div>
           </div>
 
-          <button disabled={loading} className="w-full py-8 bg-blue-600 text-white rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-xs hover:bg-slate-900 transition-all flex items-center justify-center gap-4 shadow-xl active:scale-95 disabled:opacity-50">
-            {loading ? <><UploadCloud className="animate-spin" /> Processing...</> : <>Confirm Submission <ArrowRight size={22} /></>}
+          <button
+            disabled={loading}
+            className="w-full py-8 bg-blue-600 text-white rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-xs hover:bg-slate-900 transition-all flex items-center justify-center gap-4 shadow-xl active:scale-95 disabled:opacity-50"
+          >
+            {loading ? (
+              <>
+                <UploadCloud className="animate-spin" /> Processing...
+              </>
+            ) : (
+              <>
+                Confirm Submission <ArrowRight size={22} />
+              </>
+            )}
           </button>
         </form>
       </div>
