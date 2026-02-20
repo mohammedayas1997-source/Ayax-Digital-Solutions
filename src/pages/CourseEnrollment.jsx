@@ -123,17 +123,19 @@ const CourseEnrollment = () => {
     setEducationList(list);
   };
 
-  const handleApply = async (e) => {
+ const handleApply = async (e) => {
     e.preventDefault();
     if (!passportImage) { alert("Please upload your Passport photograph!"); return; }
     
     setLoading(true);
-    const formData = new FormData(e.currentTarget); // Amfani da currentTarget ya fi kyau
-    const capturedEmail = formData.get("email"); 
+    const form = e.currentTarget;
+    const formData = new FormData(form);
+    
+    // 1. Ayya na dukkan variables a matakin sama (Top Scope)
+    const studentEmailForPaystack = formData.get("email"); 
     const studentName = formData.get("name");
-    const studentPhone = formData.get("phone");
-    const studentCourse = formData.get("course");
-    const studentAddress = formData.get("address");
+
+    let docId = "";
 
     try {
       const passportRef = ref(storage, `passports/${Date.now()}_passport`);
@@ -142,47 +144,54 @@ const CourseEnrollment = () => {
 
       const docRef = await addDoc(collection(db, "course_applications"), {
         studentName: studentName,
-        email: capturedEmail,
-        phone: studentPhone,
-        course: studentCourse,
+        email: studentEmailForPaystack,
+        phone: formData.get("phone"),
+        course: formData.get("course"),
         country: selectedCountry,
         passportUrl: passportURL,
         paymentMethod: paymentMethod,
         appliedAt: serverTimestamp(),
         paymentStatus: "Form_Unpaid",
       });
+      
+      docId = docRef.id;
 
       if (paymentMethod === "USDT") {
-        alert(`APPLICATION SUBMITTED: Transfer $${USDT_AMOUNT} USDT to the provided address.`);
+        alert(`APPLICATION SUBMITTED: Transfer $${USDT_AMOUNT} USDT.`);
         navigate("/payment-success", { state: { method: "USDT", amount: USDT_AMOUNT } });
-      } else {
-        // PAYSTACK PROTOCOL - AN GYARA SCOPE DIN VARIABLE ANAN
-        const paystackHandler = window.PaystackPop.setup({
-          key: pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7
-          email: String(capturedEmail), // Tabbatar da cewa String ne
-          amount: 5000 * 100, 
-          currency: "NGN",
-          callback: async (response) => {
-            await updateDoc(doc(db, "course_applications", docRef.id), {
-              paymentStatus: "Form_Paid",
-              formTransactionRef: response.reference,
-            });
-            alert("SUCCESS: Registration Fee Received via Paystack.");
-            navigate("/payment-success", { state: { reference: response.reference } });
-          },
-          onClose: () => {
-            alert("Payment Terminated.");
-            setLoading(false);
-          }
-        });
-        paystackHandler.openIframe();
+        return; // Tsaya anan idan USDT ne
       }
     } catch (err) {
       console.error(err);
       alert("Submission failed.");
       setLoading(false);
+      return;
+    }
+
+    // 2. Kira Paystack a wajen try/catch block (Wannan zai hana build error)
+    if (paymentMethod === "Paystack") {
+      const handler = window.PaystackPop.setup({
+        key: 'YOUR_PAYSTACK_PUBLIC_KEY', 
+        email: studentEmailForPaystack, // Yanzu esbuild zai ganshi domin yana saman function
+        amount: 5000 * 100, 
+        currency: "NGN",
+        callback: async (response) => {
+          await updateDoc(doc(db, "course_applications", docId), {
+            paymentStatus: "Form_Paid",
+            formTransactionRef: response.reference,
+          });
+          alert("SUCCESS: Registration Fee Received.");
+          navigate("/payment-success", { state: { reference: response.reference } });
+        },
+        onClose: () => {
+          alert("Payment Terminated.");
+          setLoading(false);
+        }
+      });
+      handler.openIframe();
     }
   };
+   
   return (
     <div className="pt-32 pb-20 bg-slate-50 min-h-screen px-6 font-sans">
       <div className="max-w-4xl mx-auto bg-white rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.05)] overflow-hidden border border-slate-100 relative">
