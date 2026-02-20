@@ -7,15 +7,14 @@ import {
 } from "react-router-dom";
 import { auth } from "./firebaseConfig";
 
-// --- ALL IMPORTS ---
+// --- CORE SYSTEM IMPORTS ---
+import Navbar from "./components/Navbar";
+import Home from "./pages/Home";
 import AboutUs from "./pages/AboutUs";
 import Terms from "./pages/Terms";
 import Privacy from "./pages/Privacy";
-import Navbar from "./components/Navbar";
-import Home from "./pages/Home";
-import ProjectForm from "./components/ProjectForm";
 import CourseEnrollment from "./pages/CourseEnrollment";
-import AdminDashboard from "./pages/AdminDashboard2";
+import ProjectForm from "./components/ProjectForm";
 import Login from "./pages/Login";
 import AuthPortal from "./components/AuthPortal";
 import StudentPortal from "./components/StudentPortal";
@@ -24,22 +23,26 @@ import LessonPlayer from "./components/LessonPlayer";
 import WeeklyForum from "./components/WeeklyForum";
 import VerifyCertificate from "./pages/VerifyCertificate";
 import Certificate from "./components/Certificate";
-import AdminGrading from "./pages/AdminGrading";
 import AcademicExam from "./components/AcademicExam";
-import AdminQuestionBank from "./pages/AdminQuestionBank";
-import SuperAdmin from "./pages/SuperAdmin";
-import AdminContentManager from "./components/AdminContentManager";
 import StudentLogin from "./pages/StudentLogin";
 import AdminLogin from "./pages/AdminLogin";
 import StudentGrades from "./pages/StudentGrades";
+import ForumDetails from "./components/ForumDetails";
+import CourseSection from "./components/CourseSection";
+import PricingCard from "./components/PricingCard";
+
+// --- ADMINISTRATIVE IMPORTS (FIXED PATHS) ---
+// CHANGE: Pointed to the main AdminDashboard file where our logic is
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminGrading from "./pages/AdminGrading";
+import AdminQuestionBank from "./pages/AdminQuestionBank";
+import SuperAdmin from "./pages/SuperAdmin";
+import AdminContentManager from "./components/AdminContentManager";
 import AdminChatManager from "./pages/AdminChatManager";
 import AdminCourseList from "./pages/AdminCourseList";
 import AdminCourseDashboard from "./pages/AdminCourseDashboard";
 import AdminStudentsList from "./pages/AdminStudentsList";
-import ForumDetails from "./components/ForumDetails";
 import SupervisorDashboard from "./pages/SupervisorDashboard";
-import CourseSection from "./components/CourseSection";
-import PricingCard from "./components/PricingCard";
 
 const midtermQuestions = [
   {
@@ -81,7 +84,7 @@ function App() {
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-gateway" element={<AdminLogin />} />
 
-          {/* --- PROTECTED ROUTES - ADMIN --- */}
+          {/* --- PROTECTED ROUTES: ADMINISTRATIVE --- */}
           <Route
             path="/admin-dashboard"
             element={
@@ -147,7 +150,7 @@ function App() {
             }
           />
 
-          {/* --- SUPERVISOR & SUPER ADMIN --- */}
+          {/* --- EXECUTIVE MANAGEMENT --- */}
           <Route
             path="/supervisor-dashboard"
             element={
@@ -165,7 +168,7 @@ function App() {
             }
           />
 
-          {/* --- STUDENT SECURE INFRASTRUCTURE --- */}
+          {/* --- SECURE STUDENT INFRASTRUCTURE --- */}
           <Route
             path="/student-portal"
             element={
@@ -224,7 +227,6 @@ function App() {
             }
           />
 
-          {/* CATCH-ALL REDIRECT */}
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </div>
