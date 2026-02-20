@@ -457,6 +457,79 @@ const SuperAdmin = () => {
     }
   };
 
+  // 1. Wannan shine Function din da Admin zai rika danna wa
+  const togglePortalStatus = async () => {
+    setLoading(true);
+    try {
+      const portalRef = doc(db, "system_settings", "portal_control");
+      const newStatus = !portalStatus; // Idan a bude yake zai koma kulle
+
+      await setDoc(
+        portalRef,
+        {
+          isOpen: newStatus,
+          lastUpdated: serverTimestamp(),
+          updatedBy: auth.currentUser?.email || "ADMIN_SESSION",
+        },
+        { merge: true },
+      );
+
+      // Adana hakan a cikin History Logs
+      await addDoc(collection(db, "admin_logs"), {
+        action: "PORTAL_SECURITY_TOGGLE",
+        details: `Portal was manually ${newStatus ? "OPENED" : "LOCKED"} by Admin.`,
+        timestamp: serverTimestamp(),
+      });
+
+      alert(
+        `SECURITY PROTOCOL: Portal is now ${newStatus ? "LIVE" : "LOCKED"}`,
+      );
+    } catch (err) {
+      console.error("Lockdown Error:", err);
+      alert("CRITICAL ERROR: Failed to toggle portal status.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2. Wannan shi ne UI din da zaka gani a Admin Header
+  const renderPortalControl = () => (
+    <div
+      className={`p-6 rounded-[2rem] border flex items-center justify-between gap-6 ${darkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-lg"}`}
+    >
+      <div className="flex items-center gap-4">
+        <div
+          className={`p-4 rounded-2xl ${portalStatus ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"}`}
+        >
+          {portalStatus ? <Unlock size={24} /> : <Lock size={24} />}
+        </div>
+        <div>
+          <h4 className="text-[10px] font-black uppercase opacity-40">
+            System Access Control
+          </h4>
+          <p
+            className={`font-black text-xs uppercase ${portalStatus ? "text-emerald-500" : "text-red-500"}`}
+          >
+            Portal Status:{" "}
+            {portalStatus ? "Operational (Open)" : "Lockdown (Closed)"}
+          </p>
+        </div>
+      </div>
+
+      <button
+        onClick={togglePortalStatus}
+        disabled={loading}
+        className={`px-8 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all ${portalStatus ? "bg-red-600 hover:bg-red-700 text-white shadow-red-500/20" : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-500/20"} shadow-xl active:scale-95`}
+      >
+        {loading
+          ? "Syncing..."
+          : portalStatus
+            ? "Initiate Lockdown"
+            : "Activate Portal"}
+      </button>
+    </div>
+  );
+
   const handleAdminReply = async (e) => {
     e.preventDefault();
     if (!adminReply.trim()) return;

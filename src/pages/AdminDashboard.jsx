@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { db, auth } from "../firebaseConfig";
-import { signOut } from "firebase/signOut";
+import { signOut } from "firebase/auth";
 import {
   collection,
   onSnapshot,
@@ -51,7 +51,7 @@ const AdminDashboard = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // 1. REAL-TIME DATA ENGINE (Dukkan Streams suna nan daram)
+  // 1. REAL-TIME DATA ENGINE
   useEffect(() => {
     const unsubStudents = onSnapshot(
       collection(db, "course_applications"),
@@ -98,7 +98,7 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  // 2. Chat Monitoring Engine (Surveillance Logic)
+  // 2. Chat Monitoring Engine
   useEffect(() => {
     if (!selectedChat) return;
     const q = query(
@@ -141,13 +141,13 @@ const AdminDashboard = () => {
     const newId = `AYX-2026-${randomSuffix}`;
     const courseLink = `https://ayaxacademy.com/courses`;
 
-    const message = `Sannu ${student.studentName},
+    const message = `Hello ${student.studentName},
     
-An tabbatar da biyan kudin Form dinka. Ga Student Access ID dinka: ${newId}.
+Your Form payment has been verified. Here is your Student Access ID: ${newId}.
     
-Da fatan za ka ziyarci wannan link din: ${courseLink} domin kammala biyan kudin kwas din (${student.course}) da ka zaba.
+Please visit this link: ${courseLink} to complete the payment for your selected course (${student.course}).
     
-Godiya daga Ayax Academy.`;
+Regards, Ayax Academy.`;
 
     try {
       await updateDoc(doc(db, "course_applications", student.id), {
@@ -178,7 +178,11 @@ Godiya daga Ayax Academy.`;
   };
 
   const handleLogout = async () => {
-    if (window.confirm("Kuna son fita daga Admin Dashboard?")) {
+    if (
+      window.confirm(
+        "Are you sure you want to logout from the Admin Dashboard?",
+      )
+    ) {
       await signOut(auth);
       window.location.href = "/login";
     }
@@ -260,7 +264,6 @@ Godiya daga Ayax Academy.`;
         </div>
       </aside>
 
-      {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col overflow-hidden h-screen">
         <header className="h-24 border-b flex items-center justify-between px-10 bg-white/5 backdrop-blur-md shrink-0">
           <div className="flex items-center gap-10">

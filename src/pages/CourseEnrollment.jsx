@@ -7,29 +7,23 @@ import {
   serverTimestamp,
   updateDoc,
   doc,
+  onSnapshot,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import {
   GraduationCap,
   Globe,
-  Home,
   Camera,
   UploadCloud,
-  School,
-  Info,
   ArrowRight,
   Plus,
   Trash2,
   X,
-  User,
-  MapPin,
-  Bitcoin,
   CreditCard,
-  Copy,
-  CheckCircle2,
+  Lock,
 } from "lucide-react";
 
-// MULTI-CURRENCY DATA (Africa 54 Countries - Est. Rates for NGN 5,000)
+// MULTI-CURRENCY DATA (Africa 54 Countries)
 const currencyData = {
   Nigeria: { code: "NGN", symbol: "₦", fee: 5000 },
   Algeria: { code: "DZD", symbol: "DA", fee: 455 },
@@ -91,8 +85,7 @@ const CourseEnrollment = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("USDT");
-  const [copied, setCopied] = useState(false);
+  const [portalOpen, setPortalOpen] = useState(true);
   const [passportImage, setPassportImage] = useState(null);
   const [passportPreview, setPassportPreview] = useState(null);
   const [educationList, setEducationList] = useState([
@@ -103,14 +96,34 @@ const CourseEnrollment = () => {
     location.state?.selectedCourse || "",
   );
 
-  const USDT_ADDRESS = "YOUR_BEP20_OR_TRC20_WALLET_ADDRESS_HERE";
-  const USDT_AMOUNT = "3.50";
+  // SAKA PAYSTACK KEY DINKA A NAN
+  const PAYSTACK_PUBLIC_KEY =
+    "pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7";
 
-  const copyToClipboard = () => {
-    navigator.clipboard.writeText(USDT_ADDRESS);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  // 1. PORTAL LOCKDOWN LISTENER
+  useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, "system_settings", "portal_control"),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setPortalOpen(docSnap.data().isOpen);
+        }
+      },
+    );
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const unsub = onSnapshot(
+      doc(db, "system_settings", "portal_control"),
+      (docSnap) => {
+        if (docSnap.exists()) {
+          setPortalOpen(docSnap.data().isOpen);
+        }
+      },
+    );
+    return () => unsub();
+  }, []);
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -131,6 +144,7 @@ const CourseEnrollment = () => {
       ...educationList,
       { qualification: "", institution: "", course: "", year: "" },
     ]);
+
   const removeEducation = (index) => {
     const list = [...educationList];
     list.splice(index, 1);
@@ -139,6 +153,10 @@ const CourseEnrollment = () => {
 
   const handleApply = async (e) => {
     e.preventDefault();
+    if (!portalOpen) {
+      alert("Portal is currently locked by the administrator.");
+      return;
+    }
     if (!passportImage) {
       alert("Please upload your Passport photograph!");
       return;
@@ -148,24 +166,24 @@ const CourseEnrollment = () => {
     const form = e.currentTarget;
     const formData = new FormData(form);
 
-    const studentEmailForPaystack = formData.get("email");
+    const studentEmail = formData.get("email");
     const studentName = formData.get("name");
 
-    let docId = "";
-
     try {
+      // Step 1: Upload Passport
       const passportRef = ref(storage, `passports/${Date.now()}_passport`);
       const pSnapshot = await uploadBytes(passportRef, passportImage);
       const passportURL = await getDownloadURL(pSnapshot.ref);
 
-      const docRef = await addDoc(collection(db, "course_applications"), {
+      // Step 2: Create Student Document
+      const studentData = {
         studentName: studentName,
-        email: studentEmailForPaystack,
+        email: studentEmail,
         phone: formData.get("phone"),
         course: selectedCourse,
         country: selectedCountry,
         passportUrl: passportURL,
-        paymentMethod: paymentMethod,
+        paymentMethod: "Paystack",
         education: educationList,
         address: formData.get("address"),
         currentState: formData.get("currentState"),
@@ -174,47 +192,67 @@ const CourseEnrollment = () => {
         lgaOfOrigin: formData.get("lgaOfOrigin"),
         appliedAt: serverTimestamp(),
         paymentStatus: "Form_Unpaid",
+      };
+
+      const docRef = await addDoc(
+        collection(db, "course_applications"),
+        studentData,
+      );
+
+      // Step 3: Trigger Paystack
+      const handler = window.PaystackPop.setup({
+        key: pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7,
+        email: studentEmail,
+        amount: 5000 * 100, // NGN 5,000
+        currency: "NGN",
+        callback: async (response) => {
+          await updateDoc(doc(db, "course_applications", docRef.id), {
+            paymentStatus: "Form_Paid",
+            formTransactionRef: response.reference,
+          });
+          alert("SUCCESS: Registration Fee Received.");
+          navigate("/payment-success", {
+            state: { reference: response.reference },
+          });
+        },
+        onClose: () => {
+          alert("Payment Terminated. Application saved as UNPAID.");
+          setLoading(false);
+        },
       });
-
-      docId = docRef.id;
-
-      if (paymentMethod === "USDT") {
-        alert(`APPLICATION SUBMITTED: Transfer $${USDT_AMOUNT} USDT.`);
-        navigate("/payment-success", {
-          state: { method: "USDT", amount: USDT_AMOUNT },
-        });
-        return;
-      }
-
-      if (paymentMethod === "Paystack") {
-        const handler = window.PaystackPop.setup({
-          key: pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7, // SAKA KEY DIN KA A NAN
-          email: studentEmailForPaystack,
-          amount: 5000 * 100,
-          currency: "NGN",
-          callback: async (response) => {
-            await updateDoc(doc(db, "course_applications", docId), {
-              paymentStatus: "Form_Paid",
-              formTransactionRef: response.reference,
-            });
-            alert("SUCCESS: Registration Fee Received.");
-            navigate("/payment-success", {
-              state: { reference: response.reference },
-            });
-          },
-          onClose: () => {
-            alert("Payment Terminated.");
-            setLoading(false);
-          },
-        });
-        handler.openIframe();
-      }
+      handler.openIframe();
     } catch (err) {
       console.error(err);
       alert("Submission failed.");
       setLoading(false);
     }
   };
+
+  // 3. LOCKDOWN SCREEN UI
+  if (!portalOpen) {
+    return (
+      <div className="h-screen w-full bg-slate-950 flex flex-col items-center justify-center p-10 text-center">
+        <div className="p-10 bg-white/5 rounded-[4rem] border border-white/10 backdrop-blur-3xl">
+          <Lock
+            size={100}
+            className="text-red-500 mx-auto mb-8 animate-bounce"
+          />
+          <h1 className="text-5xl font-black uppercase text-white tracking-tighter">
+            Portal <span className="text-red-500">Locked</span>
+          </h1>
+          <p className="text-slate-400 font-bold mt-4 uppercase text-xs tracking-[0.4em]">
+            Admissions are currently suspended by the administration.
+          </p>
+          <button
+            onClick={() => navigate("/")}
+            className="mt-10 px-10 py-4 bg-white text-black rounded-2xl font-black uppercase text-[10px] hover:bg-red-500 hover:text-white transition-all"
+          >
+            Return to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="pt-32 pb-20 bg-slate-50 min-h-screen px-6 font-sans">
@@ -240,73 +278,6 @@ const CourseEnrollment = () => {
         </div>
 
         <form onSubmit={handleApply} className="p-8 lg:p-16 space-y-16">
-          <div className="space-y-6">
-            <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">
-              Payment Gateway
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div
-                onClick={() => setPaymentMethod("USDT")}
-                className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all flex items-center gap-4 ${paymentMethod === "USDT" ? "border-emerald-500 bg-emerald-50" : "border-slate-100"}`}
-              >
-                <div className="p-3 bg-emerald-500 text-white rounded-xl">
-                  <Bitcoin size={24} />
-                </div>
-                <div>
-                  <p className="font-black text-xs uppercase">USDT (Crypto)</p>
-                  <p className="text-[10px] opacity-60">Global Payment ($)</p>
-                </div>
-              </div>
-
-              <div
-                onClick={() => setPaymentMethod("Paystack")}
-                className={`p-6 rounded-[2rem] border-2 cursor-pointer transition-all flex items-center gap-4 ${paymentMethod === "Paystack" ? "border-blue-600 bg-blue-50" : "border-slate-100"}`}
-              >
-                <div className="p-3 bg-blue-600 text-white rounded-xl">
-                  <CreditCard size={24} />
-                </div>
-                <div>
-                  <p className="font-black text-xs uppercase">Paystack</p>
-                  <p className="text-[10px] opacity-60">Local Cards (₦)</p>
-                </div>
-              </div>
-            </div>
-
-            {paymentMethod === "USDT" && (
-              <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white animate-in slide-in-from-top-4 duration-500 border-b-4 border-emerald-500">
-                <div className="flex justify-between items-start mb-6">
-                  <div>
-                    <h4 className="text-emerald-400 font-black text-sm uppercase italic">
-                      Crypto Settlement
-                    </h4>
-                    <p className="text-[10px] opacity-60 mt-1 uppercase tracking-widest font-black">
-                      Transfer USDT (BEP20/TRC20)
-                    </p>
-                  </div>
-                  <div className="bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl font-black text-2xl animate-pulse">
-                    ${USDT_AMOUNT}
-                  </div>
-                </div>
-                <div className="bg-white/5 p-4 rounded-2xl flex items-center justify-between border border-white/10 group hover:border-emerald-500 transition-all">
-                  <code className="text-[10px] font-bold break-all opacity-80">
-                    {USDT_ADDRESS}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={copyToClipboard}
-                    className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2"
-                  >
-                    {copied ? (
-                      <CheckCircle2 size={18} className="text-emerald-400" />
-                    ) : (
-                      <Copy size={18} className="text-white/50" />
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
           <div className="flex flex-col items-center space-y-6">
             <div className="relative w-48 h-48 bg-slate-50 rounded-[2.5rem] border-4 border-dashed border-slate-200 flex items-center justify-center overflow-hidden group hover:border-blue-400">
               {passportPreview ? (
@@ -361,29 +332,26 @@ const CourseEnrollment = () => {
                 className="input-style"
                 placeholder="WhatsApp Number"
               />
-
-              <div className="space-y-2">
-                <select
-                  name="country"
-                  required
-                  className="input-style"
-                  value={selectedCountry}
-                  onChange={(e) => setSelectedCountry(e.target.value)}
-                >
-                  {Object.keys(currencyData).map((c) => (
-                    <option key={c} value={c}>
-                      {c.replace("_", " ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <select
+                name="country"
+                required
+                className="input-style"
+                value={selectedCountry}
+                onChange={(e) => setSelectedCountry(e.target.value)}
+              >
+                {Object.keys(currencyData).map((c) => (
+                  <option key={c} value={c}>
+                    {c.replace("_", " ")}
+                  </option>
+                ))}
+              </select>
 
               <div className="md:col-span-2 p-6 bg-blue-600 rounded-[2rem] text-white flex justify-between items-center shadow-xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full translate-x-10 -translate-y-10"></div>
                 <div className="flex items-center gap-3 relative z-10">
                   <Globe size={24} className="opacity-70" />
                   <span className="text-[10px] font-black uppercase tracking-widest">
-                    Local Equivalent Price
+                    Enrollment Fee
                   </span>
                 </div>
                 <div className="text-right relative z-10">
@@ -392,7 +360,7 @@ const CourseEnrollment = () => {
                     {currencyData[selectedCountry].fee.toLocaleString()}
                   </h2>
                   <p className="text-[8px] font-bold opacity-70 uppercase tracking-tighter italic">
-                    Official Registration Rate
+                    One-time Registration
                   </p>
                 </div>
               </div>
@@ -503,7 +471,7 @@ const CourseEnrollment = () => {
             <button
               type="button"
               onClick={addEducation}
-              className="w-full py-4 border-2 border-dashed border-blue-200 text-blue-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 border-2 border-dashed border-blue-200 text-blue-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2 font-black"
             >
               <Plus size={16} /> Add More Credentials
             </button>
@@ -547,17 +515,30 @@ const CourseEnrollment = () => {
             </div>
           </div>
 
+          <div className="p-8 bg-blue-50 rounded-[2rem] border-2 border-dashed border-blue-200 flex items-center gap-6">
+            <div className="p-4 bg-blue-600 text-white rounded-2xl shadow-lg">
+              <CreditCard size={32} />
+            </div>
+            <div>
+              <h4 className="font-black text-sm uppercase text-blue-900">
+                Secure Payment via Paystack
+              </h4>
+              <p className="text-[10px] font-bold text-blue-600/70 uppercase tracking-widest">
+                Click below to proceed to our secure payment gateway to complete
+                your registration.
+              </p>
+            </div>
+          </div>
+
           <button
             disabled={loading}
             className="w-full py-8 bg-blue-600 text-white rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-xs hover:bg-slate-900 transition-all flex items-center justify-center gap-4 shadow-xl active:scale-95 disabled:opacity-50"
           >
             {loading ? (
-              <>
-                <UploadCloud className="animate-spin" /> Processing...
-              </>
+              <UploadCloud className="animate-spin" />
             ) : (
               <>
-                Confirm Submission <ArrowRight size={22} />
+                Pay & Complete Enrollment <ArrowRight size={22} />
               </>
             )}
           </button>
