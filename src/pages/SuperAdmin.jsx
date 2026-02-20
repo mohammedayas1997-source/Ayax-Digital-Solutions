@@ -792,6 +792,15 @@ const SuperAdmin = () => {
           </button>
           
           <button
+            onClick={() => setActiveTab("chat_monitor")}
+            className={`nav-link ${activeTab === "chat_monitor" ? "active-nav" : ""}`}
+          >
+            <Eye size={18} className={activeTab === "chat_monitor" ? "text-white" : "text-red-500"} />
+            <span>Chat Monitor</span>
+            {/* Wani ɗan ƙaramin alama (Indicator) don nuna bangaren tsaro ne */}
+            <div className="ml-auto w-2 h-2 bg-red-600 rounded-full animate-pulse"></div>
+          </button>
+          <button
             onClick={() => setActiveTab("academic")}
             className={`nav-link ${activeTab === "academic" ? "active-nav" : ""}`}
           >
