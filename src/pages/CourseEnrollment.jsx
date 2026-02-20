@@ -92,9 +92,9 @@ const CourseEnrollment = () => {
   const [educationList, setEducationList] = useState([{ qualification: "", institution: "", course: "", year: "" }]);
   const [selectedCountry, setSelectedCountry] = useState("Nigeria");
   const [selectedCourse, setSelectedCourse] = useState(location.state?.selectedCourse || "");
-
+  
   const USDT_ADDRESS = "YOUR_BEP20_OR_TRC20_WALLET_ADDRESS_HERE";
-  const USDT_AMOUNT = "3.50"; // Kudin Form a matsayin Dollar USDT
+  const USDT_AMOUNT = "3.50"; 
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(USDT_ADDRESS);
@@ -129,7 +129,7 @@ const CourseEnrollment = () => {
     
     setLoading(true);
     const formData = new FormData(e.target);
-    const studentEmail = formData.get("email");
+    const capturedEmail = formData.get("email"); // Mun dauko email dashi
 
     try {
       const passportRef = ref(storage, `passports/${Date.now()}_passport`);
@@ -138,7 +138,7 @@ const CourseEnrollment = () => {
 
       const docRef = await addDoc(collection(db, "course_applications"), {
         studentName: formData.get("name"),
-        email: studentEmail,
+        email: capturedEmail,
         phone: formData.get("phone"),
         course: formData.get("course"),
         country: selectedCountry,
@@ -152,11 +152,11 @@ const CourseEnrollment = () => {
         alert(`APPLICATION SUBMITTED: Transfer $${USDT_AMOUNT} USDT to the provided address. Manual verification required.`);
         navigate("/payment-success", { state: { method: "USDT", amount: USDT_AMOUNT } });
       } else {
-        // Paystack Protocol (NGN 5000 Only)
+        // PAYSTACK PROTOCOL - GYARA: Mun tabbatar capturedEmail yana da value
         const handler = window.PaystackPop.setup({
           key: pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7
-          email: studentEmail,
-          amount: 5000 * 100, // Naira 5000 (Kobo calculation)
+          email: capturedEmail, 
+          amount: 5000 * 100, 
           currency: "NGN",
           callback: async (response) => {
             await updateDoc(doc(db, "course_applications", docRef.id), {
@@ -217,17 +217,17 @@ const CourseEnrollment = () => {
             {paymentMethod === "USDT" && (
               <div className="p-8 bg-slate-900 rounded-[2.5rem] text-white animate-in slide-in-from-top-4 duration-500 border-b-4 border-emerald-500">
                 <div className="flex justify-between items-start mb-6">
-                   <div>
+                    <div>
                       <h4 className="text-emerald-400 font-black text-sm uppercase italic">Crypto Settlement</h4>
                       <p className="text-[10px] opacity-60 mt-1 uppercase tracking-widest font-black">Transfer USDT (BEP20/TRC20)</p>
-                   </div>
-                   <div className="bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl font-black text-2xl animate-pulse">${USDT_AMOUNT}</div>
+                    </div>
+                    <div className="bg-emerald-500/20 text-emerald-400 px-4 py-2 rounded-xl font-black text-2xl animate-pulse">${USDT_AMOUNT}</div>
                 </div>
                 <div className="bg-white/5 p-4 rounded-2xl flex items-center justify-between border border-white/10 group hover:border-emerald-500 transition-all">
-                   <code className="text-[10px] font-bold break-all opacity-80">{USDT_ADDRESS}</code>
-                   <button type="button" onClick={copyToClipboard} className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2">
-                      {copied ? <CheckCircle2 size={18} className="text-emerald-400" /> : <Copy size={18} className="text-white/50" />}
-                   </button>
+                    <code className="text-[10px] font-bold break-all opacity-80">{USDT_ADDRESS}</code>
+                    <button type="button" onClick={copyToClipboard} className="p-2 hover:bg-white/10 rounded-lg transition-colors flex items-center gap-2">
+                       {copied ? <CheckCircle2 size={18} className="text-emerald-400" /> : <Copy size={18} className="text-white/50" />}
+                    </button>
                 </div>
               </div>
             )}
