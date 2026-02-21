@@ -23,6 +23,7 @@ import {
   Lock,
   Loader2,
 } from "lucide-react";
+import emailjs from "@emailjs/browser";
 
 const currencyData = {
   Nigeria: { code: "NGN", symbol: "₦", fee: 5000 },
@@ -98,6 +99,37 @@ const CourseEnrollment = () => {
     location.state?.selectedCourse || "",
   );
 
+  const handleEnrollment = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+
+    // Capturing the data directly from the input fields
+    const enrollmentInfo = {
+      studentName: formData.studentName, // The system captures the name here
+      email: formData.email,
+      course: formData.course,
+      phone: formData.phone,
+    };
+
+    try {
+      // 1. Record the application in Firestore
+      await addDoc(collection(db, "course_applications"), {
+        ...enrollmentInfo,
+        status: "Pending",
+        createdAt: serverTimestamp(),
+      });
+
+      // 2. Trigger the automatic branded email
+      sendWelcomeEmail(enrollmentInfo);
+
+      alert(`Success! Welcome to AYAX Academy, ${enrollmentInfo.studentName}.`);
+    } catch (error) {
+      alert("System Error: Failed to process enrollment.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const PAYSTACK_PUBLIC_KEY =
     "pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7";
 
@@ -123,6 +155,41 @@ const CourseEnrollment = () => {
     const list = [...educationList];
     list[index][field] = value;
     setEducationList(list);
+  };
+
+  /**
+   * Sends a branded welcome email to the student automatically upon submission.
+   * @param {Object} studentData - Contains studentName, email, and course.
+   */
+  const sendWelcomeEmail = (studentData) => {
+    // Direct link to your hosted logo
+    const SCHOOL_LOGO_URL =
+      "https://firebasestorage.googleapis.com/v0/b/ayax-academy.appspot.com/o/assets%2Flogo.png?alt=media";
+
+    const templateParams = {
+      fullName: studentData.studentName, // System automatically pulls the student's name here
+      course: studentData.course,
+      email: studentData.email,
+      logo_url: SCHOOL_LOGO_URL,
+      school_name: "AYAX Digital Solutions Academy",
+      submission_date: new Date().toLocaleDateString(),
+    };
+
+    emailjs
+      .send(
+        "service_2wusktt",
+        "template_52e21uo",
+        templateParams,
+        "Zq65aNb8G1g9F7XkY", // IMPORTANT: Replace with your actual Public Key from EmailJS Account tab
+      )
+      .then((response) => {
+        console.log(
+          "Automation Success: Email sent to " + studentData.studentName,
+        );
+      })
+      .catch((err) => {
+        console.error("Automation Error: Failed to dispatch email.", err);
+      });
   };
 
   const addEducation = () =>
