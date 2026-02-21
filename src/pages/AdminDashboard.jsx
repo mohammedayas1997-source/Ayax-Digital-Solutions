@@ -43,6 +43,9 @@ import {
   ShieldAlert,
   FileText,
   Zap,
+  QrCode,
+  PlusCircle,
+  RefreshCcw,
 } from "lucide-react";
 
 const AdminDashboard = () => {
@@ -56,13 +59,20 @@ const AdminDashboard = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // SUPERVISOR PROTOCOL DATA
+  // Manual Certificate State
+  const [manualCert, setManualCert] = useState({
+    name: "",
+    course: "",
+    email: "",
+    phone: "",
+    grade: "Distinction",
+  });
+
   const SUPERVISOR_INFO = {
     email: "supervisor@ayaxacademy.com",
-    phone: "2348000000000", // Replace with actual
+    phone: "2348000000000",
   };
 
-  // 1. REAL-TIME DATA ENGINE (CORE STREAMS)
   useEffect(() => {
     const unsubStudents = onSnapshot(
       collection(db, "course_applications"),
@@ -109,7 +119,6 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  // 2. CHAT SURVEILLANCE ENGINE
   useEffect(() => {
     if (!selectedChat) return;
     const q = query(
@@ -123,7 +132,6 @@ const AdminDashboard = () => {
     return () => unsub();
   }, [selectedChat]);
 
-  // 3. ADMINISTRATIVE MASTER ACTIONS
   const logActivity = async (action, details) => {
     await addDoc(collection(db, "admin_logs"), {
       action,
@@ -146,42 +154,33 @@ const AdminDashboard = () => {
     );
   };
 
-  // 4. AUTOMATIC ID GENERATION & MULTI-CHANNEL DISPATCH
   const handleAutomaticIDDispatch = async (student) => {
     if (student.paymentStatus !== "Form_Paid") {
       alert("ERROR: No payment proof found for this student.");
       return;
     }
-
     setLoading(true);
     const generatedID = `AYX-2026-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     const courseLink = `https://ayaxacademy.com/portal`;
-
     const emailSubject = encodeURIComponent(
       "Admission Approved - Student ID Assigned",
     );
     const messageBody = `Hello ${student.studentName},%0D%0A%0D%0AYour Form payment is verified.%0D%0AYour Student ID: ${generatedID}%0D%0APortal Link: ${courseLink}%0D%0A%0D%0ARegards, Ayax Academy.`;
 
     try {
-      // Update Database
       await updateDoc(doc(db, "course_applications", student.id), {
         studentId: generatedID,
         status: "Admitted",
         idAssignedAt: serverTimestamp(),
       });
-
-      // Dispatch Email
       window.open(
         `mailto:${student.email}?subject=${emailSubject}&body=${messageBody}`,
         "_blank",
       );
-
-      // Dispatch WhatsApp
       const waMsg = encodeURIComponent(
         `Hello ${student.studentName}, Admission Confirmed! ID: ${generatedID}. Portal: ${courseLink}`,
       );
       window.open(`https://wa.me/${student.phone}?text=${waMsg}`, "_blank");
-
       await logActivity(
         "AUTO_ID_DISPATCH",
         `Generated & Dispatched ID ${generatedID} to ${student.studentName}`,
@@ -194,7 +193,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // 5. DIRECT CERTIFICATE ISSUANCE
   const issueCertificate = async (student) => {
     const certSerial = `AYX-CERT-${Date.now()}`;
     try {
@@ -203,12 +201,10 @@ const AdminDashboard = () => {
         certSerial: certSerial,
         certDate: serverTimestamp(),
       });
-
       const msg = encodeURIComponent(
         `Congratulations ${student.studentName}! Your certificate ${certSerial} is ready in your portal.`,
       );
       window.open(`https://wa.me/${student.phone}?text=${msg}`, "_blank");
-
       await logActivity(
         "CERT_ISSUE",
         `Certificate ${certSerial} issued to ${student.studentName}`,
@@ -219,23 +215,65 @@ const AdminDashboard = () => {
     }
   };
 
-  // 6. DIRECT USER/SUPERVISOR MESSAGING
+  // --- 7. MANUAL CERTIFICATE GENERATION PROTOCOL ---
+  const handleManualCertGen = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const manualID = `AYX-MAN-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+    const certSerial = `AYX-GIFT-${Date.now()}`;
+
+    // Real-life QR Encoding (Verification URL)
+    const verificationURL = `https://ayaxacademy.com/verify/${certSerial}`;
+    const qrCodeAPI = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verificationURL)}`;
+
+    try {
+      await addDoc(collection(db, "manual_certificates"), {
+        ...manualCert,
+        studentId: manualID,
+        certSerial: certSerial,
+        qrCode: qrCodeAPI,
+        issuedBy: auth.currentUser?.email,
+        timestamp: serverTimestamp(),
+      });
+
+      const waMsg = encodeURIComponent(
+        `Hello ${manualCert.name}, an Honorary Certificate has been generated for you.\n\nSerial: ${certSerial}\nAccess ID: ${manualID}\nVerify: ${verificationURL}`,
+      );
+      window.open(`https://wa.me/${manualCert.phone}?text=${waMsg}`, "_blank");
+
+      await logActivity(
+        "MANUAL_CERT_GEN",
+        `Manual Certificate ${certSerial} generated for ${manualCert.name}`,
+      );
+      alert(
+        `PROTOCOL SUCCESS: Manual ID ${manualID} Generated. WhatsApp Dispatch Initiated.`,
+      );
+      setManualCert({
+        name: "",
+        course: "",
+        email: "",
+        phone: "",
+        grade: "Distinction",
+      });
+    } catch (err) {
+      alert("MANUAL_GEN_ERROR: Protocol failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const directMessage = (target, mode) => {
     const contact = target === "supervisor" ? SUPERVISOR_INFO : target;
     const text = encodeURIComponent(
       "URGENT: Administrative update from Ayax Academy Global Controller.",
     );
-
     if (mode === "email") {
       window.open(
         `mailto:${contact.email}?subject=System Alert&body=${text}`,
         "_blank",
       );
     } else {
-      window.open(
-        `https://wa.me/${contact.phone || contact.phone}?text=${text}`,
-        "_blank",
-      );
+      window.open(`https://wa.me/${contact.phone}?text=${text}`, "_blank");
     }
   };
 
@@ -274,6 +312,11 @@ const AdminDashboard = () => {
               label: "Admission Flow",
             },
             {
+              id: "manual_gen",
+              icon: <PlusCircle size={20} />,
+              label: "Manual Minting",
+            }, // NEW TAB
+            {
               id: "surveillance",
               icon: <Eye size={20} />,
               label: "Chat Intelligence",
@@ -292,26 +335,6 @@ const AdminDashboard = () => {
               {item.icon} {item.label}
             </button>
           ))}
-
-          <div className="mt-12 p-6 bg-slate-500/5 rounded-3xl border border-slate-500/10">
-            <p className="text-[9px] font-black uppercase opacity-50 mb-4 tracking-widest text-center">
-              Supervisor Comms
-            </p>
-            <div className="flex justify-around">
-              <button
-                onClick={() => directMessage("supervisor", "email")}
-                className="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:text-blue-500 transition-colors"
-              >
-                <Mail size={18} />
-              </button>
-              <button
-                onClick={() => directMessage("supervisor", "whatsapp")}
-                className="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:text-emerald-500 transition-colors"
-              >
-                <MessageSquare size={18} />
-              </button>
-            </div>
-          </div>
         </nav>
 
         <div className="p-8 space-y-4">
@@ -343,7 +366,7 @@ const AdminDashboard = () => {
           <div className="flex items-center gap-12">
             <div className="flex flex-col">
               <span className="text-[10px] font-black uppercase opacity-40 text-emerald-500">
-                Gross Revenue (Verified)
+                Gross Revenue
               </span>
               <div className="text-3xl font-black tracking-tighter text-emerald-500">
                 ₦{totalRevenue.toLocaleString()}
@@ -379,6 +402,127 @@ const AdminDashboard = () => {
         </header>
 
         <div className="flex-1 p-12 overflow-y-auto">
+          {/* MANUAL CERTIFICATE GENERATION INTERFACE */}
+          {activeTab === "manual_gen" && (
+            <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
+              <div
+                className={`p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              >
+                <div className="flex items-center gap-4 mb-10">
+                  <div className="p-4 bg-blue-600 text-white rounded-2xl shadow-lg">
+                    <Award size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black italic uppercase tracking-tighter">
+                      Manual Certificate Minting
+                    </h3>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Gift or Honorary Issuance Protocol
+                    </p>
+                  </div>
+                </div>
+
+                <form
+                  onSubmit={handleManualCertGen}
+                  className="grid grid-cols-2 gap-8"
+                >
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[9px] font-black uppercase opacity-50 ml-2">
+                      Recipient Full Name
+                    </label>
+                    <input
+                      required
+                      className="admin-input"
+                      placeholder="e.g. John Doe"
+                      value={manualCert.name}
+                      onChange={(e) =>
+                        setManualCert({ ...manualCert, name: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[9px] font-black uppercase opacity-50 ml-2">
+                      Awarded Course
+                    </label>
+                    <input
+                      required
+                      className="admin-input"
+                      placeholder="e.g. Cyber Security"
+                      value={manualCert.course}
+                      onChange={(e) =>
+                        setManualCert({ ...manualCert, course: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[9px] font-black uppercase opacity-50 ml-2">
+                      Email Address
+                    </label>
+                    <input
+                      required
+                      type="email"
+                      className="admin-input"
+                      placeholder="recipient@email.com"
+                      value={manualCert.email}
+                      onChange={(e) =>
+                        setManualCert({ ...manualCert, email: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <label className="text-[9px] font-black uppercase opacity-50 ml-2">
+                      WhatsApp Phone (Intl Format)
+                    </label>
+                    <input
+                      required
+                      className="admin-input"
+                      placeholder="234..."
+                      value={manualCert.phone}
+                      onChange={(e) =>
+                        setManualCert({ ...manualCert, phone: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="col-span-2 flex flex-col gap-2">
+                    <label className="text-[9px] font-black uppercase opacity-50 ml-2">
+                      Honorary Grade / Title
+                    </label>
+                    <select
+                      className="admin-input"
+                      value={manualCert.grade}
+                      onChange={(e) =>
+                        setManualCert({ ...manualCert, grade: e.target.value })
+                      }
+                    >
+                      <option value="Distinction">Distinction</option>
+                      <option value="Merit">Merit</option>
+                      <option value="First Class Honors">
+                        First Class Honors
+                      </option>
+                      <option value="Executive Certification">
+                        Executive Certification
+                      </option>
+                    </select>
+                  </div>
+
+                  <button
+                    disabled={loading}
+                    className="col-span-2 py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl hover:bg-slate-900 transition-all flex items-center justify-center gap-4"
+                  >
+                    {loading ? (
+                      <RefreshCcw className="animate-spin" />
+                    ) : (
+                      <>
+                        <QrCode size={20} /> Generate & Dispatch Manual
+                        Credentials
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
           {activeTab === "admissions" && (
             <div
               className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
@@ -446,7 +590,6 @@ const AdminDashboard = () => {
                           <button
                             onClick={() => issueCertificate(s)}
                             className="p-4 bg-amber-500/10 text-amber-600 rounded-2xl hover:bg-amber-500 hover:text-white transition-all"
-                            title="Issue Certificate"
                           >
                             <Award size={20} />
                           </button>
@@ -527,6 +670,8 @@ const AdminDashboard = () => {
       </main>
 
       <style>{`
+        .admin-input { width: 100%; padding: 1.25rem; background: ${darkMode ? "#0f172a" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.25rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
+        .admin-input:focus { border-color: #2563eb; }
         .metric-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.15em; }
         .stat-card { padding: 50px; border-radius: 50px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.05); transition: transform 0.3s ease; }
         .stat-card:hover { transform: translateY(-10px); }
