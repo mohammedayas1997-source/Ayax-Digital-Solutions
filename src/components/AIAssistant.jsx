@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Bot, Send, X, Sparkles, User, ShieldCheck } from "lucide-react";
+import { Bot, Send, X, Sparkles, Globe, ShieldCheck } from "lucide-react";
 
 const AIAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -7,29 +7,26 @@ const AIAssistant = () => {
     {
       role: "assistant",
       content:
-        "Hello! I am AYAX Intelligence. How can I help you explore Abdulrahman Ayas’s Digital Academy today?",
+        "Greeting from AYAX Global Headquarters. I am Ayax, your specialized AI consultant. How can I assist you with our global digital infrastructure today?",
     },
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef();
 
-  // THE KNOWLEDGE BASE (THE BRAIN)
-  const KNOWLEDGE_BASE = {
+  // THE GLOBAL KNOWLEDGE BASE
+  const AYAX_CORE = {
+    name: "Ayax",
     ceo: "Abdulrahman Mohammed Ayas",
-    company: "AYAX Digital Solutions Academy",
-    founded: "2026",
-    mission:
-      "To empower the next generation of digital experts in Nigeria through high-end technical training.",
-    services: [
-      "Web Development (Full-Stack)",
-      "Cybersecurity & Digital Surveillance",
-      "UI/UX Design",
-      "Digital Marketing & Automation",
-      "Software Engineering",
-    ],
-    infrastructure:
-      "High-speed digital labs, 24/7 support, and globally recognized certifications.",
+    company: "AYAX Digital Solutions Academy (Global)",
+    expertise:
+      "Full-Stack Development, Cybersecurity, AI Automation, Cloud Infrastructure",
+    global_reach:
+      "Serving students and clients across Africa, Europe, and North America.",
+    vision:
+      "To bridge the gap between local talent and global tech opportunities.",
+    contact: "support@ayax.com",
+    headquarters: "Digital Hub, Nigeria (Global Operations)",
   };
 
   const handleSendMessage = async (e) => {
@@ -41,25 +38,51 @@ const AIAssistant = () => {
     setInput("");
     setIsTyping(true);
 
-    // AI LOGIC (Simulated Intelligence for AYAX)
+    // AI BRAIN LOGIC
     setTimeout(() => {
       let aiResponse = "";
       const query = input.toLowerCase();
 
+      // 1. CEO & Ownership (Identity)
       if (
-        query.includes("who is the owner") ||
+        query.includes("who is") ||
         query.includes("ceo") ||
-        query.includes("boss")
+        query.includes("owner") ||
+        query.includes("abdulrahman")
       ) {
-        aiResponse = `The CEO and Founder of AYAX Academy is ${KNOWLEDGE_BASE.ceo}. He is a visionary leader in digital infrastructure.`;
-      } else if (query.includes("course") || query.includes("study")) {
-        aiResponse = `We offer premium courses in ${KNOWLEDGE_BASE.services.join(", ")}. Which one interests you?`;
-      } else if (query.includes("location") || query.includes("where")) {
+        aiResponse = `${AYAX_CORE.company} was founded and is led by ${AYAX_CORE.ceo}, a premier expert in digital transformation and software architecture. He envisions a world where technology is accessible to all.`;
+      }
+      // 2. Global Standards & Certificates
+      else if (
+        query.includes("international") ||
+        query.includes("world") ||
+        query.includes("certificate") ||
+        query.includes("global")
+      ) {
         aiResponse =
-          "We are located at the AYAX Digital Hub. You can also study 100% online through our portal.";
-      } else {
+          "AYAX certifications are designed to meet global industry standards. Our graduates are equipped to work for top tech firms in Silicon Valley, London, and beyond. We focus on world-class coding practices and cybersecurity protocols.";
+      }
+      // 3. Services & Technical Stack
+      else if (
+        query.includes("what do you do") ||
+        query.includes("services") ||
+        query.includes("courses")
+      ) {
+        aiResponse = `We specialize in ${AYAX_CORE.expertise}. Our curriculum is updated weekly to match the global tech landscape. Are you looking to build a career in Web Development or Security?`;
+      }
+      // 4. Pricing & Payments
+      else if (
+        query.includes("cost") ||
+        query.includes("price") ||
+        query.includes("fee") ||
+        query.includes("pay")
+      ) {
         aiResponse =
-          "I am trained by AYAX Academy. I can tell you about our CEO Abdulrahman Ayas, our technical courses, or help you with enrollment.";
+          "Our pricing is structured to be the most competitive globally for the quality provided. For local students, we accept Naira; for our international scholars, we process payments via secure global gateways. You can view specific course fees on our enrollment page.";
+      }
+      // 5. Default Response
+      else {
+        aiResponse = `As Ayax, I am here to guide you through our digital ecosystem. Whether it is about ${AYAX_CORE.ceo}'s vision or our global technical training, I have the answers. What specific technical track are you interested in?`;
       }
 
       setMessages((prev) => [
@@ -67,52 +90,72 @@ const AIAssistant = () => {
         { role: "assistant", content: aiResponse },
       ]);
       setIsTyping(false);
-    }, 1000);
+
+      // Auto-scroll to bottom
+      setTimeout(
+        () => scrollRef.current?.scrollIntoView({ behavior: "smooth" }),
+        100,
+      );
+    }, 1200);
   };
 
   return (
-    <div className="fixed bottom-10 right-10 z-[500]">
-      {/* Floating Button */}
+    <div className="fixed bottom-8 right-8 z-[9999]">
+      {/* Floating Ayax Button */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="w-16 h-16 bg-blue-600 text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-all animate-bounce"
+          className="group relative w-16 h-16 bg-blue-600 text-white rounded-2xl shadow-[0_20px_50px_rgba(37,99,235,0.3)] flex items-center justify-center hover:scale-105 transition-all duration-500"
         >
-          <Bot size={30} />
+          <div className="absolute -top-2 -right-2 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full animate-pulse"></div>
+          <Bot size={32} strokeWidth={1.5} />
+          <span className="absolute -left-24 bg-gray-900 text-white text-[10px] py-2 px-4 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity font-black uppercase tracking-widest">
+            Chat with Ayax
+          </span>
         </button>
       )}
 
-      {/* Chat Window */}
+      {/* Global AI Console */}
       {isOpen && (
-        <div className="w-80 md:w-96 bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden animate-in slide-in-from-bottom-10">
-          <div className="bg-gray-900 p-6 text-white flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Sparkles className="text-blue-500" size={20} />
-              <div>
-                <h3 className="font-black text-xs uppercase tracking-widest">
-                  AYAX AI Agent
-                </h3>
-                <p className="text-[9px] opacity-50">
-                  Powered by Ayax Infrastructure
-                </p>
+        <div className="w-[350px] md:w-[400px] bg-white rounded-[2.5rem] shadow-[-20px_50px_100px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500">
+          {/* Branded Header */}
+          <div className="bg-gray-950 p-7 text-white">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                  <Globe size={20} className="animate-spin-slow" />
+                </div>
+                <div>
+                  <h3 className="font-black text-xs uppercase tracking-[0.2em]">
+                    Ayax Intelligence
+                  </h3>
+                  <p className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>{" "}
+                    Global System Active
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="opacity-30 hover:opacity-100 transition-opacity"
+              >
+                <X size={20} />
+              </button>
             </div>
-            <button onClick={() => setIsOpen(false)}>
-              <X size={20} />
-            </button>
           </div>
 
-          <div className="h-96 overflow-y-auto p-6 space-y-4 bg-gray-50/30">
+          {/* Chat Interface */}
+          <div className="h-[400px] overflow-y-auto p-6 space-y-6 bg-gray-50/50 custom-scrollbar">
             {messages.map((m, i) => (
               <div
                 key={i}
                 className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
               >
                 <div
-                  className={`max-w-[80%] p-4 rounded-2xl text-xs font-bold ${
+                  className={`max-w-[85%] p-4 rounded-[1.8rem] text-[13px] leading-relaxed font-bold shadow-sm ${
                     m.role === "user"
                       ? "bg-blue-600 text-white rounded-tr-none"
-                      : "bg-white text-gray-800 border rounded-tl-none shadow-sm"
+                      : "bg-white text-slate-800 border border-slate-100 rounded-tl-none"
                   }`}
                 >
                   {m.content}
@@ -120,29 +163,42 @@ const AIAssistant = () => {
               </div>
             ))}
             {isTyping && (
-              <p className="text-[10px] font-black animate-pulse text-blue-600 uppercase">
-                AYAX AI is thinking...
-              </p>
+              <div className="flex gap-2 items-center">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 animate-bounce">
+                  <Sparkles size={14} />
+                </div>
+                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
+                  Ayax is analyzing...
+                </p>
+              </div>
             )}
             <div ref={scrollRef} />
           </div>
 
+          {/* Global Input */}
           <form
             onSubmit={handleSendMessage}
-            className="p-4 bg-white border-t flex gap-2"
+            className="p-5 bg-white border-t border-gray-50 flex gap-3"
           >
             <input
-              className="flex-1 bg-gray-100 p-3 rounded-xl outline-none text-xs font-bold"
-              placeholder="Ask about AYAX or Abdulrahman Ayas..."
+              className="flex-1 bg-gray-100 p-4 rounded-2xl outline-none text-xs font-bold focus:ring-2 focus:ring-blue-600 transition-all border border-transparent focus:bg-white"
+              placeholder="Ask Ayax anything..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
-            <button className="p-3 bg-gray-900 text-white rounded-xl">
+            <button className="w-12 h-12 bg-gray-950 text-white rounded-2xl flex items-center justify-center hover:bg-blue-600 transition-all shadow-xl active:scale-95">
               <Send size={18} />
             </button>
           </form>
         </div>
       )}
+
+      <style>{`
+        .animate-spin-slow { animation: spin 8s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
+      `}</style>
     </div>
   );
 };
