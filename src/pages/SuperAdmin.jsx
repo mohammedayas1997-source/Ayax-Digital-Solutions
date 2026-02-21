@@ -542,6 +542,22 @@ const SuperAdmin = () => {
     setAdminReply("");
     alert("AUTHORITY_RESPONSE: Message injected into forum.");
   };
+  // A cikin SuperAdmin component dinka
+  const [aiHistory, setAiHistory] = useState([]);
+
+  useEffect(() => {
+    // Muna kiran dukkan hirar AI, muna jera su daga sabo zuwa tsoho
+    const q = query(
+      collection(db, "ai_chat_history"),
+      orderBy("createdAt", "desc"),
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setAiHistory(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const renderChatMonitor = () => (
     <div className="flex gap-6 h-[80vh] animate-in fade-in duration-500">
@@ -979,7 +995,6 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
-
         {activeTab === "schedule" && (
           <div className="max-w-6xl mx-auto space-y-6">
             <div className="bg-gray-900 text-white p-8 rounded-[3rem] border-b-8 border-blue-600 shadow-2xl">
@@ -1072,10 +1087,8 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
-
         {/* Nemo inda sauran tabs dinka suke */}
         {activeTab === "chat_monitor" && renderChatMonitor()}
-
         <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100">
           <div className="flex items-center gap-4 mb-8">
             <div className="p-4 bg-amber-100 text-amber-600 rounded-2xl">
@@ -1133,7 +1146,6 @@ const SuperAdmin = () => {
               ))}
           </div>
         </div>
-
         {/* HISTORY LOGS TAB */}
         {activeTab === "history" && (
           <div
@@ -1173,7 +1185,6 @@ const SuperAdmin = () => {
             </table>
           </div>
         )}
-
         {/* ACADEMIC MANAGEMENT */}
         {activeTab === "academic" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in slide-in-from-bottom-4 duration-500">
@@ -1329,7 +1340,6 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
-
         {/* OVERVIEW: LIVE TRACKING */}
         {activeTab === "overview" && (
           <div
@@ -1386,7 +1396,59 @@ const SuperAdmin = () => {
             </table>
           </div>
         )}
+        {activeTab === "ai_surveillance" && (
+          <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
+            <div className="flex items-center justify-between">
+              <h3 className="text-2xl font-black uppercase italic text-blue-600 flex items-center gap-3">
+                <ShieldCheck size={32} /> Ayax Global Surveillance
+              </h3>
+              <span className="px-4 py-2 bg-emerald-500/10 text-emerald-500 rounded-full text-[10px] font-black uppercase border border-emerald-500/20">
+                Live Monitoring Active
+              </span>
+            </div>
 
+            <div className="grid grid-cols-1 gap-4 overflow-y-auto max-h-[70vh] p-2 custom-scrollbar">
+              {aiHistory.map((log) => (
+                <div
+                  key={log.id}
+                  className={`p-6 rounded-[2rem] border transition-all ${
+                    log.role === "user"
+                      ? "bg-white border-slate-100 shadow-sm"
+                      : "bg-blue-600/5 border-blue-600/10"
+                  }`}
+                >
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black ${
+                          log.role === "user"
+                            ? "bg-slate-900 text-white"
+                            : "bg-blue-600 text-white"
+                        }`}
+                      >
+                        {log.role === "user" ? "ST" : "AX"}
+                      </div>
+                      <span className="text-[11px] font-black uppercase tracking-wider">
+                        {log.role === "user"
+                          ? log.userEmail
+                          : "Ayax AI Intelligence"}
+                      </span>
+                    </div>
+                    <span className="text-[9px] font-bold opacity-40 italic">
+                      {log.createdAt?.toDate().toLocaleString()}
+                    </span>
+                  </div>
+
+                  <p
+                    className={`text-sm leading-relaxed ${log.role === "user" ? "text-slate-700" : "text-blue-900 font-bold"}`}
+                  >
+                    {log.content}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {/* FORUM MANAGEMENT (Complete) */}
         {activeTab === "global_forum" && (
           <div className="flex gap-8 h-[75vh]">
@@ -1497,9 +1559,7 @@ const SuperAdmin = () => {
           </div>
         )}
         {renderStudentProfileModal()}
-
         {activeTab === "chat_monitor" && renderChatMonitor()}
-
         {/* ADMISSIONS */}
         {activeTab === "students" && (
           <div className="space-y-6 animate-in fade-in duration-500">
@@ -1606,7 +1666,6 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
-
         {/* ACCESS CONTROL */}
         {activeTab === "users" && (
           <div className="space-y-8">
@@ -1722,7 +1781,6 @@ const SuperAdmin = () => {
             </div>
           </div>
         )}
-
         {/* SERVICE REQUESTS */}
         {activeTab === "services" && (
           <div className="grid md:grid-cols-2 gap-6 animate-in fade-in duration-500">
