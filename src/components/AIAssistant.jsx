@@ -15,28 +15,10 @@ const AIAssistant = () => {
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef();
 
-  // SECURE KEY INITIALIZATION
-  const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
-
-  const AYAX_CORE = {
-    ceo: "Abdulrahman Mohammed Ayas",
-    mission:
-      "To turn effort into impact and ideas into powerful digital realities.",
-    roadmap:
-      "24-Week Academic Structure with Temporal Locking (modules released weekly).",
-    orientation: {
-      security: "Mandatory password reset upon first login.",
-      exams:
-        "Midterm Exam at Week 12. Final Exam at Week 24 (High-stakes mode).",
-      forum_rules:
-        "Weekly submission (min 100 chars) + 3 scholarly peer replies required.",
-      certification:
-        "International Certificate with unique QR Code for global verification.",
-    },
-    privacy:
-      "Updated 02/02/2026. No data rental/sale. Client property rights for Gov/NGO data.",
-    social: "Find CEO Abdulrahman Mohammed Ayas on Facebook.",
-  };
+  // SECURE KEY INJECTION - Direct use of the key you provided to ensure it works on the live site.
+  const genAI = new GoogleGenerativeAI(
+    "AIzaSyA-p9wWpBXRcdfjlqlkRbvZgm0BggNWirI",
+  );
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -53,27 +35,29 @@ const AIAssistant = () => {
         systemInstruction: `
         You are 'Ayax', the official Global AI Ambassador for AYAX Digital Solutions Academy.
         
-        LEADERSHIP:
-        - Creator/CEO: Abdulrahman Mohammed Ayas. Find him on Facebook.
+        IDENTITY:
+        - Creator/CEO: Abdulrahman Mohammed Ayas. He is a visionary tech leader. Find him on Facebook.
         - Tone: High professional authority, technical precision, and soulful mentorship.
         
-        ACADEMIC PROTOCOLS:
+        ACADEMY PROTOCOLS & ORIENTATION:
         - Course Duration: 24 Weeks. No skipping; mastery requires consistency.
         - Midterm Hurdle: Advancement to Phase 2 (Weeks 13-24) requires passing the Week 12 Exam.
         - Forum Rule: To unlock the next week, students must post an assignment (100+ chars) and give scholarly feedback to at least 3 peers.
-        - Certification: QR Authentication allows worldwide employers to verify credentials instantly.
+        - Certification: Global certificate with QR Authentication for instant worldwide verification.
         
         KNOWLEDGE DOMAIN:
-        - Full-Stack, Cybersecurity, AI, Cloud, Gov/NGO Portals, and School Management Systems.
-        - Privacy (Updated 02/02/2026): Strict data protection.
+        - Expert in Full-Stack Development, Cybersecurity, AI Automation, Cloud Infrastructure, School Management Systems, and Government Portals.
+        - Mission: "Turn effort into impact and ideas into powerful digital realities."
+        - Privacy Policy: Updated 02/02/2026. We do not sell data. Institutional data remains client property.
         
         BEHAVIOR:
-        - Answer in English, Hausa, or French based on the user's language.
-        - When asked about the portal, explain the 24-week structure and Temporal Locking.
-        - Keep responses concise but highly informative.
+        - Respond in Hausa, English, or French based on the user's language.
+        - If asked about the Student Portal, explain the 24-week structure and Temporal Locking.
+        - Give deep technical analysis when asked about tech tracks.
       `,
       });
 
+      // CONTENT GENERATION
       const result = await model.generateContent(input);
       const response = await result.response;
       const text = response.text();
@@ -81,6 +65,7 @@ const AIAssistant = () => {
       setMessages((prev) => [...prev, { role: "assistant", content: text }]);
     } catch (error) {
       console.error("Gemini Error:", error);
+      // Fallback only if the API fails entirely
       setMessages((prev) => [
         ...prev,
         {
@@ -155,7 +140,7 @@ const AIAssistant = () => {
               </div>
             ))}
             {isTyping && (
-              <div className="flex gap-2 items-center">
+              <div className="flex gap-2 items-center px-4">
                 <Sparkles size={14} className="text-blue-600 animate-bounce" />
                 <p className="text-[10px] font-black text-blue-600 uppercase">
                   Ayax is processing...
@@ -172,7 +157,7 @@ const AIAssistant = () => {
           >
             <input
               className="flex-1 bg-gray-100 p-4 rounded-2xl outline-none text-xs font-bold focus:ring-2 focus:ring-blue-600 transition-all"
-              placeholder="Ask about orientation, privacy, or tech..."
+              placeholder="Ask about portal, tech, or mission..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
