@@ -120,20 +120,26 @@ const Navbar = () => {
           <div
             className={`flex items-center gap-3 ml-4 border-l pl-6 ${scrolled ? "border-blue-200" : "border-white/20"}`}
           >
+            <Link
+              to="/gallery"
+              className="nav-link font-black uppercase text-[10px] tracking-widest"
+            >
+              Gallery
+            </Link>
             <a
               href="https://wa.me/2347087244444"
               target="_blank"
               rel="noopener noreferrer"
               className="p-2 bg-green-500 text-white rounded-lg hover:bg-green-600 hover:shadow-lg transition-all duration-300 flex items-center gap-2 font-bold text-[10px]"
             >
-              <MessageCircle size={14} /> WhatsApp
+              <MessageCircle size={10} /> WhatsApp
             </a>
 
             <a
               href="mailto:ayaxdigitalsolutions@gmail.com"
               className="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 hover:shadow-lg transition-all duration-300 flex items-center gap-2 font-bold text-[10px]"
             >
-              <Mail size={14} /> Email
+              <Mail size={10} /> Email
             </a>
 
             <Link
@@ -210,14 +216,14 @@ const Navbar = () => {
               rel="noopener noreferrer"
               className="w-full py-3 bg-green-600 text-white rounded-xl font-black flex items-center justify-center gap-3 text-sm shadow-md"
             >
-              <MessageCircle size={18} /> WhatsApp
+              <MessageCircle size={10} /> WhatsApp
             </a>
 
             <a
               href="mailto:ayaxdigitalsolutions@gmail.com"
               className="w-full py-3 bg-blue-600 text-white rounded-xl font-black flex items-center justify-center gap-3 text-sm shadow-md"
             >
-              <Mail size={18} /> Email
+              <Mail size={10} /> Email
             </a>
 
             <Link

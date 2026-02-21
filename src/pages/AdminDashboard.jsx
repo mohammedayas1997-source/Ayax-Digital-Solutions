@@ -63,6 +63,10 @@ const AdminDashboard = () => {
   const [historyLogs, setHistoryLogs] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [galleryTitle, setGalleryTitle] = useState("");
+  const [galleryUrl, setGalleryUrl] = useState("");
+  const [galleryCategory, setGalleryCategory] = useState("Workshop");
+  const [galleryItems, setGalleryItems] = useState([]); // Don lissafin hotuna
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [newsData, setNewsData] = useState({
     title: "",
@@ -94,6 +98,22 @@ const AdminDashboard = () => {
         setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
       },
     );
+
+    useEffect(() => {
+      // ... sauran listeners dinka
+      const unsubGallery = onSnapshot(
+        query(collection(db, "gallery"), orderBy("createdAt", "desc")),
+        (snap) => {
+          setGalleryItems(
+            snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+          );
+        },
+      );
+      return () => {
+        // ... sauran unsubs
+        unsubGallery();
+      };
+    }, []);
 
     const unsubChats = onSnapshot(
       query(collection(db, "private_chats"), orderBy("createdAt", "desc")),
@@ -141,6 +161,55 @@ const AdminDashboard = () => {
       unsubNews();
     };
   }, []);
+  // 1. Add this function inside AdminDashboard
+  const handleGalleryUpload = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      // A nan zaka iya saka hoton ta amfani da URL na Unsplash ko kuma Firebase Storage
+      await addDoc(collection(db, "gallery"), {
+        title: galleryTitle,
+        url: galleryUrl,
+        category: galleryCategory,
+        createdAt: serverTimestamp(),
+      });
+      alert("GALLERY UPDATED!");
+      setGalleryTitle("");
+      setGalleryUrl("");
+    } catch (err) {
+      alert("Upload failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Goge Hoto daga Gallery Protocol
+  const handleDeleteGalleryItem = async (id, title) => {
+    if (
+      window.confirm(
+        `Are you sure you want to delete "${title}" from the gallery?`,
+      )
+    ) {
+      try {
+        setLoading(true);
+        await deleteDoc(doc(db, "gallery", id));
+
+        // Yi rikodin a Audit Logs
+        await addDoc(collection(db, "admin_logs"), {
+          action: "GALLERY_DELETE",
+          details: `Deleted image: ${title}`,
+          timestamp: serverTimestamp(),
+          adminEmail: auth.currentUser?.email,
+        });
+
+        alert("Image deleted successfully.");
+      } catch (err) {
+        alert("Error deleting image.");
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
   // 2. CHAT SURVEILLANCE ENGINE
   useEffect(() => {
@@ -399,6 +468,11 @@ const AdminDashboard = () => {
               id: "history",
               icon: <History size={20} />,
               label: "System Logs",
+            },
+            {
+              id: "gallery_manager",
+              icon: <Camera size={20} />,
+              label: "Media Gallery",
             },
             {
               id: "news_manager",
@@ -677,6 +751,104 @@ const AdminDashboard = () => {
                     )}
                   </button>
                 </form>
+              </div>
+            </div>
+          )}
+          {/* Add a new Tab called "gallery_manager" in your Sidebar, then use this content */}
+          {activeTab === "gallery_manager" && (
+            <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700">
+              {/* Form na saka sabon hoto */}
+              <div
+                className={`p-8 lg:p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              >
+                <h3 className="text-2xl font-black italic uppercase text-blue-600 mb-8 flex items-center gap-4">
+                  <PlusCircle size={28} /> Add New Gallery Image
+                </h3>
+                <form
+                  onSubmit={handleGalleryUpload}
+                  className="grid grid-cols-1 md:grid-cols-2 gap-6"
+                >
+                  <input
+                    required
+                    className="admin-input"
+                    placeholder="Image Title"
+                    value={galleryTitle}
+                    onChange={(e) => setGalleryTitle(e.target.value)}
+                  />
+                  <input
+                    required
+                    className="admin-input"
+                    placeholder="Category (e.g. Workshop, Graduation)"
+                    value={galleryCategory}
+                    onChange={(e) => setGalleryCategory(e.target.value)}
+                  />
+                  <input
+                    required
+                    className="admin-input md:col-span-2"
+                    placeholder="Image URL (Unsplash or Firebase Link)"
+                    value={galleryUrl}
+                    onChange={(e) => setGalleryUrl(e.target.value)}
+                  />
+                  <button
+                    disabled={loading}
+                    className="md:col-span-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs"
+                  >
+                    {loading ? "Uploading..." : "Publish to Gallery"}
+                  </button>
+                </form>
+              </div>
+
+              {/* Jadawalin goge hotuna (Management Table) */}
+              <div
+                className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              >
+                <div className="p-8 border-b border-slate-800/10">
+                  <h3 className="text-xl font-black uppercase italic text-slate-500 tracking-widest">
+                    Manage Archives
+                  </h3>
+                </div>
+                <table className="w-full text-left min-w-[600px]">
+                  <thead className="bg-slate-500/5 text-[10px] font-black uppercase opacity-60">
+                    <tr>
+                      <th className="p-8">Visual</th>
+                      <th className="p-8">Identity</th>
+                      <th className="p-8">Category</th>
+                      <th className="p-8 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/10">
+                    {galleryItems.map((img) => (
+                      <tr
+                        key={img.id}
+                        className="hover:bg-slate-500/5 transition-all font-bold"
+                      >
+                        <td className="p-8">
+                          <img
+                            src={img.url}
+                            className="w-16 h-16 rounded-xl object-cover border-2 border-blue-600/20"
+                            alt=""
+                          />
+                        </td>
+                        <td className="p-8 text-sm uppercase tracking-tighter">
+                          {img.title}
+                        </td>
+                        <td className="p-8 text-xs opacity-50 uppercase">
+                          {img.category}
+                        </td>
+                        <td className="p-8 text-center">
+                          <button
+                            onClick={() =>
+                              handleDeleteGalleryItem(img.id, img.title)
+                            }
+                            className="p-4 bg-red-600/10 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}

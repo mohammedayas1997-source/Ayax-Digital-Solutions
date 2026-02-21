@@ -14,6 +14,7 @@ import {
   Mail,
   Lock,
 } from "lucide-react";
+import Gallery from "../components/Gallery";
 import NewsFeed from "../components/NewsFeed";
 import { Link, useNavigate } from "react-router-dom";
 import { Cpu, X } from "lucide-react";
@@ -215,6 +216,38 @@ const Home = () => {
       <div className="mt-20">
         <NewsFeed />
       </div>
+
+      {/* --- BRANDED GALLERY PREVIEW --- */}
+      <section id="gallery-preview" className="py-24 bg-white overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex flex-col md:flex-row items-end justify-between mb-12 gap-6">
+            <div className="text-left">
+              <h2 className="text-blue-600 font-black tracking-widest uppercase text-xs mb-4 flex items-center gap-2">
+                <div className="w-10 h-[2px] bg-blue-600"></div> Visual Archives
+              </h2>
+              <h3 className="text-5xl lg:text-6xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+                Inside Our <br />{" "}
+                <span className="text-blue-600">Infrastructure.</span>
+              </h3>
+            </div>
+
+            {/* Wannan maɓallin zai iya kai su zuwa cikakken shafin Gallery */}
+            <Link
+              to="/gallery"
+              className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 transition-all flex items-center gap-3 group"
+            >
+              Explore Full Gallery
+              <ArrowRight
+                size={16}
+                className="group-hover:translate-x-2 transition-transform"
+              />
+            </Link>
+          </div>
+
+          {/* Kira Gallery Component din a nan */}
+          <Gallery limit={3} />
+        </div>
+      </section>
 
       {/* --- SERVICES & PRICING --- */}
       <section id="services" className="py-24 bg-gray-50">
