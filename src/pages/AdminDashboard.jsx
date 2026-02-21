@@ -50,7 +50,7 @@ import {
   Calendar,
   Newspaper,
   Trash2,
-  Camera, // GYARA: Na kara Camera a nan domin Gallery ya yi aiki
+  Camera,
 } from "lucide-react";
 
 const AdminDashboard = () => {
@@ -69,6 +69,10 @@ const AdminDashboard = () => {
   const [galleryCategory, setGalleryCategory] = useState("Workshop");
   const [galleryItems, setGalleryItems] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // New State for Auto-Reply
+  const [autoReplyText, setAutoReplyText] = useState("");
+
   const [newsData, setNewsData] = useState({
     title: "",
     content: "",
@@ -90,9 +94,8 @@ const AdminDashboard = () => {
     phone: "2348000000000",
   };
 
-  // 1. REAL-TIME DATA ENGINE (CORE STREAMS)
+  // 1. REAL-TIME DATA ENGINE
   useEffect(() => {
-    // A nan na hade dukkan listeners din wuri daya don kaucewa blank screen
     const unsubStudents = onSnapshot(
       collection(db, "course_applications"),
       (snap) => {
@@ -108,22 +111,6 @@ const AdminDashboard = () => {
         );
       },
     );
-
-    // Add this state
-    const [autoReplyText, setAutoReplyText] = useState("");
-
-    // Add this function to save the setting to Firestore
-    const updateAutoReplySettings = async () => {
-      await setDoc(
-        doc(db, "system_settings", "chat_config"),
-        {
-          autoReplyMessage: autoReplyText,
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true },
-      );
-      alert("Auto-Reply Updated!");
-    };
 
     const unsubChats = onSnapshot(
       query(collection(db, "private_chats"), orderBy("createdAt", "desc")),
@@ -162,6 +149,11 @@ const AdminDashboard = () => {
       },
     );
 
+    // Fetch existing Auto-Reply settings
+    getDoc(doc(db, "system_settings", "chat_config")).then((docSnap) => {
+      if (docSnap.exists()) setAutoReplyText(docSnap.data().autoReplyMessage);
+    });
+
     return () => {
       unsubStudents();
       unsubGallery();
@@ -171,6 +163,23 @@ const AdminDashboard = () => {
       unsubNews();
     };
   }, []);
+
+  // Admin Actions Functions
+  const updateAutoReplySettings = async () => {
+    try {
+      setLoading(true);
+      await setDoc(
+        doc(db, "system_settings", "chat_config"),
+        { autoReplyMessage: autoReplyText, updatedAt: serverTimestamp() },
+        { merge: true },
+      );
+      alert("Auto-Reply Updated!");
+    } catch (err) {
+      alert("Error updating settings");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleGalleryUpload = async (e) => {
     e.preventDefault();
@@ -211,19 +220,6 @@ const AdminDashboard = () => {
     }
   };
 
-  useEffect(() => {
-    if (!selectedChat) return;
-    const q = query(
-      collection(db, "private_chats"),
-      where("studentId", "==", selectedChat.studentId),
-      orderBy("createdAt", "asc"),
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-    return () => unsub();
-  }, [selectedChat]);
-
   const logActivity = async (action, details) => {
     await addDoc(collection(db, "admin_logs"), {
       action,
@@ -255,7 +251,7 @@ const AdminDashboard = () => {
         createdAt: serverTimestamp(),
         adminEmail: auth.currentUser?.email,
       });
-      alert("NEWS PUBLISHED: Labari ya tafi Home Page nasara.");
+      alert("NEWS PUBLISHED!");
       setNewsData({ title: "", content: "", category: "General", image: "" });
       logActivity("NEWS_PUBLISH", `Published news: ${newsData.title}`);
     } catch (err) {
@@ -279,36 +275,22 @@ const AdminDashboard = () => {
 
   const handleAutomaticIDDispatch = async (student) => {
     if (student.paymentStatus !== "Form_Paid") {
-      alert("ERROR: No payment proof found for this student.");
+      alert("ERROR: No payment proof found.");
       return;
     }
     setLoading(true);
     const generatedID = `AYX-2026-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    const courseLink = `https://ayaxacademy.com/portal`;
-    const emailSubject = encodeURIComponent(
-      "Admission Approved - Student ID Assigned",
-    );
-    const messageBody = `Hello ${student.studentName},%0D%0A%0D%0AYour Form payment is verified.%0D%0AYour Student ID: ${generatedID}%0D%0APortal Link: ${courseLink}%0D%0A%0D%0ARegards, Ayax Academy.`;
-
     try {
       await updateDoc(doc(db, "course_applications", student.id), {
         studentId: generatedID,
         status: "Admitted",
         idAssignedAt: serverTimestamp(),
       });
-      window.open(
-        `mailto:${student.email}?subject=${emailSubject}&body=${messageBody}`,
-        "_blank",
-      );
-      const waMsg = encodeURIComponent(
-        `Hello ${student.studentName}, Admission Confirmed! ID: ${generatedID}. Portal: ${courseLink}`,
-      );
-      window.open(`https://wa.me/${student.phone}?text=${waMsg}`, "_blank");
       await logActivity(
         "AUTO_ID_DISPATCH",
-        `Generated & Dispatched ID ${generatedID} to ${student.studentName}`,
+        `Generated ID ${generatedID} for ${student.studentName}`,
       );
-      alert(`SUCCESS: ID ${generatedID} sent to Email and WhatsApp.`);
+      alert(`SUCCESS: ID ${generatedID} dispatched.`);
     } catch (err) {
       alert("CRITICAL ERROR: ID dispatch failed.");
     } finally {
@@ -324,25 +306,19 @@ const AdminDashboard = () => {
         certSerial: certSerial,
         certDate: serverTimestamp(),
       });
-      const msg = encodeURIComponent(
-        `Congratulations ${student.studentName}! Your certificate ${certSerial} is ready in your portal.`,
-      );
-      window.open(`https://wa.me/${student.phone}?text=${msg}`, "_blank");
       await logActivity(
         "CERT_ISSUE",
-        `Certificate ${certSerial} issued to ${student.studentName}`,
+        `Certificate issued to ${student.studentName}`,
       );
-      alert("Certificate Protocol Executed.");
+      alert("Certificate Issued.");
     } catch (err) {
-      alert("Certificate Error.");
+      alert("Error issuing certificate.");
     }
   };
 
   const directMessage = (target, mode) => {
     const contact = target === "supervisor" ? SUPERVISOR_INFO : target;
-    const text = encodeURIComponent(
-      "URGENT: Administrative update from Ayax Academy Global Controller.",
-    );
+    const text = encodeURIComponent("Administrative update from Ayax Academy.");
     if (mode === "email") {
       window.open(
         `mailto:${contact.email}?subject=System Alert&body=${text}`,
@@ -356,30 +332,15 @@ const AdminDashboard = () => {
   const handleManualCertGen = async (e) => {
     e.preventDefault();
     setLoading(true);
-    const manualID = `AYX-MAN-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const certSerial = `AYX-GIFT-${Date.now()}`;
-    const verificationURL = `https://ayaxacademy.com/verify/${certSerial}`;
-    const qrCodeAPI = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verificationURL)}`;
-
     try {
       await addDoc(collection(db, "manual_certificates"), {
         ...manualCert,
-        studentId: manualID,
         certSerial: certSerial,
-        qrCode: qrCodeAPI,
         issuedBy: auth.currentUser?.email,
         timestamp: serverTimestamp(),
       });
-
-      const waMsg = encodeURIComponent(
-        `Hello ${manualCert.name}, an Honorary Certificate has been generated for you.\n\nSerial: ${certSerial}\nIssue Date: ${manualCert.issueDate}\nVerify: ${verificationURL}`,
-      );
-      window.open(`https://wa.me/${manualCert.phone}?text=${waMsg}`, "_blank");
-      await logActivity(
-        "MANUAL_CERT_GEN",
-        `Manual Certificate ${certSerial} generated for ${manualCert.name}`,
-      );
-      alert(`SUCCESS: Manual ID ${manualID} Generated.`);
+      alert(`SUCCESS: Manual Certificate ${certSerial} Generated.`);
       setManualCert({
         name: "",
         course: "",
@@ -404,6 +365,7 @@ const AdminDashboard = () => {
     <div
       className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"}`}
     >
+      {/* MOBILE MENU OVERLAY */}
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm lg:hidden"
@@ -411,6 +373,7 @@ const AdminDashboard = () => {
         ></div>
       )}
 
+      {/* SIDEBAR */}
       <aside
         className={`fixed inset-y-0 left-0 z-[110] w-80 border-r flex flex-col transform transition-transform duration-300 lg:relative lg:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-2xl"}`}
       >
@@ -429,7 +392,7 @@ const AdminDashboard = () => {
           </p>
         </div>
 
-        <nav className="flex-1 px-6 space-y-3">
+        <nav className="flex-1 px-6 space-y-3 overflow-y-auto">
           {[
             {
               id: "overview",
@@ -494,7 +457,7 @@ const AdminDashboard = () => {
           </button>
           <button
             onClick={() => signOut(auth)}
-            className="w-full py-5 bg-red-600/10 text-red-600 rounded-2xl font-black text-[10px] uppercase border border-red-600/20 hover:bg-red-600 hover:text-white transition-all"
+            className="w-full py-5 bg-red-600/10 text-red-600 rounded-2xl font-black text-[10px] uppercase border border-red-600/20"
           >
             <LogOut size={20} className="inline mr-2" /> Shutdown
           </button>
@@ -503,142 +466,115 @@ const AdminDashboard = () => {
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <header className="h-28 border-b flex items-center justify-between px-6 lg:px-12 bg-white/5 backdrop-blur-3xl shrink-0">
-          <div className="flex items-center gap-4 lg:gap-12">
+          <div className="flex items-center gap-4">
             <button
               onClick={() => setMobileMenuOpen(true)}
               className="p-3 bg-blue-600 text-white rounded-xl lg:hidden"
             >
               <Menu size={24} />
             </button>
-            <div className="hidden sm:flex flex-col">
-              <span className="text-[10px] font-black uppercase opacity-40 text-emerald-500">
-                Gross Revenue
-              </span>
-              <div className="text-xl lg:text-3xl font-black tracking-tighter text-emerald-500">
-                ₦{totalRevenue.toLocaleString()}
-              </div>
-            </div>
             <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase opacity-40 text-blue-500">
-                Talent Pool
+              <span className="text-[10px] font-black uppercase opacity-40 text-emerald-500">
+                Revenue
               </span>
-              <div className="text-xl lg:text-3xl font-black tracking-tighter text-blue-500">
-                {students.length}
+              <div className="text-xl font-black text-emerald-500">
+                ₦{totalRevenue.toLocaleString()}
               </div>
             </div>
           </div>
           <button
             onClick={togglePortal}
-            className={`px-6 lg:px-10 py-4 rounded-2xl font-black text-[10px] uppercase transition-all shadow-2xl ${portalStatus ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
+            className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl ${portalStatus ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
           >
             {portalStatus ? "Lockdown" : "Open System"}
           </button>
         </header>
 
         <div className="flex-1 p-4 lg:p-12 overflow-y-auto custom-scrollbar">
+          {activeTab === "overview" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="stat-card">
+                <Activity className="text-blue-600 mb-4" size={32} />
+                <h4 className="metric-label">Applications</h4>
+                <p className="text-5xl font-black">{students.length}</p>
+              </div>
+              <div className="stat-card">
+                <CheckCircle className="text-emerald-500 mb-4" size={32} />
+                <h4 className="metric-label">Paid Forms</h4>
+                <p className="text-5xl font-black">{formPaidCount}</p>
+              </div>
+              <div className="stat-card">
+                <Zap className="text-purple-500 mb-4" size={32} />
+                <h4 className="metric-label">Smart IDs</h4>
+                <p className="text-5xl font-black">
+                  {students.filter((s) => s.studentId).length}
+                </p>
+              </div>
+            </div>
+          )}
+
           {activeTab === "news_manager" && (
-            <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700">
+            <div className="space-y-12">
               <div
-                className={`p-8 lg:p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+                className={`p-8 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
               >
-                <h3 className="text-2xl font-black italic uppercase tracking-tighter text-blue-600 mb-8 flex items-center gap-4">
-                  <Newspaper size={28} /> Publish New Update
+                <h3 className="text-2xl font-black italic uppercase text-blue-600 mb-8">
+                  <Newspaper className="inline mr-2" /> Publish Update
                 </h3>
                 <form onSubmit={handlePublishNews} className="space-y-6">
                   <input
                     required
                     className="admin-input"
-                    placeholder="News Title"
+                    placeholder="Title"
                     value={newsData.title}
                     onChange={(e) =>
                       setNewsData({ ...newsData, title: e.target.value })
                     }
                   />
-                  <div className="grid grid-cols-2 gap-6">
-                    <select
-                      className="admin-input"
-                      value={newsData.category}
-                      onChange={(e) =>
-                        setNewsData({ ...newsData, category: e.target.value })
-                      }
-                    >
-                      <option value="General">General</option>
-                      <option value="Admission">Admission</option>
-                      <option value="Urgent">Urgent</option>
-                    </select>
-                    <input
-                      className="admin-input"
-                      placeholder="Image URL"
-                      value={newsData.image}
-                      onChange={(e) =>
-                        setNewsData({ ...newsData, image: e.target.value })
-                      }
-                    />
-                  </div>
                   <textarea
                     required
-                    className="admin-input min-h-[150px] pt-5"
-                    placeholder="Content Body"
+                    className="admin-input min-h-[150px]"
+                    placeholder="Content"
                     value={newsData.content}
                     onChange={(e) =>
                       setNewsData({ ...newsData, content: e.target.value })
                     }
-                  ></textarea>
-                  <button
-                    disabled={loading}
-                    className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-xs shadow-2xl hover:bg-slate-900 transition-all"
-                  >
-                    {loading ? (
-                      <RefreshCcw className="animate-spin mx-auto" />
-                    ) : (
-                      "Broadcast to News Feed"
-                    )}
+                  />
+                  <button className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase shadow-2xl">
+                    Broadcast News
                   </button>
                 </form>
               </div>
-
+              {/* News List */}
               <div
-                className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+                className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}
               >
-                <div className="p-8 border-b border-slate-800/10">
-                  <h3 className="text-xl font-black uppercase italic text-slate-500 tracking-widest">
-                    Active News Stream
-                  </h3>
-                </div>
-                <table className="w-full text-left min-w-[700px]">
-                  <thead className="bg-slate-500/5 text-[10px] font-black uppercase opacity-60">
+                <table className="w-full text-left">
+                  <thead className="bg-slate-500/5 text-[10px] font-black uppercase">
                     <tr>
                       <th className="p-8">Headline</th>
                       <th className="p-8">Category</th>
-                      <th className="p-8">Date Published</th>
-                      <th className="p-8 text-center">Delete</th>
+                      <th className="p-8 text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/10 font-bold">
+                  <tbody>
                     {newsFeed.map((item) => (
                       <tr
                         key={item.id}
-                        className="hover:bg-slate-500/5 transition-all"
+                        className="border-t border-slate-800/10 font-bold"
                       >
+                        <td className="p-8 text-sm">{item.title}</td>
                         <td className="p-8">
-                          <p className="text-sm font-black uppercase truncate max-w-xs">
-                            {item.title}
-                          </p>
-                        </td>
-                        <td className="p-8">
-                          <span className="px-3 py-1 bg-blue-600/10 text-blue-600 rounded-lg text-[9px] uppercase border border-blue-600/20">
+                          <span className="px-3 py-1 bg-blue-600/10 text-blue-600 rounded-lg text-[9px] uppercase">
                             {item.category}
                           </span>
-                        </td>
-                        <td className="p-8 text-xs opacity-50">
-                          {item.createdAt?.toDate().toLocaleDateString()}
                         </td>
                         <td className="p-8 text-center">
                           <button
                             onClick={() =>
                               handleDeleteNews(item.id, item.title)
                             }
-                            className="p-4 bg-red-600/10 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                            className="p-4 bg-red-600/10 text-red-600 rounded-2xl"
                           >
                             <Trash2 size={18} />
                           </button>
@@ -648,110 +584,92 @@ const AdminDashboard = () => {
                   </tbody>
                 </table>
               </div>
+              {/* Bot Logic Section moved inside a logical tab */}
+              <div className="p-8 bg-blue-600/5 rounded-[2rem] border border-blue-600/20">
+                <h4 className="text-sm font-black uppercase mb-4 text-blue-600">
+                  Smart Auto-Reply Configuration
+                </h4>
+                <textarea
+                  className="admin-input h-32 mb-4"
+                  placeholder="Instant message..."
+                  value={autoReplyText}
+                  onChange={(e) => setAutoReplyText(e.target.value)}
+                />
+                <button
+                  onClick={updateAutoReplySettings}
+                  className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px]"
+                >
+                  Save Bot Logic
+                </button>
+              </div>
             </div>
           )}
-          // Add this UI inside a new Tab or News Manager
-          <div className="p-8 bg-blue-600/5 rounded-[2rem] border border-blue-600/20 mt-10">
-            <h4 className="text-sm font-black uppercase mb-4 text-blue-600">
-              Smart Auto-Reply Configuration
-            </h4>
-            <textarea
-              className="admin-input h-32 mb-4"
-              placeholder="Write the message students get instantly..."
-              value={autoReplyText}
-              onChange={(e) => setAutoReplyText(e.target.value)}
-            ></textarea>
-            <button
-              onClick={updateAutoReplySettings}
-              className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px]"
-            >
-              Save Bot Logic
-            </button>
-          </div>
-          ;
+
           {activeTab === "gallery_manager" && (
-            <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700">
+            <div className="space-y-12">
               <div
-                className={`p-8 lg:p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+                className={`p-8 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
               >
-                <h3 className="text-2xl font-black italic uppercase text-blue-600 mb-8 flex items-center gap-4">
-                  <PlusCircle size={28} /> Add New Gallery Image
+                <h3 className="text-2xl font-black italic uppercase text-blue-600 mb-8">
+                  <Camera className="inline mr-2" /> Add Gallery
                 </h3>
                 <form
                   onSubmit={handleGalleryUpload}
                   className="grid grid-cols-1 md:grid-cols-2 gap-6"
                 >
                   <input
-                    required
                     className="admin-input"
-                    placeholder="Image Title"
+                    placeholder="Title"
                     value={galleryTitle}
                     onChange={(e) => setGalleryTitle(e.target.value)}
                   />
                   <input
-                    required
                     className="admin-input"
                     placeholder="Category"
                     value={galleryCategory}
                     onChange={(e) => setGalleryCategory(e.target.value)}
                   />
                   <input
-                    required
                     className="admin-input md:col-span-2"
                     placeholder="Image URL"
                     value={galleryUrl}
                     onChange={(e) => setGalleryUrl(e.target.value)}
                   />
-                  <button
-                    disabled={loading}
-                    className="md:col-span-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs"
-                  >
-                    {loading ? "Uploading..." : "Publish to Gallery"}
+                  <button className="md:col-span-2 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase">
+                    Publish Image
                   </button>
                 </form>
               </div>
               <div
-                className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+                className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100"}`}
               >
-                <div className="p-8 border-b border-slate-800/10">
-                  <h3 className="text-xl font-black uppercase italic text-slate-500 tracking-widest">
-                    Manage Archives
-                  </h3>
-                </div>
-                <table className="w-full text-left min-w-[600px]">
-                  <thead className="bg-slate-500/5 text-[10px] font-black uppercase opacity-60">
+                <table className="w-full">
+                  <thead className="bg-slate-500/5 text-[10px] font-black uppercase">
                     <tr>
-                      <th className="p-8">Visual</th>
-                      <th className="p-8">Identity</th>
-                      <th className="p-8">Category</th>
+                      <th className="p-8 text-left">Visual</th>
+                      <th className="p-8 text-left">Title</th>
                       <th className="p-8 text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/10">
+                  <tbody>
                     {galleryItems.map((img) => (
                       <tr
                         key={img.id}
-                        className="hover:bg-slate-500/5 transition-all font-bold"
+                        className="border-t border-slate-800/10 font-bold"
                       >
                         <td className="p-8">
                           <img
                             src={img.url}
-                            className="w-16 h-16 rounded-xl object-cover border-2 border-blue-600/20"
-                            alt=""
+                            className="w-12 h-12 rounded-xl object-cover"
                           />
                         </td>
-                        <td className="p-8 text-sm uppercase tracking-tighter">
-                          {img.title}
-                        </td>
-                        <td className="p-8 text-xs opacity-50 uppercase">
-                          {img.category}
-                        </td>
+                        <td className="p-8 text-sm uppercase">{img.title}</td>
                         <td className="p-8 text-center">
                           <button
                             onClick={() =>
                               handleDeleteGalleryItem(img.id, img.title)
                             }
-                            className="p-4 bg-red-600/10 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                            className="p-4 bg-red-600/10 text-red-600 rounded-2xl"
                           >
                             <Trash2 size={18} />
                           </button>
@@ -763,108 +681,59 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
+
           {activeTab === "admissions" && (
             <div
-              className={`rounded-[3rem] border overflow-x-auto ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
             >
-              <table className="w-full text-left min-w-[800px]">
-                <thead className="bg-slate-500/5 text-[11px] font-black uppercase opacity-60">
+              <table className="w-full text-left">
+                <thead className="bg-slate-500/5 text-[10px] font-black uppercase opacity-60">
                   <tr>
-                    <th className="p-8">Identity</th>
-                    <th className="p-8">Clearance</th>
-                    <th className="p-8">Credentialing</th>
-                    <th className="p-8 text-center">Actions</th>
+                    <th className="p-8">Student</th>
+                    <th className="p-8">Status</th>
+                    <th className="p-8">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/10 font-bold">
                   {students.map((s) => (
-                    <tr
-                      key={s.id}
-                      className="hover:bg-slate-500/5 transition-all"
-                    >
-                      <td className="p-8 flex items-center gap-5">
+                    <tr key={s.id}>
+                      <td className="p-8 flex items-center gap-4">
                         <img
                           src={s.passportUrl}
-                          className="w-14 h-14 rounded-[1.2rem] object-cover border-2 border-blue-600/30"
+                          className="w-10 h-10 rounded-lg object-cover"
                         />
                         <div>
-                          <p className="text-sm font-black uppercase">
-                            {s.studentName}
-                          </p>
-                          <p className="text-[10px] text-blue-500 uppercase">
-                            {s.course}
-                          </p>
+                          <p className="text-sm uppercase">{s.studentName}</p>
+                          <p className="text-[9px] opacity-40">{s.course}</p>
                         </div>
                       </td>
                       <td className="p-8">
                         <span
-                          className={`px-4 py-2 rounded-xl text-[10px] uppercase border ${s.paymentStatus === "Form_Paid" ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/30" : "bg-red-500/10 text-red-500 border-red-500/30"}`}
+                          className={`px-3 py-1 rounded-lg text-[9px] uppercase ${s.paymentStatus === "Form_Paid" ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-600"}`}
                         >
                           {s.paymentStatus}
                         </span>
                       </td>
-                      <td className="p-8">
-                        {s.studentId ? (
-                          <div className="flex items-center gap-3">
-                            <Zap size={16} className="text-purple-500" />
-                            <span className="font-mono text-xs">
-                              {s.studentId}
-                            </span>
-                          </div>
-                        ) : (
+                      <td className="p-8 flex gap-2">
+                        {!s.studentId && (
                           <button
                             onClick={() => handleAutomaticIDDispatch(s)}
-                            className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase"
+                            className="p-3 bg-blue-600 text-white rounded-xl"
                           >
-                            Dispatch ID
+                            <Zap size={14} />
                           </button>
                         )}
-                      </td>
-                      <td className="p-8 flex justify-center gap-3">
                         <button
                           onClick={() => issueCertificate(s)}
-                          className="p-4 bg-amber-500/10 text-amber-600 rounded-2xl"
+                          className="p-3 bg-amber-500/10 text-amber-600 rounded-xl"
                         >
-                          <Award size={20} />
-                        </button>
-                        <button
-                          onClick={() => directMessage(s, "email")}
-                          className="p-4 bg-blue-500/10 text-blue-600 rounded-2xl"
-                        >
-                          <Mail size={20} />
-                        </button>
-                        <button
-                          onClick={() => directMessage(s, "whatsapp")}
-                          className="p-4 bg-emerald-500/10 text-emerald-600 rounded-2xl"
-                        >
-                          <MessageSquare size={20} />
+                          <Award size={14} />
                         </button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-            </div>
-          )}
-          {activeTab === "overview" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-              <div className="stat-card">
-                <Activity className="text-blue-600 mb-6" size={32} />
-                <h4 className="metric-label">System Admissions</h4>
-                <p className="text-6xl font-black">{students.length}</p>
-              </div>
-              <div className="stat-card">
-                <CheckCircle className="text-emerald-500 mb-6" size={32} />
-                <h4 className="metric-label">Revenue Sources</h4>
-                <p className="text-6xl font-black">{formPaidCount}</p>
-              </div>
-              <div className="stat-card">
-                <Fingerprint className="text-purple-500 mb-6" size={32} />
-                <h4 className="metric-label">Security IDs Active</h4>
-                <p className="text-6xl font-black">
-                  {students.filter((s) => s.studentId).length}
-                </p>
-              </div>
             </div>
           )}
         </div>
@@ -874,7 +743,7 @@ const AdminDashboard = () => {
         .admin-input { width: 100%; padding: 1.25rem; background: ${darkMode ? "#0f172a" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.25rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
         .admin-input:focus { border-color: #2563eb; }
         .metric-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.15em; }
-        .stat-card { padding: 50px; border-radius: 50px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); }
+        .stat-card { padding: 40px; border-radius: 40px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); }
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
       `}</style>
