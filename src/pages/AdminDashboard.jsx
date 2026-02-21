@@ -46,6 +46,8 @@ import {
   QrCode,
   PlusCircle,
   RefreshCcw,
+  Menu,
+  Calendar,
 } from "lucide-react";
 
 const AdminDashboard = () => {
@@ -58,14 +60,16 @@ const AdminDashboard = () => {
   const [historyLogs, setHistoryLogs] = useState([]);
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Manual Certificate State
+  // Manual Certificate State - Ya hada da Date
   const [manualCert, setManualCert] = useState({
     name: "",
     course: "",
     email: "",
     phone: "",
     grade: "Distinction",
+    issueDate: new Date().toISOString().split("T")[0],
   });
 
   const SUPERVISOR_INFO = {
@@ -73,6 +77,7 @@ const AdminDashboard = () => {
     phone: "2348000000000",
   };
 
+  // 1. REAL-TIME DATA ENGINE (CORE STREAMS)
   useEffect(() => {
     const unsubStudents = onSnapshot(
       collection(db, "course_applications"),
@@ -119,6 +124,7 @@ const AdminDashboard = () => {
     };
   }, []);
 
+  // 2. CHAT SURVEILLANCE ENGINE
   useEffect(() => {
     if (!selectedChat) return;
     const q = query(
@@ -132,6 +138,7 @@ const AdminDashboard = () => {
     return () => unsub();
   }, [selectedChat]);
 
+  // 3. ADMINISTRATIVE MASTER ACTIONS
   const logActivity = async (action, details) => {
     await addDoc(collection(db, "admin_logs"), {
       action,
@@ -154,6 +161,7 @@ const AdminDashboard = () => {
     );
   };
 
+  // 4. AUTOMATIC ID GENERATION & MULTI-CHANNEL DISPATCH
   const handleAutomaticIDDispatch = async (student) => {
     if (student.paymentStatus !== "Form_Paid") {
       alert("ERROR: No payment proof found for this student.");
@@ -193,6 +201,7 @@ const AdminDashboard = () => {
     }
   };
 
+  // 5. DIRECT CERTIFICATE ISSUANCE
   const issueCertificate = async (student) => {
     const certSerial = `AYX-CERT-${Date.now()}`;
     try {
@@ -215,14 +224,31 @@ const AdminDashboard = () => {
     }
   };
 
-  // --- 7. MANUAL CERTIFICATE GENERATION PROTOCOL ---
+  // 6. DIRECT USER/SUPERVISOR MESSAGING
+  const directMessage = (target, mode) => {
+    const contact = target === "supervisor" ? SUPERVISOR_INFO : target;
+    const text = encodeURIComponent(
+      "URGENT: Administrative update from Ayax Academy Global Controller.",
+    );
+    if (mode === "email") {
+      window.open(
+        `mailto:${contact.email}?subject=System Alert&body=${text}`,
+        "_blank",
+      );
+    } else {
+      window.open(
+        `https://wa.me/${contact.phone || contact.phone}?text=${text}`,
+        "_blank",
+      );
+    }
+  };
+
+  // 7. MANUAL CERTIFICATE GENERATION PROTOCOL (Sabon Gyara tare da Date)
   const handleManualCertGen = async (e) => {
     e.preventDefault();
     setLoading(true);
     const manualID = `AYX-MAN-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
     const certSerial = `AYX-GIFT-${Date.now()}`;
-
-    // Real-life QR Encoding (Verification URL)
     const verificationURL = `https://ayaxacademy.com/verify/${certSerial}`;
     const qrCodeAPI = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(verificationURL)}`;
 
@@ -237,7 +263,7 @@ const AdminDashboard = () => {
       });
 
       const waMsg = encodeURIComponent(
-        `Hello ${manualCert.name}, an Honorary Certificate has been generated for you.\n\nSerial: ${certSerial}\nAccess ID: ${manualID}\nVerify: ${verificationURL}`,
+        `Hello ${manualCert.name}, an Honorary Certificate has been generated for you.\n\nSerial: ${certSerial}\nIssue Date: ${manualCert.issueDate}\nVerify: ${verificationURL}`,
       );
       window.open(`https://wa.me/${manualCert.phone}?text=${waMsg}`, "_blank");
 
@@ -245,35 +271,19 @@ const AdminDashboard = () => {
         "MANUAL_CERT_GEN",
         `Manual Certificate ${certSerial} generated for ${manualCert.name}`,
       );
-      alert(
-        `PROTOCOL SUCCESS: Manual ID ${manualID} Generated. WhatsApp Dispatch Initiated.`,
-      );
+      alert(`SUCCESS: Manual ID ${manualID} Generated.`);
       setManualCert({
         name: "",
         course: "",
         email: "",
         phone: "",
         grade: "Distinction",
+        issueDate: new Date().toISOString().split("T")[0],
       });
     } catch (err) {
-      alert("MANUAL_GEN_ERROR: Protocol failed.");
+      alert("ERROR: Manual Gen Failed.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const directMessage = (target, mode) => {
-    const contact = target === "supervisor" ? SUPERVISOR_INFO : target;
-    const text = encodeURIComponent(
-      "URGENT: Administrative update from Ayax Academy Global Controller.",
-    );
-    if (mode === "email") {
-      window.open(
-        `mailto:${contact.email}?subject=System Alert&body=${text}`,
-        "_blank",
-      );
-    } else {
-      window.open(`https://wa.me/${contact.phone}?text=${text}`, "_blank");
     }
   };
 
@@ -286,11 +296,25 @@ const AdminDashboard = () => {
     <div
       className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"}`}
     >
-      {/* SIDEBAR */}
+      {/* MOBILE HAMBURGER OVERLAY */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        ></div>
+      )}
+
+      {/* SIDEBAR - Responsive */}
       <aside
-        className={`w-80 border-r flex flex-col ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-2xl"}`}
+        className={`fixed inset-y-0 left-0 z-[110] w-80 border-r flex flex-col transform transition-transform duration-300 lg:relative lg:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-2xl"}`}
       >
-        <div className="p-10 text-center">
+        <div className="p-10 text-center relative">
+          <button
+            onClick={() => setMobileMenuOpen(false)}
+            className="absolute top-4 right-4 p-2 lg:hidden"
+          >
+            <X size={20} />
+          </button>
           <h2 className="text-3xl font-black italic tracking-tighter text-blue-600">
             AYAX GLOBAL
           </h2>
@@ -315,7 +339,7 @@ const AdminDashboard = () => {
               id: "manual_gen",
               icon: <PlusCircle size={20} />,
               label: "Manual Minting",
-            }, // NEW TAB
+            },
             {
               id: "surveillance",
               icon: <Eye size={20} />,
@@ -329,12 +353,34 @@ const AdminDashboard = () => {
           ].map((item) => (
             <button
               key={item.id}
-              onClick={() => setActiveTab(item.id)}
+              onClick={() => {
+                setActiveTab(item.id);
+                setMobileMenuOpen(false);
+              }}
               className={`w-full flex items-center gap-5 p-5 rounded-[1.5rem] font-black text-xs uppercase transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-xl scale-105" : "hover:bg-blue-500/10 opacity-60"}`}
             >
               {item.icon} {item.label}
             </button>
           ))}
+          <div className="mt-8 p-6 bg-slate-500/5 rounded-3xl border border-slate-500/10">
+            <p className="text-[9px] font-black uppercase opacity-50 mb-4 tracking-widest text-center">
+              Supervisor Comms
+            </p>
+            <div className="flex justify-around">
+              <button
+                onClick={() => directMessage("supervisor", "email")}
+                className="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:text-blue-500 transition-colors"
+              >
+                <Mail size={18} />
+              </button>
+              <button
+                onClick={() => directMessage("supervisor", "whatsapp")}
+                className="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:text-emerald-500 transition-colors"
+              >
+                <MessageSquare size={18} />
+              </button>
+            </div>
+          </div>
         </nav>
 
         <div className="p-8 space-y-4">
@@ -348,173 +394,157 @@ const AdminDashboard = () => {
               <Moon size={20} className="text-blue-500" />
             )}
             <span className="font-black text-[10px] uppercase">
-              {darkMode ? "Light Mode" : "Dark Mode"}
+              {darkMode ? "Light" : "Dark"}
             </span>
           </button>
           <button
             onClick={() => auth.signOut()}
             className="w-full py-5 bg-red-600/10 text-red-600 rounded-2xl font-black text-[10px] uppercase border border-red-600/20 hover:bg-red-600 hover:text-white transition-all"
           >
-            <LogOut size={20} className="inline mr-2" /> Shutdown Session
+            <LogOut size={20} className="inline mr-2" /> Shutdown
           </button>
         </div>
       </aside>
 
       {/* MAIN CONSOLE */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-28 border-b flex items-center justify-between px-12 bg-white/5 backdrop-blur-3xl shrink-0">
-          <div className="flex items-center gap-12">
-            <div className="flex flex-col">
+        <header className="h-28 border-b flex items-center justify-between px-6 lg:px-12 bg-white/5 backdrop-blur-3xl shrink-0">
+          <div className="flex items-center gap-4 lg:gap-12">
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="p-3 bg-blue-600 text-white rounded-xl lg:hidden"
+            >
+              <Menu size={24} />
+            </button>
+            <div className="hidden sm:flex flex-col">
               <span className="text-[10px] font-black uppercase opacity-40 text-emerald-500">
                 Gross Revenue
               </span>
-              <div className="text-3xl font-black tracking-tighter text-emerald-500">
+              <div className="text-xl lg:text-3xl font-black tracking-tighter text-emerald-500">
                 ₦{totalRevenue.toLocaleString()}
               </div>
             </div>
-            <div className="w-[1px] h-12 bg-slate-500/20"></div>
+            <div className="hidden sm:block w-[1px] h-12 bg-slate-500/20"></div>
             <div className="flex flex-col">
               <span className="text-[10px] font-black uppercase opacity-40 text-blue-500">
                 Registered Talent
               </span>
-              <div className="text-3xl font-black tracking-tighter text-blue-500">
+              <div className="text-xl lg:text-3xl font-black tracking-tighter text-blue-500">
                 {students.length}
               </div>
             </div>
           </div>
 
           <div className="flex items-center gap-6">
-            <div className="flex items-center gap-3 bg-slate-500/5 px-6 py-3 rounded-2xl border border-slate-500/10">
+            <div className="hidden md:flex items-center gap-3 bg-slate-500/5 px-6 py-3 rounded-2xl border border-slate-500/10">
               <div
-                className={`w-3 h-3 rounded-full ${portalStatus ? "bg-emerald-500 shadow-[0_0_15px_#10b981]" : "bg-red-500 shadow-[0_0_15px_#ef4444]"}`}
+                className={`w-3 h-3 rounded-full ${portalStatus ? "bg-emerald-500" : "bg-red-500"}`}
               ></div>
               <span className="text-[11px] font-black uppercase">
-                Portal: {portalStatus ? "Active" : "Locked"}
+                Portal: {portalStatus ? "Live" : "Locked"}
               </span>
             </div>
             <button
               onClick={togglePortal}
-              className={`px-10 py-4 rounded-2xl font-black text-[10px] uppercase transition-all shadow-2xl ${portalStatus ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
+              className={`px-6 lg:px-10 py-4 rounded-2xl font-black text-[10px] uppercase transition-all shadow-2xl ${portalStatus ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
             >
-              {portalStatus ? "Initiate Lockdown" : "Open System Access"}
+              {portalStatus ? "Lockdown" : "Open System"}
             </button>
           </div>
         </header>
 
-        <div className="flex-1 p-12 overflow-y-auto">
-          {/* MANUAL CERTIFICATE GENERATION INTERFACE */}
+        <div className="flex-1 p-4 lg:p-12 overflow-y-auto custom-scrollbar">
+          {/* MANUAL GENERATION TAB */}
           {activeTab === "manual_gen" && (
             <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
               <div
-                className={`p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+                className={`p-8 lg:p-12 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
               >
                 <div className="flex items-center gap-4 mb-10">
                   <div className="p-4 bg-blue-600 text-white rounded-2xl shadow-lg">
                     <Award size={28} />
                   </div>
                   <div>
-                    <h3 className="text-2xl font-black italic uppercase tracking-tighter">
+                    <h3 className="text-2xl font-black italic uppercase tracking-tighter text-blue-600">
                       Manual Certificate Minting
                     </h3>
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">
-                      Gift or Honorary Issuance Protocol
-                    </p>
                   </div>
                 </div>
-
                 <form
                   onSubmit={handleManualCertGen}
-                  className="grid grid-cols-2 gap-8"
+                  className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8"
                 >
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black uppercase opacity-50 ml-2">
-                      Recipient Full Name
-                    </label>
-                    <input
-                      required
-                      className="admin-input"
-                      placeholder="e.g. John Doe"
-                      value={manualCert.name}
-                      onChange={(e) =>
-                        setManualCert({ ...manualCert, name: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black uppercase opacity-50 ml-2">
-                      Awarded Course
-                    </label>
-                    <input
-                      required
-                      className="admin-input"
-                      placeholder="e.g. Cyber Security"
-                      value={manualCert.course}
-                      onChange={(e) =>
-                        setManualCert({ ...manualCert, course: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black uppercase opacity-50 ml-2">
-                      Email Address
-                    </label>
-                    <input
-                      required
-                      type="email"
-                      className="admin-input"
-                      placeholder="recipient@email.com"
-                      value={manualCert.email}
-                      onChange={(e) =>
-                        setManualCert({ ...manualCert, email: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-[9px] font-black uppercase opacity-50 ml-2">
-                      WhatsApp Phone (Intl Format)
-                    </label>
-                    <input
-                      required
-                      className="admin-input"
-                      placeholder="234..."
-                      value={manualCert.phone}
-                      onChange={(e) =>
-                        setManualCert({ ...manualCert, phone: e.target.value })
-                      }
-                    />
-                  </div>
-                  <div className="col-span-2 flex flex-col gap-2">
-                    <label className="text-[9px] font-black uppercase opacity-50 ml-2">
-                      Honorary Grade / Title
-                    </label>
-                    <select
-                      className="admin-input"
-                      value={manualCert.grade}
-                      onChange={(e) =>
-                        setManualCert({ ...manualCert, grade: e.target.value })
-                      }
-                    >
-                      <option value="Distinction">Distinction</option>
-                      <option value="Merit">Merit</option>
-                      <option value="First Class Honors">
-                        First Class Honors
-                      </option>
-                      <option value="Executive Certification">
-                        Executive Certification
-                      </option>
-                    </select>
-                  </div>
-
+                  <input
+                    required
+                    className="admin-input"
+                    placeholder="Full Name"
+                    value={manualCert.name}
+                    onChange={(e) =>
+                      setManualCert({ ...manualCert, name: e.target.value })
+                    }
+                  />
+                  <input
+                    required
+                    type="date"
+                    className="admin-input"
+                    value={manualCert.issueDate}
+                    onChange={(e) =>
+                      setManualCert({
+                        ...manualCert,
+                        issueDate: e.target.value,
+                      })
+                    }
+                  />
+                  <input
+                    required
+                    className="admin-input"
+                    placeholder="Awarded Course"
+                    value={manualCert.course}
+                    onChange={(e) =>
+                      setManualCert({ ...manualCert, course: e.target.value })
+                    }
+                  />
+                  <input
+                    required
+                    className="admin-input"
+                    placeholder="WhatsApp Number"
+                    value={manualCert.phone}
+                    onChange={(e) =>
+                      setManualCert({ ...manualCert, phone: e.target.value })
+                    }
+                  />
+                  <input
+                    required
+                    type="email"
+                    className="admin-input"
+                    placeholder="Email Address"
+                    value={manualCert.email}
+                    onChange={(e) =>
+                      setManualCert({ ...manualCert, email: e.target.value })
+                    }
+                  />
+                  <select
+                    className="admin-input"
+                    value={manualCert.grade}
+                    onChange={(e) =>
+                      setManualCert({ ...manualCert, grade: e.target.value })
+                    }
+                  >
+                    <option value="Distinction">Distinction</option>
+                    <option value="Merit">Merit</option>
+                    <option value="First Class Honors">
+                      First Class Honors
+                    </option>
+                  </select>
                   <button
                     disabled={loading}
-                    className="col-span-2 py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl hover:bg-slate-900 transition-all flex items-center justify-center gap-4"
+                    className="md:col-span-2 py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-xs shadow-2xl flex items-center justify-center gap-4"
                   >
                     {loading ? (
                       <RefreshCcw className="animate-spin" />
                     ) : (
                       <>
-                        <QrCode size={20} /> Generate & Dispatch Manual
-                        Credentials
+                        <QrCode size={20} /> Mint Certificate
                       </>
                     )}
                   </button>
@@ -523,17 +553,18 @@ const AdminDashboard = () => {
             </div>
           )}
 
+          {/* ADMISSION FLOW TAB */}
           {activeTab === "admissions" && (
             <div
-              className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              className={`rounded-[3rem] border overflow-x-auto ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
             >
-              <table className="w-full text-left">
-                <thead className="bg-slate-500/5 text-[11px] font-black uppercase tracking-widest opacity-60">
+              <table className="w-full text-left min-w-[800px]">
+                <thead className="bg-slate-500/5 text-[11px] font-black uppercase opacity-60">
                   <tr>
                     <th className="p-8">Student Identity</th>
-                    <th className="p-8">Financial Clearance</th>
+                    <th className="p-8">Clearance</th>
                     <th className="p-8">Credentialing</th>
-                    <th className="p-8 text-center">Global Actions</th>
+                    <th className="p-8 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/10 font-bold">
@@ -542,20 +573,18 @@ const AdminDashboard = () => {
                       key={s.id}
                       className="hover:bg-slate-500/5 transition-all"
                     >
-                      <td className="p-8">
-                        <div className="flex items-center gap-5">
-                          <img
-                            src={s.passportUrl}
-                            className="w-14 h-14 rounded-[1.2rem] object-cover border-2 border-blue-600/30"
-                          />
-                          <div>
-                            <p className="text-sm font-black uppercase tracking-tight">
-                              {s.studentName}
-                            </p>
-                            <p className="text-[10px] text-blue-500 uppercase">
-                              {s.course}
-                            </p>
-                          </div>
+                      <td className="p-8 flex items-center gap-5">
+                        <img
+                          src={s.passportUrl}
+                          className="w-14 h-14 rounded-[1.2rem] object-cover border-2 border-blue-600/30"
+                        />
+                        <div>
+                          <p className="text-sm font-black uppercase">
+                            {s.studentName}
+                          </p>
+                          <p className="text-[10px] text-blue-500 uppercase">
+                            {s.course}
+                          </p>
                         </div>
                       </td>
                       <td className="p-8">
@@ -568,44 +597,39 @@ const AdminDashboard = () => {
                       <td className="p-8">
                         {s.studentId ? (
                           <div className="flex items-center gap-3">
-                            <Zap
-                              size={16}
-                              className="text-purple-500 fill-purple-500/20"
-                            />
-                            <span className="font-mono text-xs font-black tracking-tighter">
+                            <Zap size={16} className="text-purple-500" />
+                            <span className="font-mono text-xs">
                               {s.studentId}
                             </span>
                           </div>
                         ) : (
                           <button
                             onClick={() => handleAutomaticIDDispatch(s)}
-                            className="flex items-center gap-3 px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase shadow-lg hover:bg-slate-900 transition-all"
+                            className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase"
                           >
-                            <UserCheck size={16} /> Verify & Dispatch
+                            Verify & Dispatch
                           </button>
                         )}
                       </td>
-                      <td className="p-8">
-                        <div className="flex items-center justify-center gap-3">
-                          <button
-                            onClick={() => issueCertificate(s)}
-                            className="p-4 bg-amber-500/10 text-amber-600 rounded-2xl hover:bg-amber-500 hover:text-white transition-all"
-                          >
-                            <Award size={20} />
-                          </button>
-                          <button
-                            onClick={() => directMessage(s, "email")}
-                            className="p-4 bg-blue-500/10 text-blue-600 rounded-2xl hover:bg-blue-500 hover:text-white transition-all"
-                          >
-                            <Mail size={20} />
-                          </button>
-                          <button
-                            onClick={() => directMessage(s, "whatsapp")}
-                            className="p-4 bg-emerald-500/10 text-emerald-600 rounded-2xl hover:bg-emerald-500 hover:text-white transition-all"
-                          >
-                            <MessageSquare size={20} />
-                          </button>
-                        </div>
+                      <td className="p-8 flex justify-center gap-3">
+                        <button
+                          onClick={() => issueCertificate(s)}
+                          className="p-4 bg-amber-500/10 text-amber-600 rounded-2xl"
+                        >
+                          <Award size={20} />
+                        </button>
+                        <button
+                          onClick={() => directMessage(s, "email")}
+                          className="p-4 bg-blue-500/10 text-blue-600 rounded-2xl"
+                        >
+                          <Mail size={20} />
+                        </button>
+                        <button
+                          onClick={() => directMessage(s, "whatsapp")}
+                          className="p-4 bg-emerald-500/10 text-emerald-600 rounded-2xl"
+                        >
+                          <MessageSquare size={20} />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -614,6 +638,100 @@ const AdminDashboard = () => {
             </div>
           )}
 
+          {/* CHAT SURVEILLANCE TAB */}
+          {activeTab === "surveillance" && (
+            <div className="flex flex-col lg:flex-row gap-8 h-[75vh]">
+              <div
+                className={`w-full lg:w-1/3 rounded-[2.5rem] border overflow-hidden flex flex-col ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-xl"}`}
+              >
+                <div className="p-6 border-b border-slate-800 font-black text-[10px] uppercase opacity-50">
+                  Active Student Threads
+                </div>
+                <div className="overflow-y-auto flex-1">
+                  {chats.map((c) => (
+                    <div
+                      key={c.id}
+                      onClick={() => setSelectedChat(c)}
+                      className={`p-6 border-b border-slate-800 cursor-pointer transition-all ${selectedChat?.studentId === c.studentId ? "bg-blue-600 text-white" : "hover:bg-blue-500/10"}`}
+                    >
+                      <p className="font-black text-sm uppercase">{c.sender}</p>
+                      <p className="text-[10px] opacity-60 truncate">
+                        {c.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div
+                className={`flex-1 rounded-[2.5rem] border flex flex-col overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              >
+                {selectedChat ? (
+                  <div className="flex flex-col h-full">
+                    <div className="p-8 border-b border-slate-800 flex justify-between items-center">
+                      <h3 className="font-black italic uppercase text-blue-600">
+                        Intel: {selectedChat.sender}
+                      </h3>
+                      <ShieldAlert className="text-red-500" />
+                    </div>
+                    <div className="flex-1 p-8 overflow-y-auto space-y-4">
+                      {messages.map((m) => (
+                        <div
+                          key={m.id}
+                          className={`max-w-[75%] p-4 rounded-3xl ${m.senderRole === "supervisor" ? "bg-slate-800 text-white self-start" : "bg-blue-600 text-white self-end"}`}
+                        >
+                          <p className="text-[10px] font-black uppercase mb-1 opacity-50">
+                            {m.senderRole}
+                          </p>
+                          <p className="text-sm font-bold">{m.text}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center opacity-20">
+                    <Eye size={60} />
+                    <p className="font-black text-[10px] uppercase mt-4 tracking-widest">
+                      Select Thread to Audit
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* SYSTEM LOGS TAB */}
+          {activeTab === "history" && (
+            <div
+              className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+            >
+              <table className="w-full text-left">
+                <thead className="bg-slate-500/5 text-[11px] font-black uppercase opacity-60">
+                  <tr>
+                    <th className="p-8">Audit Time</th>
+                    <th className="p-8">Protocol</th>
+                    <th className="p-8">Operational Data</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/10">
+                  {historyLogs.map((log) => (
+                    <tr key={log.id} className="text-xs font-bold">
+                      <td className="p-8 opacity-40">
+                        {log.timestamp?.toDate().toLocaleString()}
+                      </td>
+                      <td className="p-8">
+                        <span className="px-3 py-1 bg-blue-600/10 text-blue-600 rounded-lg uppercase text-[10px]">
+                          {log.action}
+                        </span>
+                      </td>
+                      <td className="p-8 italic opacity-70">{log.details}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
               <div className="stat-card">
@@ -635,37 +753,6 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
-
-          {activeTab === "history" && (
-            <div
-              className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
-            >
-              <table className="w-full text-left">
-                <thead className="bg-slate-500/5 text-[11px] font-black uppercase tracking-widest opacity-60">
-                  <tr>
-                    <th className="p-8">Audit Time</th>
-                    <th className="p-8">Protocol</th>
-                    <th className="p-8">Operational Data</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/10 font-bold">
-                  {historyLogs.map((log) => (
-                    <tr key={log.id} className="text-xs">
-                      <td className="p-8 opacity-40">
-                        {log.timestamp?.toDate().toLocaleString()}
-                      </td>
-                      <td className="p-8">
-                        <span className="px-3 py-1 bg-blue-600/10 text-blue-600 rounded-lg font-black uppercase text-[10px]">
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="p-8 italic opacity-70">{log.details}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       </main>
 
@@ -673,10 +760,9 @@ const AdminDashboard = () => {
         .admin-input { width: 100%; padding: 1.25rem; background: ${darkMode ? "#0f172a" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.25rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
         .admin-input:focus { border-color: #2563eb; }
         .metric-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.15em; }
-        .stat-card { padding: 50px; border-radius: 50px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.05); transition: transform 0.3s ease; }
-        .stat-card:hover { transform: translateY(-10px); }
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
+        .stat-card { padding: 50px; border-radius: 50px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.05); }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
       `}</style>
     </div>
   );

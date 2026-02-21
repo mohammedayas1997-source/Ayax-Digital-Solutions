@@ -42,6 +42,8 @@ import {
   RefreshCcw,
   UploadCloud,
   ChevronRight,
+  Menu,
+  X,
 } from "lucide-react";
 
 const SupervisorDashboard = () => {
@@ -53,6 +55,7 @@ const SupervisorDashboard = () => {
   const [activeThread, setActiveThread] = useState(null);
   const [replies, setReplies] = useState([]);
   const [reply, setReply] = useState("");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // NEW STATES: PRIVATE MESSAGING & HISTORY
   const [privateMessages, setPrivateMessages] = useState([]);
@@ -310,33 +313,33 @@ const SupervisorDashboard = () => {
   if (!selectedCourse)
     return (
       <div
-        className={`min-h-screen flex items-center justify-center p-6 ${isDarkMode ? "bg-slate-950" : "bg-slate-50"}`}
+        className={`min-h-screen flex items-center justify-center p-4 lg:p-6 ${isDarkMode ? "bg-slate-950" : "bg-slate-50"}`}
       >
-        <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-12">
-          <div className="flex flex-col justify-center">
-            <h1 className="text-6xl font-black italic tracking-tighter mb-4 text-blue-600 text-shadow-glow">
+        <div className="max-w-4xl w-full grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+          <div className="flex flex-col justify-center text-center md:text-left">
+            <h1 className="text-5xl lg:text-6xl font-black italic tracking-tighter mb-4 text-blue-600 text-shadow-glow">
               AYAX.SV
             </h1>
             <p
-              className={`font-black uppercase tracking-widest text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}
+              className={`font-black uppercase tracking-widest text-[10px] lg:text-xs ${isDarkMode ? "text-slate-400" : "text-slate-500"}`}
             >
               System Terminal Access
             </p>
             <h2
-              className={`text-3xl font-bold mt-8 ${isDarkMode ? "text-white" : "text-slate-900"}`}
+              className={`text-2xl lg:text-3xl font-bold mt-4 lg:mt-8 ${isDarkMode ? "text-white" : "text-slate-900"}`}
             >
               Welcome, {supervisorData?.fullName}
             </h2>
           </div>
-          <div className="grid grid-cols-1 gap-4 max-h-[70vh] overflow-y-auto pr-2">
+          <div className="grid grid-cols-1 gap-4 max-h-[60vh] md:max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
             {availableCourses.map((course) => (
               <button
                 key={course}
                 onClick={() => setSelectedCourse(course)}
-                className={`p-6 rounded-[2rem] text-left transition-all group border ${isDarkMode ? "bg-white/5 border-white/10 hover:bg-blue-600" : "bg-white border-slate-200 hover:bg-blue-600"}`}
+                className={`p-5 lg:p-6 rounded-[1.5rem] lg:rounded-[2rem] text-left transition-all group border ${isDarkMode ? "bg-white/5 border-white/10 hover:bg-blue-600" : "bg-white border-slate-200 hover:bg-blue-600"}`}
               >
                 <p
-                  className={`font-black text-lg group-hover:text-white transition-all ${isDarkMode ? "text-white" : "text-slate-900"}`}
+                  className={`font-black text-base lg:text-lg group-hover:text-white transition-all ${isDarkMode ? "text-white" : "text-slate-900"}`}
                 >
                   {course}
                 </p>
@@ -349,14 +352,43 @@ const SupervisorDashboard = () => {
 
   return (
     <div
-      className={`flex min-h-screen font-sans transition-colors duration-300 ${isDarkMode ? "bg-slate-950 text-white" : "bg-[#f8fafc] text-slate-900"}`}
+      className={`flex flex-col lg:flex-row min-h-screen font-sans transition-colors duration-300 ${isDarkMode ? "bg-slate-950 text-white" : "bg-[#f8fafc] text-slate-900"}`}
     >
-      {/* SIDEBAR */}
-      <aside
-        className={`w-80 border-r p-8 flex flex-col sticky top-0 h-screen ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
+      {/* MOBILE HEADER */}
+      <header
+        className={`lg:hidden flex items-center justify-between p-4 border-b sticky top-0 z-[100] ${isDarkMode ? "bg-slate-950 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
       >
         <div
-          className="flex items-center gap-3 mb-10 cursor-pointer"
+          className="flex items-center gap-2"
+          onClick={() => setSelectedCourse(null)}
+        >
+          <ShieldCheck className="text-blue-600" size={24} />
+          <h2 className="text-lg font-black italic text-blue-600 tracking-tighter">
+            AYAX CORE
+          </h2>
+        </div>
+        <button
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          className="p-2 bg-blue-600 text-white rounded-lg"
+        >
+          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+      </header>
+
+      {/* MOBILE OVERLAY */}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[90] lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        ></div>
+      )}
+
+      {/* SIDEBAR - Desktop & Mobile */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-[110] w-72 lg:w-80 border-r p-6 lg:p-8 flex flex-col transition-transform duration-300 transform lg:translate-x-0 lg:sticky lg:h-screen ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
+      >
+        <div
+          className="hidden lg:flex items-center gap-3 mb-10 cursor-pointer"
           onClick={() => setSelectedCourse(null)}
         >
           <div className="p-2 bg-blue-600 rounded-xl text-white shadow-lg">
@@ -367,108 +399,99 @@ const SupervisorDashboard = () => {
           </h2>
         </div>
 
-        <nav className="space-y-3 flex-1">
-          <button
-            onClick={() => setActiveTab("forum")}
-            className={`t-nav ${activeTab === "forum" ? "t-active" : ""}`}
-          >
-            <MessageSquare size={18} /> Forum Patrol
-          </button>
-          <button
-            onClick={() => setActiveTab("dm")}
-            className={`t-nav ${activeTab === "dm" ? "t-active" : ""}`}
-          >
-            <Lock size={18} /> Private DMs
-          </button>
-          <button
-            onClick={() => setActiveTab("students")}
-            className={`t-nav ${activeTab === "students" ? "t-active" : ""}`}
-          >
-            <Users size={18} /> Student Roster
-          </button>
-          <button
-            onClick={() => setActiveTab("library")}
-            className={`t-nav ${activeTab === "library" ? "t-active" : ""}`}
-          >
-            <BookOpen size={18} /> E-Library
-          </button>
-          <button
-            onClick={() => setActiveTab("history")}
-            className={`t-nav ${activeTab === "history" ? "t-active" : ""}`}
-          >
-            <History size={18} /> System Logs
-          </button>
-          <button
-            onClick={() => setActiveTab("settings")}
-            className={`t-nav ${activeTab === "settings" ? "t-active" : ""}`}
-          >
-            <Settings size={18} /> Settings
-          </button>
+        <nav className="space-y-2 lg:space-y-3 flex-1 overflow-y-auto custom-scrollbar">
+          {[
+            {
+              id: "forum",
+              icon: <MessageSquare size={18} />,
+              label: "Forum Patrol",
+            },
+            { id: "dm", icon: <Lock size={18} />, label: "Private DMs" },
+            {
+              id: "students",
+              icon: <Users size={18} />,
+              label: "Student Roster",
+            },
+            { id: "library", icon: <BookOpen size={18} />, label: "E-Library" },
+            {
+              id: "history",
+              icon: <History size={18} />,
+              label: "System Logs",
+            },
+            { id: "settings", icon: <Settings size={18} />, label: "Settings" },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setIsMobileMenuOpen(false);
+              }}
+              className={`t-nav ${activeTab === tab.id ? "t-active" : ""}`}
+            >
+              {tab.icon} {tab.label}
+            </button>
+          ))}
         </nav>
 
         {/* SALARY MODULE */}
-        <div className="mb-6 p-6 bg-blue-600 rounded-3xl text-white shadow-xl shadow-blue-500/20">
+        <div className="mt-6 mb-6 p-5 lg:p-6 bg-blue-600 rounded-2xl lg:rounded-3xl text-white shadow-xl">
           <div className="flex items-center gap-2 mb-2">
             <Wallet size={16} />
             <span className="text-[10px] font-black uppercase opacity-60 tracking-widest">
-              Monthly Allowance
+              Allowance
             </span>
           </div>
-          <div className="text-2xl font-black tracking-tighter">
+          <div className="text-xl lg:text-2xl font-black tracking-tighter">
             ₦{supervisorData?.salary?.toLocaleString() || "0.00"}
           </div>
-          <p className="text-[8px] font-bold uppercase mt-2 opacity-50">
-            Auto-credited every 30 days
-          </p>
         </div>
 
         <div className="space-y-4 pt-4 border-t border-slate-800">
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
-            className="w-full flex items-center justify-center gap-3 p-4 bg-slate-800/50 rounded-2xl font-black uppercase text-[10px] tracking-widest"
+            className="w-full flex items-center justify-center gap-3 p-3 lg:p-4 bg-slate-800/50 rounded-2xl font-black uppercase text-[10px] tracking-widest"
           >
-            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />} Switch
-            Spectrum
+            {isDarkMode ? <Sun size={18} /> : <Moon size={18} />} Spectrum
           </button>
           <button
             onClick={handleLogout}
-            className="w-full flex items-center justify-center gap-3 p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl transition-all"
+            className="w-full flex items-center justify-center gap-3 p-3 lg:p-4 bg-red-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all"
           >
-            <LogOut size={18} /> Logout Terminal
+            <LogOut size={18} /> Logout
           </button>
         </div>
       </aside>
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 p-10 overflow-y-auto">
-        <header className="flex justify-between items-center mb-10">
-          <h1 className="text-4xl font-black italic uppercase tracking-tighter">
+      <main className="flex-1 p-4 lg:p-10 overflow-y-auto overflow-x-hidden">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 lg:mb-10 gap-4">
+          <h1 className="text-2xl lg:text-4xl font-black italic uppercase tracking-tighter">
             {activeTab.replace("_", " ")} Node
           </h1>
-          <div className="px-6 py-3 bg-blue-600/10 rounded-2xl text-blue-600 font-black text-xs uppercase tracking-widest border border-blue-600/20">
+          <div className="px-4 py-2 bg-blue-600/10 rounded-xl text-blue-600 font-black text-[10px] lg:text-xs uppercase tracking-widest border border-blue-600/20">
             {selectedCourse}
           </div>
         </header>
 
         {/* SETTINGS MODULE */}
         {activeTab === "settings" && (
-          <div className="max-w-4xl space-y-12 animate-in fade-in duration-500">
+          <div className="max-w-4xl space-y-8 lg:space-y-12 animate-in fade-in duration-500">
             {settingsMsg.text && (
               <div
-                className={`p-4 rounded-2xl flex items-center gap-3 font-black text-xs uppercase border ${settingsMsg.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-red-500/10 border-red-500/20 text-red-500"}`}
+                className={`p-4 rounded-xl flex items-center gap-3 font-black text-[10px] uppercase border ${settingsMsg.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-red-500/10 border-red-500/20 text-red-500"}`}
               >
                 {settingsMsg.type === "success" ? (
-                  <CheckCircle2 size={18} />
+                  <CheckCircle2 size={16} />
                 ) : (
-                  <AlertCircle size={18} />
+                  <AlertCircle size={16} />
                 )}{" "}
                 {settingsMsg.text}
               </div>
             )}
-            <div className="grid md:grid-cols-3 gap-12">
-              <div className="space-y-6">
-                <div className="relative group">
-                  <div className="w-full aspect-square rounded-[3rem] overflow-hidden border-4 border-blue-600/20 bg-slate-800 flex items-center justify-center relative">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 lg:gap-12">
+              <div className="flex justify-center md:block">
+                <div className="relative group w-48 lg:w-full">
+                  <div className="w-full aspect-square rounded-[2rem] lg:rounded-[3rem] overflow-hidden border-4 border-blue-600/20 bg-slate-800 flex items-center justify-center relative">
                     {supervisorData?.photoURL ? (
                       <img
                         src={supervisorData.photoURL}
@@ -483,8 +506,8 @@ const SupervisorDashboard = () => {
                       </div>
                     )}
                   </div>
-                  <label className="absolute -bottom-4 -right-4 p-4 bg-blue-600 text-white rounded-2xl shadow-xl cursor-pointer hover:scale-110 transition-all">
-                    <Camera size={20} />
+                  <label className="absolute -bottom-2 lg:-bottom-4 -right-2 lg:-right-4 p-3 lg:p-4 bg-blue-600 text-white rounded-xl lg:rounded-2xl shadow-xl cursor-pointer hover:scale-110 transition-all">
+                    <Camera size={18} />
                     <input
                       type="file"
                       className="hidden"
@@ -497,7 +520,7 @@ const SupervisorDashboard = () => {
               <div className="md:col-span-2">
                 <form
                   onSubmit={handlePasswordUpdate}
-                  className={`p-10 rounded-[2.5rem] border space-y-6 ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl border-slate-100"}`}
+                  className={`p-6 lg:p-10 rounded-[2rem] lg:rounded-[2.5rem] border space-y-4 lg:space-y-6 ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl border-slate-100"}`}
                 >
                   <input
                     type="password"
@@ -509,7 +532,7 @@ const SupervisorDashboard = () => {
                       setPasswords({ ...passwords, current: e.target.value })
                     }
                   />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <input
                       type="password"
                       placeholder="NEW PASSWORD"
@@ -533,13 +556,13 @@ const SupervisorDashboard = () => {
                   </div>
                   <button
                     disabled={isUpdating}
-                    className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3"
+                    className="w-full py-4 lg:py-5 bg-blue-600 text-white rounded-xl lg:rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-3"
                   >
                     {isUpdating ? (
                       <RefreshCcw className="animate-spin" />
                     ) : (
                       <>
-                        <UploadCloud size={16} /> Update Security Credentials
+                        <UploadCloud size={16} /> Update Security
                       </>
                     )}
                   </button>
@@ -551,25 +574,25 @@ const SupervisorDashboard = () => {
 
         {/* FORUM INTERFACE */}
         {activeTab === "forum" && (
-          <div className="flex gap-8 h-[75vh]">
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 h-auto lg:h-[75vh]">
             <div
-              className={`w-1/3 rounded-[2.5rem] border overflow-hidden flex flex-col ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
+              className={`w-full lg:w-1/3 rounded-[1.5rem] lg:rounded-[2.5rem] border overflow-hidden flex flex-col max-h-[40vh] lg:max-h-full ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-sm"}`}
             >
-              <div className="p-6 border-b border-slate-800 font-black uppercase text-[10px] opacity-50">
+              <div className="p-4 lg:p-6 border-b border-slate-800 font-black uppercase text-[10px] opacity-50">
                 Active Forum Threads
               </div>
-              <div className="overflow-y-auto flex-1">
+              <div className="overflow-y-auto flex-1 custom-scrollbar">
                 {forumThreads.map((thread) => (
                   <div
                     key={thread.id}
                     onClick={() => setActiveThread(thread)}
-                    className={`p-6 border-b border-slate-800 cursor-pointer transition-all ${activeThread?.id === thread.id ? "bg-blue-600 text-white" : "hover:bg-blue-600/10"}`}
+                    className={`p-4 lg:p-6 border-b border-slate-800 cursor-pointer transition-all ${activeThread?.id === thread.id ? "bg-blue-600 text-white" : "hover:bg-blue-600/10"}`}
                   >
-                    <p className="font-black text-sm line-clamp-1 italic uppercase">
+                    <p className="font-black text-xs lg:text-sm line-clamp-1 italic uppercase">
                       "{thread.title}"
                     </p>
                     <p
-                      className={`text-[10px] mt-2 font-bold ${activeThread?.id === thread.id ? "text-blue-100" : "text-slate-400"}`}
+                      className={`text-[10px] mt-1 lg:mt-2 font-bold ${activeThread?.id === thread.id ? "text-blue-100" : "text-slate-400"}`}
                     >
                       By {thread.studentName}
                     </p>
@@ -578,30 +601,30 @@ const SupervisorDashboard = () => {
               </div>
             </div>
             <div
-              className={`flex-1 rounded-[2.5rem] border flex flex-col overflow-hidden ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-xl"}`}
+              className={`flex-1 rounded-[1.5rem] lg:rounded-[2.5rem] border flex flex-col overflow-hidden min-h-[50vh] lg:min-h-0 ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-xl"}`}
             >
               {activeThread ? (
                 <>
                   <div
-                    className={`p-8 border-b ${isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50/50 border-slate-100"}`}
+                    className={`p-6 lg:p-8 border-b ${isDarkMode ? "bg-slate-800/50 border-slate-700" : "bg-slate-50/50 border-slate-100"}`}
                   >
-                    <h3 className="font-black text-2xl italic uppercase">
+                    <h3 className="font-black text-xl lg:text-2xl italic uppercase">
                       {activeThread.title}
                     </h3>
-                    <p className="opacity-60 text-sm mt-3 leading-relaxed">
+                    <p className="opacity-60 text-xs lg:text-sm mt-3 leading-relaxed">
                       {activeThread.content}
                     </p>
                   </div>
-                  <div className="flex-1 p-8 overflow-y-auto space-y-6 flex flex-col">
+                  <div className="flex-1 p-6 lg:p-8 overflow-y-auto space-y-4 lg:space-y-6 flex flex-col custom-scrollbar">
                     {replies.map((msg) => (
                       <div
                         key={msg.id}
-                        className={`max-w-[80%] p-4 rounded-3xl ${msg.role === "supervisor" ? "bg-blue-600 text-white self-end rounded-tr-none" : "bg-slate-800 text-white self-start"}`}
+                        className={`max-w-[85%] lg:max-w-[80%] p-4 rounded-2xl lg:rounded-3xl ${msg.role === "supervisor" ? "bg-blue-600 text-white self-end rounded-tr-none" : "bg-slate-800 text-white self-start"}`}
                       >
-                        <p className="text-[9px] font-black uppercase mb-1 opacity-70">
+                        <p className="text-[8px] font-black uppercase mb-1 opacity-70">
                           {msg.sender}
                         </p>
-                        <p className="text-sm font-medium italic">
+                        <p className="text-xs lg:text-sm font-medium italic">
                           "{msg.text}"
                         </p>
                       </div>
@@ -609,23 +632,23 @@ const SupervisorDashboard = () => {
                   </div>
                   <form
                     onSubmit={handleReply}
-                    className="p-6 border-t border-slate-800 flex gap-4"
+                    className="p-4 lg:p-6 border-t border-slate-800 flex gap-3 lg:gap-4"
                   >
                     <input
-                      className="flex-1 bg-transparent outline-none font-black text-sm"
-                      placeholder="Post public reply..."
+                      className="flex-1 bg-transparent outline-none font-black text-xs lg:text-sm"
+                      placeholder="Post reply..."
                       value={reply}
                       onChange={(e) => setReply(e.target.value)}
                     />
-                    <button className="p-5 bg-blue-600 text-white rounded-2xl">
-                      <Send size={20} />
+                    <button className="p-4 lg:p-5 bg-blue-600 text-white rounded-xl lg:rounded-2xl">
+                      <Send size={18} />
                     </button>
                   </form>
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center opacity-20">
-                  <MessageSquare size={80} />
-                  <p className="font-black uppercase text-xs mt-4">
+                <div className="flex-1 flex flex-col items-center justify-center opacity-20 p-8 text-center">
+                  <MessageSquare size={60} />
+                  <p className="font-black uppercase text-[10px] mt-4">
                     Select Public Forum Thread
                   </p>
                 </div>
@@ -634,23 +657,23 @@ const SupervisorDashboard = () => {
           </div>
         )}
 
-        {/* REST OF ORIGINAL MODULES (Students, History, Library) REMAINED UNTOUCHED AS REQUESTED */}
+        {/* DM SECTION */}
         {activeTab === "dm" && (
-          <div className="flex gap-8 h-[75vh]">
+          <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 h-auto lg:h-[75vh]">
             <div
-              className={`w-1/3 rounded-[2.5rem] border flex flex-col ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+              className={`w-full lg:w-1/3 rounded-[1.5rem] lg:rounded-[2.5rem] border flex flex-col max-h-[40vh] lg:max-h-full ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
             >
-              <div className="p-6 font-black uppercase text-[10px] opacity-50 border-b border-slate-800">
+              <div className="p-4 lg:p-6 font-black uppercase text-[10px] opacity-50 border-b border-slate-800">
                 Student Directory
               </div>
-              <div className="overflow-y-auto flex-1">
+              <div className="overflow-y-auto flex-1 custom-scrollbar">
                 {students.map((s) => (
                   <div
                     key={s.id}
                     onClick={() => setSelectedStudentForDM(s)}
-                    className={`p-6 border-b border-slate-800 cursor-pointer transition-all ${selectedStudentForDM?.id === s.id ? "bg-blue-600 text-white" : "hover:bg-blue-600/10"}`}
+                    className={`p-4 lg:p-6 border-b border-slate-800 cursor-pointer transition-all ${selectedStudentForDM?.id === s.id ? "bg-blue-600 text-white" : "hover:bg-blue-600/10"}`}
                   >
-                    <p className="font-black uppercase text-sm">
+                    <p className="font-black uppercase text-xs lg:text-sm">
                       {s.studentName}
                     </p>
                   </div>
@@ -658,20 +681,20 @@ const SupervisorDashboard = () => {
               </div>
             </div>
             <div
-              className={`flex-1 rounded-[2.5rem] border flex flex-col overflow-hidden ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+              className={`flex-1 rounded-[1.5rem] lg:rounded-[2.5rem] border flex flex-col overflow-hidden min-h-[50vh] lg:min-h-0 ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
             >
               {selectedStudentForDM ? (
                 <>
-                  <div className="p-8 border-b border-slate-800">
-                    <h3 className="font-black italic uppercase text-blue-600">
+                  <div className="p-6 lg:p-8 border-b border-slate-800">
+                    <h3 className="font-black italic uppercase text-blue-600 text-xs lg:text-base">
                       Secure Direct Line: {selectedStudentForDM.studentName}
                     </h3>
                   </div>
-                  <div className="flex-1 p-8 overflow-y-auto flex flex-col space-y-4">
+                  <div className="flex-1 p-6 lg:p-8 overflow-y-auto flex flex-col space-y-4 custom-scrollbar">
                     {privateMessages.map((m) => (
                       <div
                         key={m.id}
-                        className={`max-w-[70%] p-5 rounded-3xl font-bold text-sm ${m.senderRole === "supervisor" ? "bg-blue-600 text-white self-end" : "bg-slate-800 text-white self-start"}`}
+                        className={`max-w-[85%] lg:max-w-[70%] p-4 lg:p-5 rounded-2xl lg:rounded-3xl font-bold text-xs lg:text-sm ${m.senderRole === "supervisor" ? "bg-blue-600 text-white self-end" : "bg-slate-800 text-white self-start"}`}
                       >
                         {m.text}
                         <div className="text-[8px] opacity-50 mt-2 uppercase">
@@ -682,23 +705,23 @@ const SupervisorDashboard = () => {
                   </div>
                   <form
                     onSubmit={handleSendDM}
-                    className="p-6 border-t border-slate-800 flex gap-4"
+                    className="p-4 lg:p-6 border-t border-slate-800 flex gap-3 lg:gap-4"
                   >
                     <input
                       value={dmText}
                       onChange={(e) => setDmText(e.target.value)}
                       placeholder="Type private message..."
-                      className="flex-1 bg-transparent outline-none font-black text-sm"
+                      className="flex-1 bg-transparent outline-none font-black text-xs lg:text-sm"
                     />
-                    <button className="p-4 bg-blue-600 text-white rounded-2xl">
-                      <Send size={20} />
+                    <button className="p-4 bg-blue-600 text-white rounded-xl lg:rounded-2xl">
+                      <Send size={18} />
                     </button>
                   </form>
                 </>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center opacity-30">
+                <div className="flex-1 flex flex-col items-center justify-center opacity-30 p-8 text-center">
                   <Lock size={60} />
-                  <p className="font-black uppercase text-xs mt-4">
+                  <p className="font-black uppercase text-[10px] mt-4">
                     Select Student for Private Link
                   </p>
                 </div>
@@ -707,38 +730,39 @@ const SupervisorDashboard = () => {
           </div>
         )}
 
+        {/* ROSTER SECTION */}
         {activeTab === "students" && (
           <div
-            className={`rounded-[3rem] border overflow-hidden ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-sm"}`}
+            className={`rounded-[1.5rem] lg:rounded-[3rem] border overflow-x-auto custom-scrollbar ${isDarkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-sm"}`}
           >
-            <table className="w-full text-left">
+            <table className="w-full text-left min-w-[600px]">
               <thead>
-                <tr className="text-[10px] font-black uppercase tracking-widest border-b border-slate-800 bg-slate-800/10 text-slate-500">
-                  <th className="p-8">Student Identity</th>
-                  <th className="p-8">Track</th>
-                  <th className="p-8 text-center">Authorization</th>
+                <tr className="text-[9px] lg:text-[10px] font-black uppercase tracking-widest border-b border-slate-800 bg-slate-800/10 text-slate-500">
+                  <th className="p-6 lg:p-8">Student Identity</th>
+                  <th className="p-6 lg:p-8">Track</th>
+                  <th className="p-6 lg:p-8 text-center">Authorization</th>
                 </tr>
               </thead>
               <tbody>
                 {students.map((std) => (
                   <tr
                     key={std.id}
-                    className="border-b border-slate-800/5 hover:bg-blue-600/5"
+                    className="border-b border-slate-800/5 hover:bg-blue-600/5 transition-all"
                   >
-                    <td className="p-8 flex items-center gap-4">
-                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-xs">
+                    <td className="p-6 lg:p-8 flex items-center gap-4">
+                      <div className="w-8 lg:w-10 h-8 lg:h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-black text-[10px] lg:text-xs">
                         {std.studentName?.charAt(0)}
                       </div>
-                      <p className="font-black text-sm uppercase">
+                      <p className="font-black text-xs lg:text-sm uppercase">
                         {std.studentName}
                       </p>
                     </td>
-                    <td className="p-8 text-xs font-bold text-blue-500 italic">
+                    <td className="p-6 lg:p-8 text-[10px] lg:text-xs font-bold text-blue-500 italic">
                       {std.course}
                     </td>
-                    <td className="p-8 text-center">
+                    <td className="p-6 lg:p-8 text-center">
                       <div className="px-3 py-1 bg-emerald-500/10 text-emerald-500 text-[8px] font-black uppercase rounded-full inline-block">
-                        Authorized Student
+                        Authorized
                       </div>
                     </td>
                   </tr>
@@ -748,26 +772,32 @@ const SupervisorDashboard = () => {
           </div>
         )}
 
+        {/* LOGS SECTION */}
         {activeTab === "history" && (
           <div
-            className={`rounded-[2.5rem] border overflow-hidden ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
+            className={`rounded-[1.5rem] lg:rounded-[2.5rem] border overflow-x-auto custom-scrollbar ${isDarkMode ? "bg-slate-900 border-white/5" : "bg-white shadow-xl"}`}
           >
-            <table className="w-full text-left">
+            <table className="w-full text-left min-w-[600px]">
               <thead>
-                <tr className="text-[10px] font-black uppercase text-slate-500 border-b border-slate-800 bg-slate-800/20">
-                  <th className="p-6">Action Event</th>
-                  <th className="p-6">Details</th>
-                  <th className="p-6">Timestamp</th>
+                <tr className="text-[9px] lg:text-[10px] font-black uppercase text-slate-500 border-b border-slate-800 bg-slate-800/20">
+                  <th className="p-4 lg:p-6">Action</th>
+                  <th className="p-4 lg:p-6">Details</th>
+                  <th className="p-4 lg:p-6 text-right">Time</th>
                 </tr>
               </thead>
               <tbody>
                 {systemLogs.map((log) => (
-                  <tr key={log.id} className="border-b border-slate-800/10">
-                    <td className="p-6 text-blue-600 font-black uppercase text-[10px]">
+                  <tr
+                    key={log.id}
+                    className="border-b border-slate-800/10 transition-all hover:bg-slate-500/5"
+                  >
+                    <td className="p-4 lg:p-6 text-blue-600 font-black uppercase text-[8px] lg:text-[10px]">
                       {log.action}
                     </td>
-                    <td className="p-6 font-bold text-sm">{log.details}</td>
-                    <td className="p-6 text-[10px] opacity-40">
+                    <td className="p-4 lg:p-6 font-bold text-[10px] lg:text-xs">
+                      {log.details}
+                    </td>
+                    <td className="p-4 lg:p-6 text-[8px] lg:text-[10px] opacity-40 text-right">
                       {log.timestamp?.toDate().toLocaleString()}
                     </td>
                   </tr>
@@ -777,22 +807,25 @@ const SupervisorDashboard = () => {
           </div>
         )}
 
+        {/* LIBRARY SECTION */}
         {activeTab === "library" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
             {libraryLinks.map((lib, i) => (
               <a
                 key={i}
                 href={lib.url}
                 target="_blank"
                 rel="noreferrer"
-                className={`p-8 rounded-[2.5rem] border transition-all hover:-translate-y-2 ${isDarkMode ? "bg-slate-900 border-white/5 hover:border-blue-600" : "bg-white border-slate-200 shadow-xl hover:border-blue-600"}`}
+                className={`p-6 lg:p-8 rounded-[1.5rem] lg:rounded-[2.5rem] border transition-all hover:-translate-y-2 ${isDarkMode ? "bg-slate-900 border-white/5 hover:border-blue-600" : "bg-white border-slate-200 shadow-xl hover:border-blue-600"}`}
               >
-                <div className="text-[10px] font-black text-blue-600 uppercase mb-2">
+                <div className="text-[9px] lg:text-[10px] font-black text-blue-600 uppercase mb-2">
                   {lib.cat}
                 </div>
-                <h3 className="font-black text-xl mb-4">{lib.name}</h3>
-                <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-500">
-                  Access Books <ExternalLink size={12} />
+                <h3 className="font-black text-base lg:text-xl mb-3 lg:mb-4">
+                  {lib.name}
+                </h3>
+                <div className="flex items-center gap-2 text-[9px] lg:text-[10px] font-black uppercase text-slate-500">
+                  Access <ExternalLink size={12} />
                 </div>
               </a>
             ))}
@@ -801,12 +834,12 @@ const SupervisorDashboard = () => {
       </main>
 
       <style>{`
-        .t-nav { width: 100%; display: flex; align-items: center; gap: 15px; padding: 18px 25px; border-radius: 20px; font-weight: 900; font-size: 11px; text-transform: uppercase; color: #64748b; transition: 0.3s; border:none; background:none; cursor:pointer; }
+        .t-nav { width: 100%; display: flex; align-items: center; gap: 12px lg:15px; padding: 14px 20px lg:padding: 18px 25px; border-radius: 15px lg:20px; font-weight: 900; font-size: 10px lg:11px; text-transform: uppercase; color: #64748b; transition: 0.3s; border:none; background:none; cursor:pointer; }
         .t-active { background: #2563eb !important; color: white !important; box-shadow: 0 10px 20px -5px rgba(37, 99, 235, 0.4); }
-        .s-input { width: 100%; padding: 1.25rem; background: ${isDarkMode ? "#1e293b" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.5rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
+        .s-input { width: 100%; padding: 1rem lg:1.25rem; background: ${isDarkMode ? "#1e293b" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.25rem lg:1.5rem; font-weight: 800; font-size: 0.75rem lg:0.8rem; outline: none; transition: 0.3s; color: inherit; }
         .s-input:focus { border-color: #2563eb; background: ${isDarkMode ? "#0f172a" : "white"}; }
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; height: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
         .text-shadow-glow { text-shadow: 0 0 15px rgba(37, 99, 235, 0.4); }
       `}</style>
     </div>
