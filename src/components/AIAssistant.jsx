@@ -1,18 +1,23 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Bot, Send, X, Sparkles, Globe, ShieldCheck } from "lucide-react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { db, auth } from "../firebaseConfig";
+import {
+  collection,
+  addDoc,
+  serverTimestamp,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+} from "firebase/firestore";
 
 const AIAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState([
-    {
-      role: "assistant",
-      content:
-        "Greeting from AYAX Global Headquarters. I am Ayax, your specialized AI consultant. How can I assist you with our global digital infrastructure today?",
-    },
-  ]);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [chatSessionId, setChatSessionId] = useState(null);
   const scrollRef = useRef();
 
   // Initialize Gemini
@@ -33,12 +38,69 @@ const AIAssistant = () => {
     headquarters: "Digital Hub, Nigeria (Global Operations)",
   };
 
+  // 1. GENERATE OR RETRIEVE SESSION ID (Don adana history daban-daban)
+  useEffect(() => {
+    let sessionId = localStorage.getItem("ayax_ai_session");
+    if (!sessionId) {
+      sessionId = `SESSION-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      localStorage.setItem("ayax_ai_session", sessionId);
+    }
+    setChatSessionId(sessionId);
+  }, []);
+
+  // 2. REAL-TIME HISTORY RETRIEVAL (Dauko tsohuwar hira daga Firestore)
+  useEffect(() => {
+    if (!chatSessionId || !isOpen) return;
+
+    const q = query(
+      collection(db, "ai_chat_history"),
+      where("sessionId", "==", chatSessionId),
+      orderBy("createdAt", "asc"),
+    );
+
+    const unsubscribe = onSnapshot(q, (snap) => {
+      const history = snap.docs.map((doc) => doc.data());
+      if (history.length > 0) {
+        setMessages(history);
+      } else {
+        setMessages([
+          {
+            role: "assistant",
+            content:
+              "Greeting from AYAX Global Headquarters. I am Ayax, your specialized AI consultant. How can I assist you today?",
+            createdAt: new Date(),
+          },
+        ]);
+      }
+      setTimeout(
+        () => scrollRef.current?.scrollIntoView({ behavior: "smooth" }),
+        100,
+      );
+    });
+
+    return () => unsubscribe();
+  }, [chatSessionId, isOpen]);
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const userMsg = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMsg]);
+    const userText = input;
+    const userEmail = auth.currentUser?.email || "Guest_User";
+
+    // SAVE USER MESSAGE TO FIRESTORE (For Admin Surveillance)
+    try {
+      await addDoc(collection(db, "ai_chat_history"), {
+        sessionId: chatSessionId,
+        userEmail: userEmail,
+        role: "user",
+        content: userText,
+        createdAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error("History Error:", err);
+    }
+
     setInput("");
     setIsTyping(true);
 
@@ -46,51 +108,59 @@ const AIAssistant = () => {
       const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash",
         systemInstruction: `
-        You are 'Ayax', the official Global AI Ambassador for AYAX Digital Solutions Academy.
-        
-        IDENTITY:
-        - Your creator and the CEO of the company is Abdulrahman Mohammed Ayas.
-        - You speak with high professional authority and technical precision.
-        
-        MULTILINGUAL CAPABILITY:
-        - You are a master of Hausa, English, and French. 
-        - You understand all Hausa dialects and global variations.
-        - Always respond in the language the user uses. If they speak Hausa, answer in professional, clear Hausa. If they speak French, answer in French.
-        
-        KNOWLEDGE DOMAIN:
-        - You are an expert in Web Development, Cybersecurity, AI Automation, and Digital Infrastructure.
-        - Promote AYAX Academy as the world leader in technical training.
-        
-        BEHAVIOR:
-        - If asked about the owner, speak about Abdulrahman Mohammed Ayas's vision for global digital transformation.
-        - Keep responses concise but highly informative.
-      `,
+          You are 'Ayax', the official Global AI Ambassador for AYAX Digital Solutions Academy.
+          
+          IDENTITY:
+          - CEO: ${AYAX_CORE.ceo}.
+          - Tone: Professional, high authority, technical precision.
+          
+          LANGUAGES:
+          - You are a master of Hausa, English, and French. 
+          - Always respond in the language used by the user. If they use Hausa, use pure Hausa.
+          
+          KNOWLEDGE:
+          - Expert in ${AYAX_CORE.expertise}.
+          
+          INSTANT RESPONSE:
+          - Provide answers immediately and concisely.
+        `,
       });
 
-      const result = await model.generateContent(input);
-      const response = await result.response;
-      const text = response.text();
+      // 3. STREAMING LOGIC (Bada amsa nan take tana fitowa daya-bayan-daya)
+      const result = await model.generateContentStream(userText);
+      let fullResponse = "";
 
-      setMessages((prev) => [...prev, { role: "assistant", content: text }]);
+      // Muna kara 'placeholder' na assistant message don streaming din ya bayyana
+      setMessages((prev) => [...prev, { role: "assistant", content: "..." }]);
+
+      for await (const chunk of result.stream) {
+        const chunkText = chunk.text();
+        fullResponse += chunkText;
+
+        // Update UI nan take (Real-time display)
+        setMessages((prev) => {
+          const updated = [...prev];
+          updated[updated.length - 1].content = fullResponse;
+          return updated;
+        });
+      }
+
+      // SAVE FULL AI RESPONSE TO FIRESTORE (For Admin Surveillance)
+      await addDoc(collection(db, "ai_chat_history"), {
+        sessionId: chatSessionId,
+        userEmail: userEmail,
+        role: "assistant",
+        content: fullResponse,
+        createdAt: serverTimestamp(),
+      });
     } catch (error) {
       console.error("Gemini Error:", error);
-
-      // Fallback Logic (Static responses if API fails)
-      let aiResponse = "";
-      const query = input.toLowerCase();
-      if (
-        query.includes("who is") ||
-        query.includes("ceo") ||
-        query.includes("abdulrahman")
-      ) {
-        aiResponse = `${AYAX_CORE.company} was founded and is led by ${AYAX_CORE.ceo}.`;
-      } else {
-        aiResponse =
-          "Ayax global relay is experiencing heavy traffic. Please hold on a moment.";
-      }
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: aiResponse },
+        {
+          role: "assistant",
+          content: "Ayax system relay is experiencing traffic. Please retry.",
+        },
       ]);
     } finally {
       setIsTyping(false);
@@ -119,12 +189,12 @@ const AIAssistant = () => {
 
       {/* Global AI Console */}
       {isOpen && (
-        <div className="w-[350px] md:w-[400px] bg-white rounded-[2.5rem] shadow-[-20px_50px_100px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500">
-          {/* Branded Header */}
+        <div className="w-[350px] md:w-[400px] bg-white rounded-[2.5rem] shadow-[-20px_50px_100px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500 flex flex-col">
+          {/* Header */}
           <div className="bg-gray-950 p-7 text-white">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/20">
+                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg">
                   <Globe size={20} className="animate-spin-slow" />
                 </div>
                 <div>
@@ -133,7 +203,7 @@ const AIAssistant = () => {
                   </h3>
                   <p className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>{" "}
-                    Global System Active
+                    Surveillance Active
                   </p>
                 </div>
               </div>
@@ -164,16 +234,6 @@ const AIAssistant = () => {
                 </div>
               </div>
             ))}
-            {isTyping && (
-              <div className="flex gap-2 items-center">
-                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 animate-bounce">
-                  <Sparkles size={14} />
-                </div>
-                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">
-                  Ayax is analyzing...
-                </p>
-              </div>
-            )}
             <div ref={scrollRef} />
           </div>
 
@@ -183,12 +243,12 @@ const AIAssistant = () => {
             className="p-5 bg-white border-t border-gray-50 flex gap-3"
           >
             <input
-              className="flex-1 bg-gray-100 p-4 rounded-2xl outline-none text-xs font-bold focus:ring-2 focus:ring-blue-600 transition-all border border-transparent focus:bg-white"
-              placeholder="Ask Ayax anything..."
+              className="flex-1 bg-gray-100 p-4 rounded-2xl outline-none text-xs font-bold focus:ring-2 focus:ring-blue-600 transition-all"
+              placeholder="Hausa, English, French..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
-            <button className="w-12 h-12 bg-gray-950 text-white rounded-2xl flex items-center justify-center hover:bg-blue-600 transition-all shadow-xl active:scale-95">
+            <button className="w-12 h-12 bg-gray-950 text-white rounded-2xl flex items-center justify-center shadow-xl active:scale-95">
               <Send size={18} />
             </button>
           </form>
