@@ -50,13 +50,14 @@ import {
   Calendar,
   Newspaper,
   Trash2,
+  Camera, // GYARA: Na kara Camera a nan domin Gallery ya yi aiki
 } from "lucide-react";
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [students, setStudents] = useState([]);
   const [chats, setChats] = useState([]);
-  const [newsFeed, setNewsFeed] = useState([]); // NEW STATE: For managing news
+  const [newsFeed, setNewsFeed] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [portalStatus, setPortalStatus] = useState(true);
@@ -66,7 +67,7 @@ const AdminDashboard = () => {
   const [galleryTitle, setGalleryTitle] = useState("");
   const [galleryUrl, setGalleryUrl] = useState("");
   const [galleryCategory, setGalleryCategory] = useState("Workshop");
-  const [galleryItems, setGalleryItems] = useState([]); // Don lissafin hotuna
+  const [galleryItems, setGalleryItems] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [newsData, setNewsData] = useState({
     title: "",
@@ -75,7 +76,6 @@ const AdminDashboard = () => {
     image: "",
   });
 
-  // Manual Certificate State
   const [manualCert, setManualCert] = useState({
     name: "",
     course: "",
@@ -92,6 +92,7 @@ const AdminDashboard = () => {
 
   // 1. REAL-TIME DATA ENGINE (CORE STREAMS)
   useEffect(() => {
+    // A nan na hade dukkan listeners din wuri daya don kaucewa blank screen
     const unsubStudents = onSnapshot(
       collection(db, "course_applications"),
       (snap) => {
@@ -99,21 +100,14 @@ const AdminDashboard = () => {
       },
     );
 
-    useEffect(() => {
-      // ... sauran listeners dinka
-      const unsubGallery = onSnapshot(
-        query(collection(db, "gallery"), orderBy("createdAt", "desc")),
-        (snap) => {
-          setGalleryItems(
-            snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
-          );
-        },
-      );
-      return () => {
-        // ... sauran unsubs
-        unsubGallery();
-      };
-    }, []);
+    const unsubGallery = onSnapshot(
+      query(collection(db, "gallery"), orderBy("createdAt", "desc")),
+      (snap) => {
+        setGalleryItems(
+          snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })),
+        );
+      },
+    );
 
     const unsubChats = onSnapshot(
       query(collection(db, "private_chats"), orderBy("createdAt", "desc")),
@@ -145,7 +139,6 @@ const AdminDashboard = () => {
       },
     );
 
-    // NEW LISTENER: For the News Feed Management
     const unsubNews = onSnapshot(
       query(collection(db, "news_feed"), orderBy("createdAt", "desc")),
       (snap) => {
@@ -155,18 +148,18 @@ const AdminDashboard = () => {
 
     return () => {
       unsubStudents();
+      unsubGallery();
       unsubChats();
       unsubPortal();
       unsubLogs();
       unsubNews();
     };
   }, []);
-  // 1. Add this function inside AdminDashboard
+
   const handleGalleryUpload = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // A nan zaka iya saka hoton ta amfani da URL na Unsplash ko kuma Firebase Storage
       await addDoc(collection(db, "gallery"), {
         title: galleryTitle,
         url: galleryUrl,
@@ -183,7 +176,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // Goge Hoto daga Gallery Protocol
   const handleDeleteGalleryItem = async (id, title) => {
     if (
       window.confirm(
@@ -193,15 +185,7 @@ const AdminDashboard = () => {
       try {
         setLoading(true);
         await deleteDoc(doc(db, "gallery", id));
-
-        // Yi rikodin a Audit Logs
-        await addDoc(collection(db, "admin_logs"), {
-          action: "GALLERY_DELETE",
-          details: `Deleted image: ${title}`,
-          timestamp: serverTimestamp(),
-          adminEmail: auth.currentUser?.email,
-        });
-
+        await logActivity("GALLERY_DELETE", `Deleted image: ${title}`);
         alert("Image deleted successfully.");
       } catch (err) {
         alert("Error deleting image.");
@@ -211,7 +195,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // 2. CHAT SURVEILLANCE ENGINE
   useEffect(() => {
     if (!selectedChat) return;
     const q = query(
@@ -225,7 +208,6 @@ const AdminDashboard = () => {
     return () => unsub();
   }, [selectedChat]);
 
-  // 3. ADMINISTRATIVE MASTER ACTIONS
   const logActivity = async (action, details) => {
     await addDoc(collection(db, "admin_logs"), {
       action,
@@ -267,7 +249,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // NEW ACTION: Delete News Protocol
   const handleDeleteNews = async (newsId, title) => {
     if (window.confirm(`Are you sure you want to delete: "${title}"?`)) {
       try {
@@ -280,7 +261,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // 4. AUTOMATIC ID GENERATION & MULTI-CHANNEL DISPATCH
   const handleAutomaticIDDispatch = async (student) => {
     if (student.paymentStatus !== "Form_Paid") {
       alert("ERROR: No payment proof found for this student.");
@@ -320,7 +300,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // 5. DIRECT CERTIFICATE ISSUANCE
   const issueCertificate = async (student) => {
     const certSerial = `AYX-CERT-${Date.now()}`;
     try {
@@ -343,7 +322,6 @@ const AdminDashboard = () => {
     }
   };
 
-  // 6. DIRECT USER/SUPERVISOR MESSAGING
   const directMessage = (target, mode) => {
     const contact = target === "supervisor" ? SUPERVISOR_INFO : target;
     const text = encodeURIComponent(
@@ -355,14 +333,10 @@ const AdminDashboard = () => {
         "_blank",
       );
     } else {
-      window.open(
-        `https://wa.me/${contact.phone || contact.phone}?text=${text}`,
-        "_blank",
-      );
+      window.open(`https://wa.me/${contact.phone}?text=${text}`, "_blank");
     }
   };
 
-  // 7. MANUAL CERTIFICATE GENERATION PROTOCOL
   const handleManualCertGen = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -385,7 +359,6 @@ const AdminDashboard = () => {
         `Hello ${manualCert.name}, an Honorary Certificate has been generated for you.\n\nSerial: ${certSerial}\nIssue Date: ${manualCert.issueDate}\nVerify: ${verificationURL}`,
       );
       window.open(`https://wa.me/${manualCert.phone}?text=${waMsg}`, "_blank");
-
       await logActivity(
         "MANUAL_CERT_GEN",
         `Manual Certificate ${certSerial} generated for ${manualCert.name}`,
@@ -415,7 +388,6 @@ const AdminDashboard = () => {
     <div
       className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"}`}
     >
-      {/* MOBILE MENU OVERLAY */}
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm lg:hidden"
@@ -423,7 +395,6 @@ const AdminDashboard = () => {
         ></div>
       )}
 
-      {/* SIDEBAR */}
       <aside
         className={`fixed inset-y-0 left-0 z-[110] w-80 border-r flex flex-col transform transition-transform duration-300 lg:relative lg:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-2xl"}`}
       >
@@ -514,7 +485,6 @@ const AdminDashboard = () => {
         </div>
       </aside>
 
-      {/* MAIN CONSOLE */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <header className="h-28 border-b flex items-center justify-between px-6 lg:px-12 bg-white/5 backdrop-blur-3xl shrink-0">
           <div className="flex items-center gap-4 lg:gap-12">
@@ -550,15 +520,13 @@ const AdminDashboard = () => {
         </header>
 
         <div className="flex-1 p-4 lg:p-12 overflow-y-auto custom-scrollbar">
-          {/* TAB CONTENT - NEWS MANAGER & FEED MANAGEMENT */}
           {activeTab === "news_manager" && (
             <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700">
-              {/* Publication Form */}
               <div
                 className={`p-8 lg:p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
               >
                 <h3 className="text-2xl font-black italic uppercase tracking-tighter text-blue-600 mb-8 flex items-center gap-4">
-                  <PlusCircle size={28} /> Publish New Update
+                  <Newspaper size={28} /> Publish New Update
                 </h3>
                 <form onSubmit={handlePublishNews} className="space-y-6">
                   <input
@@ -613,7 +581,6 @@ const AdminDashboard = () => {
                 </form>
               </div>
 
-              {/* NEWS FEED MANAGEMENT TABLE */}
               <div
                 className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
               >
@@ -668,96 +635,8 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* MANUAL GENERATION TAB */}
-          {activeTab === "manual_gen" && (
-            <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
-              <div
-                className={`p-8 lg:p-12 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
-              >
-                <h3 className="text-2xl font-black italic uppercase text-blue-600 mb-10 flex items-center gap-4">
-                  <PlusCircle size={28} /> Manual Minting Protocol
-                </h3>
-                <form
-                  onSubmit={handleManualCertGen}
-                  className="grid grid-cols-1 md:grid-cols-2 gap-6"
-                >
-                  <input
-                    required
-                    className="admin-input"
-                    placeholder="Full Name"
-                    value={manualCert.name}
-                    onChange={(e) =>
-                      setManualCert({ ...manualCert, name: e.target.value })
-                    }
-                  />
-                  <input
-                    required
-                    type="date"
-                    className="admin-input"
-                    value={manualCert.issueDate}
-                    onChange={(e) =>
-                      setManualCert({
-                        ...manualCert,
-                        issueDate: e.target.value,
-                      })
-                    }
-                  />
-                  <input
-                    required
-                    className="admin-input"
-                    placeholder="Course"
-                    value={manualCert.course}
-                    onChange={(e) =>
-                      setManualCert({ ...manualCert, course: e.target.value })
-                    }
-                  />
-                  <input
-                    required
-                    className="admin-input"
-                    placeholder="WhatsApp"
-                    value={manualCert.phone}
-                    onChange={(e) =>
-                      setManualCert({ ...manualCert, phone: e.target.value })
-                    }
-                  />
-                  <input
-                    required
-                    type="email"
-                    className="admin-input"
-                    placeholder="Email"
-                    value={manualCert.email}
-                    onChange={(e) =>
-                      setManualCert({ ...manualCert, email: e.target.value })
-                    }
-                  />
-                  <select
-                    className="admin-input"
-                    value={manualCert.grade}
-                    onChange={(e) =>
-                      setManualCert({ ...manualCert, grade: e.target.value })
-                    }
-                  >
-                    <option value="Distinction">Distinction</option>
-                    <option value="Merit">Merit</option>
-                  </select>
-                  <button
-                    disabled={loading}
-                    className="md:col-span-2 py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-xs shadow-2xl flex items-center justify-center gap-4"
-                  >
-                    {loading ? (
-                      <RefreshCcw className="animate-spin" />
-                    ) : (
-                      "Mint & Send Certificate"
-                    )}
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-          {/* Add a new Tab called "gallery_manager" in your Sidebar, then use this content */}
           {activeTab === "gallery_manager" && (
             <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700">
-              {/* Form na saka sabon hoto */}
               <div
                 className={`p-8 lg:p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
               >
@@ -778,14 +657,14 @@ const AdminDashboard = () => {
                   <input
                     required
                     className="admin-input"
-                    placeholder="Category (e.g. Workshop, Graduation)"
+                    placeholder="Category"
                     value={galleryCategory}
                     onChange={(e) => setGalleryCategory(e.target.value)}
                   />
                   <input
                     required
                     className="admin-input md:col-span-2"
-                    placeholder="Image URL (Unsplash or Firebase Link)"
+                    placeholder="Image URL"
                     value={galleryUrl}
                     onChange={(e) => setGalleryUrl(e.target.value)}
                   />
@@ -797,8 +676,6 @@ const AdminDashboard = () => {
                   </button>
                 </form>
               </div>
-
-              {/* Jadawalin goge hotuna (Management Table) */}
               <div
                 className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
               >
@@ -853,7 +730,6 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* ADMISSIONS FLOW TAB */}
           {activeTab === "admissions" && (
             <div
               className={`rounded-[3rem] border overflow-x-auto ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
@@ -938,7 +814,6 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
               <div className="stat-card">
@@ -967,7 +842,7 @@ const AdminDashboard = () => {
         .admin-input { width: 100%; padding: 1.25rem; background: ${darkMode ? "#0f172a" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.25rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
         .admin-input:focus { border-color: #2563eb; }
         .metric-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.15em; }
-        .stat-card { padding: 50px; border-radius: 50px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); shadow-xl; }
+        .stat-card { padding: 50px; border-radius: 50px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); }
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
       `}</style>
