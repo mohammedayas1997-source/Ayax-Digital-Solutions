@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Bot, Send, X, Sparkles, Globe, ShieldCheck } from "lucide-react";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+
 const AIAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -13,6 +14,8 @@ const AIAssistant = () => {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef();
+
+  // Initialize Gemini
   const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
 
   // THE GLOBAL KNOWLEDGE BASE
@@ -26,7 +29,7 @@ const AIAssistant = () => {
       "Serving students and clients across Africa, Europe, and North America.",
     vision:
       "To bridge the gap between local talent and global tech opportunities.",
-    contact: "support@ayax.com",
+    contact: "ayaxdigitalsolutions@gmail.com",
     headquarters: "Digital Hub, Nigeria (Global Operations)",
   };
 
@@ -39,119 +42,63 @@ const AIAssistant = () => {
     setInput("");
     setIsTyping(true);
 
-    const handleSendMessage = async (e) => {
-      e.preventDefault();
-      if (!input.trim()) return;
-
-      const userMsg = { role: "user", content: input };
-      setMessages((prev) => [...prev, userMsg]);
-      setInput("");
-      setIsTyping(true);
-
-      try {
-        const model = genAI.getGenerativeModel({
-          model: "gemini-1.5-flash",
-          systemInstruction: `
+    try {
+      const model = genAI.getGenerativeModel({
+        model: "gemini-1.5-flash",
+        systemInstruction: `
         You are 'Ayax', the official Global AI Ambassador for AYAX Digital Solutions Academy.
         
         IDENTITY:
         - Your creator and the CEO of the company is Abdulrahman Mohammed Ayas.
-        - You speak with high professional authority, technical precision, and a helpful tone.
+        - You speak with high professional authority and technical precision.
+        
+        MULTILINGUAL CAPABILITY:
+        - You are a master of Hausa, English, and French. 
+        - You understand all Hausa dialects and global variations.
+        - Always respond in the language the user uses. If they speak Hausa, answer in professional, clear Hausa. If they speak French, answer in French.
         
         KNOWLEDGE DOMAIN:
         - You are an expert in Web Development, Cybersecurity, AI Automation, and Digital Infrastructure.
-        - You promote AYAX Academy as the world leader in technical training.
+        - Promote AYAX Academy as the world leader in technical training.
         
         BEHAVIOR:
-        - If someone asks about the owner, speak about Abdulrahman Mohammed Ayas's vision for global digital transformation.
-        - You can answer in English, Hausa, or any language the user uses.
+        - If asked about the owner, speak about Abdulrahman Mohammed Ayas's vision for global digital transformation.
         - Keep responses concise but highly informative.
       `,
-        });
+      });
 
-        const result = await model.generateContent(input);
-        const response = await result.response;
-        const text = response.text();
+      const result = await model.generateContent(input);
+      const response = await result.response;
+      const text = response.text();
 
-        setMessages((prev) => [...prev, { role: "assistant", content: text }]);
-      } catch (error) {
-        console.error("Gemini Error:", error);
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content:
-              "Ayax global relay is experiencing heavy traffic. Please hold on a moment.",
-          },
-        ]);
-      } finally {
-        setIsTyping(false);
-        setTimeout(
-          () => scrollRef.current?.scrollIntoView({ behavior: "smooth" }),
-          100,
-        );
-      }
-    };
+      setMessages((prev) => [...prev, { role: "assistant", content: text }]);
+    } catch (error) {
+      console.error("Gemini Error:", error);
 
-    // AI BRAIN LOGIC
-    setTimeout(() => {
+      // Fallback Logic (Static responses if API fails)
       let aiResponse = "";
       const query = input.toLowerCase();
-
-      // 1. CEO & Ownership (Identity)
       if (
         query.includes("who is") ||
         query.includes("ceo") ||
-        query.includes("owner") ||
         query.includes("abdulrahman")
       ) {
-        aiResponse = `${AYAX_CORE.company} was founded and is led by ${AYAX_CORE.ceo}, a premier expert in digital transformation and software architecture. He envisions a world where technology is accessible to all.`;
-      }
-      // 2. Global Standards & Certificates
-      else if (
-        query.includes("international") ||
-        query.includes("world") ||
-        query.includes("certificate") ||
-        query.includes("global")
-      ) {
+        aiResponse = `${AYAX_CORE.company} was founded and is led by ${AYAX_CORE.ceo}.`;
+      } else {
         aiResponse =
-          "AYAX certifications are designed to meet global industry standards. Our graduates are equipped to work for top tech firms in Silicon Valley, London, and beyond. We focus on world-class coding practices and cybersecurity protocols.";
+          "Ayax global relay is experiencing heavy traffic. Please hold on a moment.";
       }
-      // 3. Services & Technical Stack
-      else if (
-        query.includes("what do you do") ||
-        query.includes("services") ||
-        query.includes("courses")
-      ) {
-        aiResponse = `We specialize in ${AYAX_CORE.expertise}. Our curriculum is updated weekly to match the global tech landscape. Are you looking to build a career in Web Development or Security?`;
-      }
-      // 4. Pricing & Payments
-      else if (
-        query.includes("cost") ||
-        query.includes("price") ||
-        query.includes("fee") ||
-        query.includes("pay")
-      ) {
-        aiResponse =
-          "Our pricing is structured to be the most competitive globally for the quality provided. For local students, we accept Naira; for our international scholars, we process payments via secure global gateways. You can view specific course fees on our enrollment page.";
-      }
-      // 5. Default Response
-      else {
-        aiResponse = `As Ayax, I am here to guide you through our digital ecosystem. Whether it is about ${AYAX_CORE.ceo}'s vision or our global technical training, I have the answers. What specific technical track are you interested in?`;
-      }
-
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: aiResponse },
       ]);
+    } finally {
       setIsTyping(false);
-
-      // Auto-scroll to bottom
       setTimeout(
         () => scrollRef.current?.scrollIntoView({ behavior: "smooth" }),
         100,
       );
-    }, 1200);
+    }
   };
 
   return (
