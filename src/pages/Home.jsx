@@ -238,7 +238,7 @@ const Home = () => {
             >
               Explore Full Gallery
               <ArrowRight
-                size={16}
+                size={10}
                 className="group-hover:translate-x-2 transition-transform"
               />
             </Link>
