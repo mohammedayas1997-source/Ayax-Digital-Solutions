@@ -31,8 +31,7 @@ import ForumDetails from "./components/ForumDetails";
 import CourseSection from "./components/CourseSection";
 import PricingCard from "./components/PricingCard";
 
-// --- ADMINISTRATIVE IMPORTS (FIXED PATHS) ---
-// CHANGE: Pointed to the main AdminDashboard file where our logic is
+// --- ADMINISTRATIVE IMPORTS ---
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminGrading from "./pages/AdminGrading";
 import AdminQuestionBank from "./pages/AdminQuestionBank";
@@ -62,8 +61,11 @@ function App() {
     <Router>
       <div className="App">
         <Navbar />
+
+        {/* GYARA: AIAssistant is now outside <Routes> so it can float on all pages */}
+        <AIAssistant />
+
         <Routes>
-          <AIAssistant />
           {/* --- PUBLIC ACCESS PROTOCOLS --- */}
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<AboutUs />} />
