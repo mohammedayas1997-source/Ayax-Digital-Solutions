@@ -20,7 +20,7 @@ const AIAssistant = () => {
   const [chatSessionId, setChatSessionId] = useState(null);
   const scrollRef = useRef();
 
-  // --- DIRECT API KEY INTEGRATION (UMURNI) ---
+  // --- MASTER API KEY INTEGRATION ---
   const API_KEY = "AIzaSyA-p9wWpBXRcdfjlqlkRbvZgm0BggNWirI";
   const genAI = new GoogleGenerativeAI(API_KEY);
 
@@ -81,7 +81,7 @@ const AIAssistant = () => {
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!input.trim()) return;
+    if (!input.trim() || isTyping) return; // Kare ninkawa idan AI yana magana
 
     const userText = input;
     const userEmail = auth.currentUser?.email || "Guest_User";
@@ -90,7 +90,7 @@ const AIAssistant = () => {
     setIsTyping(true);
 
     try {
-      // 1. Log user message to Firestore immediately
+      // 1. Log user message to Firestore
       await addDoc(collection(db, "ai_chat_history"), {
         sessionId: chatSessionId,
         userEmail: userEmail,
@@ -99,40 +99,23 @@ const AIAssistant = () => {
         createdAt: serverTimestamp(),
       });
 
-      // 2. Initialize Gemini 1.5 Flash Model
+      // 2. Initialize Model
       const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash",
-        systemInstruction: `
-            You are 'Ayax', the official Global AI Ambassador for AYAX Digital Solutions Academy.
-            
-            IDENTITY:
-            - CEO: ${AYAX_CORE.ceo}.
-            - Tone: Professional, high authority, technical precision.
-            
-            LANGUAGES:
-            - You are a master of Hausa, English, and French. 
-            - Always respond in the language used by the user. If they use Hausa, use pure Hausa.
-            
-            KNOWLEDGE:
-            - Expert in ${AYAX_CORE.expertise}.
-            
-            INSTANT RESPONSE:
-            - Provide answers immediately and concisely. Use streaming to show thoughts as they happen.
-          `,
+        systemInstruction: `You are 'Ayax'. CEO: ${AYAX_CORE.ceo}. Master of Hausa, English, French. Expert in ${AYAX_CORE.expertise}. Respond instantly.`,
       });
 
       // 3. Start Content Stream
       const result = await model.generateContentStream(userText);
       let fullResponse = "";
 
-      // Add a blank assistant message to start the stream display
+      // Muna amfani da wucin-gadi (Local State) don sauri kafin mu adana a Firestore
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
         fullResponse += chunkText;
 
-        // Reactive UI update for each chunk received
         setMessages((prev) => {
           const updated = [...prev];
           updated[updated.length - 1].content = fullResponse;
@@ -149,13 +132,13 @@ const AIAssistant = () => {
         createdAt: serverTimestamp(),
       });
     } catch (error) {
-      console.error("Gemini Critical Error:", error);
+      console.error("Critical Connection Error:", error);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
           content:
-            "Ayax global infrastructure is currently re-routing. Please refresh or retry in a moment.",
+            "Ayax system relay is experiencing heavy traffic. Please check your internet or refresh.",
         },
       ]);
     } finally {
@@ -172,43 +155,37 @@ const AIAssistant = () => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="group relative w-16 h-16 bg-blue-600 text-white rounded-2xl shadow-[0_20px_50px_rgba(37,99,235,0.3)] flex items-center justify-center hover:scale-105 transition-all duration-500"
+          className="group relative w-16 h-16 bg-blue-600 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-105 transition-all duration-500"
         >
           <div className="absolute -top-2 -right-2 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full animate-pulse"></div>
           <Bot size={32} strokeWidth={1.5} />
-          <span className="absolute -left-24 bg-gray-900 text-white text-[10px] py-2 px-4 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity font-black uppercase tracking-widest">
-            Chat with Ayax
-          </span>
         </button>
       )}
 
       {isOpen && (
-        <div className="w-[350px] md:w-[400px] bg-white rounded-[2.5rem] shadow-[-20px_50px_100px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500 flex flex-col">
+        <div className="w-[350px] md:w-[400px] bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden flex flex-col animate-in fade-in slide-in-from-bottom-5 duration-500">
+          {/* Header */}
           <div className="bg-gray-950 p-7 text-white">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Globe size={20} className="animate-spin-slow" />
-                </div>
+                <Globe size={20} className="text-blue-500 animate-spin-slow" />
                 <div>
                   <h3 className="font-black text-xs uppercase tracking-[0.2em]">
                     Ayax Intelligence
                   </h3>
-                  <p className="text-[9px] text-emerald-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                  <p className="text-[9px] text-emerald-500 font-bold uppercase flex items-center gap-1">
                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>{" "}
                     Surveillance Active
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="opacity-30 hover:opacity-100 transition-opacity"
-              >
+              <button onClick={() => setIsOpen(false)}>
                 <X size={20} />
               </button>
             </div>
           </div>
 
+          {/* Chat Area */}
           <div className="h-[400px] overflow-y-auto p-6 space-y-6 bg-gray-50/50 custom-scrollbar">
             {messages.map((m, i) => (
               <div
@@ -219,7 +196,7 @@ const AIAssistant = () => {
                   className={`max-w-[85%] p-4 rounded-[1.8rem] text-[13px] leading-relaxed font-bold shadow-sm ${
                     m.role === "user"
                       ? "bg-blue-600 text-white rounded-tr-none"
-                      : "bg-white text-slate-800 border border-slate-100 rounded-tl-none"
+                      : "bg-white text-slate-800 border rounded-tl-none"
                   }`}
                 >
                   {m.content}
@@ -227,24 +204,25 @@ const AIAssistant = () => {
               </div>
             ))}
             {isTyping && (
-              <div className="text-[10px] font-black text-blue-600 animate-pulse uppercase tracking-widest px-4">
-                Ayax is thinking...
+              <div className="text-[10px] font-black text-blue-600 animate-pulse px-4 uppercase">
+                Ayax is processing...
               </div>
             )}
             <div ref={scrollRef} />
           </div>
 
+          {/* Input Area */}
           <form
             onSubmit={handleSendMessage}
-            className="p-5 bg-white border-t border-gray-50 flex gap-3"
+            className="p-5 bg-white border-t flex gap-3"
           >
             <input
-              className="flex-1 bg-gray-100 p-4 rounded-2xl outline-none text-xs font-bold focus:ring-2 focus:ring-blue-600 transition-all"
+              className="flex-1 bg-gray-100 p-4 rounded-2xl outline-none text-xs font-bold"
               placeholder="Hausa, English, French..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
-            <button className="w-12 h-12 bg-gray-950 text-white rounded-2xl flex items-center justify-center shadow-xl active:scale-95">
+            <button className="w-12 h-12 bg-gray-950 text-white rounded-2xl flex items-center justify-center hover:bg-blue-600 transition-all">
               <Send size={18} />
             </button>
           </form>
