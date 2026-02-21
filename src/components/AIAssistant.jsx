@@ -20,10 +20,8 @@ const AIAssistant = () => {
   const [chatSessionId, setChatSessionId] = useState(null);
   const scrollRef = useRef();
 
-  // --- MASTER FIX: SAKA KEY DIN A NAN KAI TSAYE ---
-  // Mun cire process.env domin tabbatar da cewa live server ya gani
+  // --- MASTER FIX: DIRECT API KEY ---
   const MASTER_KEY = "AIzaSyA-p9wWpBXRcdfjlqlkRbvZgm0BggNWirI";
-  const genAI = new GoogleGenerativeAI(MASTER_KEY);
 
   const AYAX_CORE = {
     name: "Ayax",
@@ -91,6 +89,9 @@ const AIAssistant = () => {
     setIsTyping(true);
 
     try {
+      // Tabbatar an yi initialization na SDK a nan don sauri
+      const genAI = new GoogleGenerativeAI(MASTER_KEY);
+
       // 1. Log user message to Firestore immediately
       await addDoc(collection(db, "ai_chat_history"), {
         sessionId: chatSessionId,
@@ -105,20 +106,10 @@ const AIAssistant = () => {
         model: "gemini-1.5-flash",
         systemInstruction: `
             You are 'Ayax', the official Global AI Ambassador for AYAX Digital Solutions Academy.
-            
-            IDENTITY:
-            - CEO: ${AYAX_CORE.ceo}.
-            - Tone: Professional, high authority, technical precision.
-            
-            LANGUAGES:
-            - You are a master of Hausa, English, and French. 
-            - Always respond in the language used by the user. If they use Hausa, use pure Hausa.
-            
-            KNOWLEDGE:
-            - Expert in ${AYAX_CORE.expertise}.
-            
-            INSTANT RESPONSE:
-            - Provide answers immediately and concisely. Use streaming to show thoughts as they happen.
+            CEO: ${AYAX_CORE.ceo}.
+            Expertise: ${AYAX_CORE.expertise}.
+            Languages: Master of Hausa, English, and French. Always respond in the language used by the user.
+            Tone: Professional, authoritative, and helpful.
           `,
       });
 
@@ -126,6 +117,7 @@ const AIAssistant = () => {
       const result = await model.generateContentStream(userText);
       let fullResponse = "";
 
+      // Add a placeholder for AI response
       setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       for await (const chunk of result.stream) {
@@ -139,7 +131,7 @@ const AIAssistant = () => {
         });
       }
 
-      // 4. Save the finalized AI response to Firestore
+      // 4. Save finalized AI response to Firestore
       await addDoc(collection(db, "ai_chat_history"), {
         sessionId: chatSessionId,
         userEmail: userEmail,
@@ -168,11 +160,10 @@ const AIAssistant = () => {
 
   return (
     <div className="fixed bottom-8 right-8 z-[9999]">
-      {/* Floating Ayax Button */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
-          className="group relative w-16 h-16 bg-blue-600 text-white rounded-2xl shadow-[0_20px_50px_rgba(37,99,235,0.3)] flex items-center justify-center hover:scale-105 transition-all duration-500"
+          className="group relative w-16 h-16 bg-blue-600 text-white rounded-2xl shadow-2xl flex items-center justify-center hover:scale-105 transition-all duration-500"
         >
           <div className="absolute -top-2 -right-2 w-5 h-5 bg-emerald-500 border-4 border-white rounded-full animate-pulse"></div>
           <Bot size={32} strokeWidth={1.5} />
@@ -182,10 +173,9 @@ const AIAssistant = () => {
         </button>
       )}
 
-      {/* Global AI Console */}
       {isOpen && (
-        <div className="w-[350px] md:w-[400px] bg-white rounded-[2.5rem] shadow-[-20px_50px_100px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500 flex flex-col">
-          <div className="bg-gray-950 p-7 text-white">
+        <div className="w-[350px] md:w-[400px] bg-white rounded-[2.5rem] shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500 flex flex-col">
+          <div className="bg-gray-950 p-7 text-white shrink-0">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -210,7 +200,7 @@ const AIAssistant = () => {
             </div>
           </div>
 
-          <div className="h-[400px] overflow-y-auto p-6 space-y-6 bg-gray-50/50 custom-scrollbar">
+          <div className="h-[400px] overflow-y-auto p-6 space-y-6 bg-gray-50/50 custom-scrollbar flex-1">
             {messages.map((m, i) => (
               <div
                 key={i}
@@ -237,15 +227,18 @@ const AIAssistant = () => {
 
           <form
             onSubmit={handleSendMessage}
-            className="p-5 bg-white border-t border-gray-50 flex gap-3"
+            className="p-5 bg-white border-t border-gray-50 flex gap-3 shrink-0"
           >
             <input
-              className="flex-1 bg-gray-100 p-4 rounded-2xl outline-none text-xs font-bold focus:ring-2 focus:ring-blue-600 transition-all"
+              className="flex-1 bg-gray-100 p-4 rounded-2xl outline-none text-xs font-bold focus:ring-2 focus:ring-blue-600 transition-all border border-transparent focus:bg-white text-slate-900"
               placeholder="Hausa, English, French..."
               value={input}
               onChange={(e) => setInput(e.target.value)}
             />
-            <button className="w-12 h-12 bg-gray-950 text-white rounded-2xl flex items-center justify-center shadow-xl active:scale-95">
+            <button
+              type="submit"
+              className="w-12 h-12 bg-gray-950 text-white rounded-2xl flex items-center justify-center shadow-xl active:scale-95 hover:bg-blue-600 transition-colors"
+            >
               <Send size={18} />
             </button>
           </form>
