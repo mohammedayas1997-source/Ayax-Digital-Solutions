@@ -14,7 +14,7 @@ import {
   Mail,
   Lock,
 } from "lucide-react";
-import NewsFeed from "./components/NewsFeed";
+import NewsFeed from "../components/NewsFeed";
 import { Link, useNavigate } from "react-router-dom";
 import { Cpu, X } from "lucide-react";
 import Navbar from "../components/Navbar";
