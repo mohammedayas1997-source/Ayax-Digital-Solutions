@@ -20,10 +20,9 @@ const AIAssistant = () => {
   const [chatSessionId, setChatSessionId] = useState(null);
   const scrollRef = useRef();
 
-  // Initialize Gemini
+  // Initialize Gemini Engine
   const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
 
-  // THE GLOBAL KNOWLEDGE BASE
   const AYAX_CORE = {
     name: "Ayax",
     ceo: "Abdulrahman Mohammed Ayas",
@@ -38,7 +37,6 @@ const AIAssistant = () => {
     headquarters: "Digital Hub, Nigeria (Global Operations)",
   };
 
-  // 1. GENERATE OR RETRIEVE SESSION ID (Don adana history daban-daban)
   useEffect(() => {
     let sessionId = localStorage.getItem("ayax_ai_session");
     if (!sessionId) {
@@ -48,7 +46,6 @@ const AIAssistant = () => {
     setChatSessionId(sessionId);
   }, []);
 
-  // 2. REAL-TIME HISTORY RETRIEVAL (Dauko tsohuwar hira daga Firestore)
   useEffect(() => {
     if (!chatSessionId || !isOpen) return;
 
@@ -88,8 +85,12 @@ const AIAssistant = () => {
     const userText = input;
     const userEmail = auth.currentUser?.email || "Guest_User";
 
-    // SAVE USER MESSAGE TO FIRESTORE (For Admin Surveillance)
+    // Immediate local update for user message
+    setInput("");
+    setIsTyping(true);
+
     try {
+      // 1. Log user message to Firestore immediately
       await addDoc(collection(db, "ai_chat_history"), {
         sessionId: chatSessionId,
         userEmail: userEmail,
@@ -97,14 +98,8 @@ const AIAssistant = () => {
         content: userText,
         createdAt: serverTimestamp(),
       });
-    } catch (err) {
-      console.error("History Error:", err);
-    }
 
-    setInput("");
-    setIsTyping(true);
-
-    try {
+      // 2. Initialize Gemini 1.5 Flash Model
       const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash",
         systemInstruction: `
@@ -122,22 +117,22 @@ const AIAssistant = () => {
           - Expert in ${AYAX_CORE.expertise}.
           
           INSTANT RESPONSE:
-          - Provide answers immediately and concisely.
+          - Provide answers immediately and concisely. Use streaming to show thoughts as they happen.
         `,
       });
 
-      // 3. STREAMING LOGIC (Bada amsa nan take tana fitowa daya-bayan-daya)
+      // 3. Start Content Stream
       const result = await model.generateContentStream(userText);
       let fullResponse = "";
 
-      // Muna kara 'placeholder' na assistant message don streaming din ya bayyana
-      setMessages((prev) => [...prev, { role: "assistant", content: "..." }]);
+      // Add a blank assistant message to start the stream display
+      setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
 
       for await (const chunk of result.stream) {
         const chunkText = chunk.text();
         fullResponse += chunkText;
 
-        // Update UI nan take (Real-time display)
+        // Reactive UI update for each chunk received
         setMessages((prev) => {
           const updated = [...prev];
           updated[updated.length - 1].content = fullResponse;
@@ -145,7 +140,7 @@ const AIAssistant = () => {
         });
       }
 
-      // SAVE FULL AI RESPONSE TO FIRESTORE (For Admin Surveillance)
+      // 4. Save the finalized AI response to Firestore
       await addDoc(collection(db, "ai_chat_history"), {
         sessionId: chatSessionId,
         userEmail: userEmail,
@@ -154,12 +149,13 @@ const AIAssistant = () => {
         createdAt: serverTimestamp(),
       });
     } catch (error) {
-      console.error("Gemini Error:", error);
+      console.error("Gemini Critical Error:", error);
       setMessages((prev) => [
         ...prev,
         {
           role: "assistant",
-          content: "Ayax system relay is experiencing traffic. Please retry.",
+          content:
+            "Ayax global infrastructure is currently re-routing. Please refresh or retry in a moment.",
         },
       ]);
     } finally {
@@ -173,7 +169,6 @@ const AIAssistant = () => {
 
   return (
     <div className="fixed bottom-8 right-8 z-[9999]">
-      {/* Floating Ayax Button */}
       {!isOpen && (
         <button
           onClick={() => setIsOpen(true)}
@@ -187,10 +182,8 @@ const AIAssistant = () => {
         </button>
       )}
 
-      {/* Global AI Console */}
       {isOpen && (
         <div className="w-[350px] md:w-[400px] bg-white rounded-[2.5rem] shadow-[-20px_50px_100px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-500 flex flex-col">
-          {/* Header */}
           <div className="bg-gray-950 p-7 text-white">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-3">
@@ -216,7 +209,6 @@ const AIAssistant = () => {
             </div>
           </div>
 
-          {/* Chat Interface */}
           <div className="h-[400px] overflow-y-auto p-6 space-y-6 bg-gray-50/50 custom-scrollbar">
             {messages.map((m, i) => (
               <div
@@ -234,10 +226,14 @@ const AIAssistant = () => {
                 </div>
               </div>
             ))}
+            {isTyping && (
+              <div className="text-[10px] font-black text-blue-600 animate-pulse uppercase tracking-widest px-4">
+                Ayax is thinking...
+              </div>
+            )}
             <div ref={scrollRef} />
           </div>
 
-          {/* Global Input */}
           <form
             onSubmit={handleSendMessage}
             className="p-5 bg-white border-t border-gray-50 flex gap-3"
