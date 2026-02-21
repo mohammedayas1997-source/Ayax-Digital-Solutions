@@ -48,13 +48,15 @@ import {
   RefreshCcw,
   Menu,
   Calendar,
-  Newspaper, // FIXED: Added missing import to prevent blank screen
+  Newspaper,
+  Trash2,
 } from "lucide-react";
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [students, setStudents] = useState([]);
   const [chats, setChats] = useState([]);
+  const [newsFeed, setNewsFeed] = useState([]); // NEW STATE: For managing news
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [portalStatus, setPortalStatus] = useState(true);
@@ -123,11 +125,20 @@ const AdminDashboard = () => {
       },
     );
 
+    // NEW LISTENER: For the News Feed Management
+    const unsubNews = onSnapshot(
+      query(collection(db, "news_feed"), orderBy("createdAt", "desc")),
+      (snap) => {
+        setNewsFeed(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      },
+    );
+
     return () => {
       unsubStudents();
       unsubChats();
       unsubPortal();
       unsubLogs();
+      unsubNews();
     };
   }, []);
 
@@ -184,6 +195,19 @@ const AdminDashboard = () => {
       alert("Error publishing news.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // NEW ACTION: Delete News Protocol
+  const handleDeleteNews = async (newsId, title) => {
+    if (window.confirm(`Are you sure you want to delete: "${title}"?`)) {
+      try {
+        await deleteDoc(doc(db, "news_feed", newsId));
+        logActivity("NEWS_DELETE", `Deleted news article: ${title}`);
+        alert("News article removed successfully.");
+      } catch (err) {
+        alert("Failed to delete news.");
+      }
     }
   };
 
@@ -393,26 +417,6 @@ const AdminDashboard = () => {
               {item.icon} {item.label}
             </button>
           ))}
-
-          <div className="mt-8 p-6 bg-slate-500/5 rounded-3xl border border-slate-500/10 text-center">
-            <p className="text-[9px] font-black uppercase opacity-50 mb-4 tracking-widest">
-              Supervisor Comms
-            </p>
-            <div className="flex justify-around">
-              <button
-                onClick={() => directMessage("supervisor", "email")}
-                className="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:text-blue-500 transition-colors"
-              >
-                <Mail size={18} />
-              </button>
-              <button
-                onClick={() => directMessage("supervisor", "whatsapp")}
-                className="p-4 bg-white dark:bg-slate-800 rounded-2xl shadow-sm hover:text-emerald-500 transition-colors"
-              >
-                <MessageSquare size={18} />
-              </button>
-            </div>
-          </div>
         </nav>
 
         <div className="p-8 space-y-4">
@@ -472,14 +476,15 @@ const AdminDashboard = () => {
         </header>
 
         <div className="flex-1 p-4 lg:p-12 overflow-y-auto custom-scrollbar">
-          {/* TAB CONTENT - NEWS MANAGER */}
+          {/* TAB CONTENT - NEWS MANAGER & FEED MANAGEMENT */}
           {activeTab === "news_manager" && (
-            <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
+            <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700">
+              {/* Publication Form */}
               <div
                 className={`p-8 lg:p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
               >
                 <h3 className="text-2xl font-black italic uppercase tracking-tighter text-blue-600 mb-8 flex items-center gap-4">
-                  <Newspaper size={28} /> Broadcast News Feed
+                  <PlusCircle size={28} /> Publish New Update
                 </h3>
                 <form onSubmit={handlePublishNews} className="space-y-6">
                   <input
@@ -514,7 +519,7 @@ const AdminDashboard = () => {
                   </div>
                   <textarea
                     required
-                    className="admin-input min-h-[200px] pt-5"
+                    className="admin-input min-h-[150px] pt-5"
                     placeholder="Content Body"
                     value={newsData.content}
                     onChange={(e) =>
@@ -523,20 +528,73 @@ const AdminDashboard = () => {
                   ></textarea>
                   <button
                     disabled={loading}
-                    className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-xs shadow-2xl flex items-center justify-center gap-4"
+                    className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-xs shadow-2xl hover:bg-slate-900 transition-all"
                   >
                     {loading ? (
-                      <RefreshCcw className="animate-spin" />
+                      <RefreshCcw className="animate-spin mx-auto" />
                     ) : (
-                      "Publish to Home Page"
+                      "Broadcast to News Feed"
                     )}
                   </button>
                 </form>
               </div>
+
+              {/* NEWS FEED MANAGEMENT TABLE */}
+              <div
+                className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              >
+                <div className="p-8 border-b border-slate-800/10">
+                  <h3 className="text-xl font-black uppercase italic text-slate-500 tracking-widest">
+                    Active News Stream
+                  </h3>
+                </div>
+                <table className="w-full text-left min-w-[700px]">
+                  <thead className="bg-slate-500/5 text-[10px] font-black uppercase opacity-60">
+                    <tr>
+                      <th className="p-8">Headline</th>
+                      <th className="p-8">Category</th>
+                      <th className="p-8">Date Published</th>
+                      <th className="p-8 text-center">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/10 font-bold">
+                    {newsFeed.map((item) => (
+                      <tr
+                        key={item.id}
+                        className="hover:bg-slate-500/5 transition-all"
+                      >
+                        <td className="p-8">
+                          <p className="text-sm font-black uppercase truncate max-w-xs">
+                            {item.title}
+                          </p>
+                        </td>
+                        <td className="p-8">
+                          <span className="px-3 py-1 bg-blue-600/10 text-blue-600 rounded-lg text-[9px] uppercase border border-blue-600/20">
+                            {item.category}
+                          </span>
+                        </td>
+                        <td className="p-8 text-xs opacity-50">
+                          {item.createdAt?.toDate().toLocaleDateString()}
+                        </td>
+                        <td className="p-8 text-center">
+                          <button
+                            onClick={() =>
+                              handleDeleteNews(item.id, item.title)
+                            }
+                            className="p-4 bg-red-600/10 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all shadow-sm"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
-          {/* TAB CONTENT - MANUAL CERT MINTING */}
+          {/* MANUAL GENERATION TAB */}
           {activeTab === "manual_gen" && (
             <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
               <div
@@ -623,29 +681,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* OTHER TABS - OVERVIEW, ADMISSIONS, SURVEILLANCE, HISTORY */}
-          {activeTab === "overview" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-              <div className="stat-card">
-                <Activity className="text-blue-600 mb-6" size={32} />
-                <h4 className="metric-label">System Admissions</h4>
-                <p className="text-6xl font-black">{students.length}</p>
-              </div>
-              <div className="stat-card">
-                <CheckCircle className="text-emerald-500 mb-6" size={32} />
-                <h4 className="metric-label">Revenue Sources</h4>
-                <p className="text-6xl font-black">{formPaidCount}</p>
-              </div>
-              <div className="stat-card">
-                <Fingerprint className="text-purple-500 mb-6" size={32} />
-                <h4 className="metric-label">Security IDs Active</h4>
-                <p className="text-6xl font-black">
-                  {students.filter((s) => s.studentId).length}
-                </p>
-              </div>
-            </div>
-          )}
-
+          {/* ADMISSIONS FLOW TAB */}
           {activeTab === "admissions" && (
             <div
               className={`rounded-[3rem] border overflow-x-auto ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
@@ -727,6 +763,29 @@ const AdminDashboard = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {/* OVERVIEW TAB */}
+          {activeTab === "overview" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+              <div className="stat-card">
+                <Activity className="text-blue-600 mb-6" size={32} />
+                <h4 className="metric-label">System Admissions</h4>
+                <p className="text-6xl font-black">{students.length}</p>
+              </div>
+              <div className="stat-card">
+                <CheckCircle className="text-emerald-500 mb-6" size={32} />
+                <h4 className="metric-label">Revenue Sources</h4>
+                <p className="text-6xl font-black">{formPaidCount}</p>
+              </div>
+              <div className="stat-card">
+                <Fingerprint className="text-purple-500 mb-6" size={32} />
+                <h4 className="metric-label">Security IDs Active</h4>
+                <p className="text-6xl font-black">
+                  {students.filter((s) => s.studentId).length}
+                </p>
+              </div>
             </div>
           )}
         </div>
