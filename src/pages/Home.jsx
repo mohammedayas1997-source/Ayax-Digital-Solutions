@@ -14,6 +14,7 @@ import {
   Mail,
   Lock,
 } from "lucide-react";
+import NewsFeed from "./components/NewsFeed";
 import { Link, useNavigate } from "react-router-dom";
 import { Cpu, X } from "lucide-react";
 import Navbar from "../components/Navbar";
@@ -217,6 +218,7 @@ const Home = () => {
             </div>
           </div>
         </div>
+        <NewsFeed />
 
         {/* Ado na background circles */}
         <div className="absolute -top-20 -right-20 w-80 h-80 bg-white/10 rounded-full blur-[80px]"></div>

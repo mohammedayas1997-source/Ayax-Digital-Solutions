@@ -61,7 +61,12 @@ const AdminDashboard = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
+  const [newsData, setNewsData] = useState({
+    title: "",
+    content: "",
+    category: "General",
+    image: "",
+  });
   // Manual Certificate State - Ya hada da Date
   const [manualCert, setManualCert] = useState({
     name: "",
@@ -159,6 +164,25 @@ const AdminDashboard = () => {
       "PORTAL_TOGGLE",
       `Portal system state: ${newStatus ? "ACTIVE" : "LOCKDOWN"}`,
     );
+  };
+
+  const handlePublishNews = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "news_feed"), {
+        ...newsData,
+        createdAt: serverTimestamp(),
+        adminEmail: auth.currentUser?.email,
+      });
+      alert("NEWS PUBLISHED: Labari ya tafi Home Page nasara.");
+      setNewsData({ title: "", content: "", category: "General", image: "" });
+      logActivity("NEWS_PUBLISH", `Published news: ${newsData.title}`);
+    } catch (err) {
+      alert("Error publishing news.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // 4. AUTOMATIC ID GENERATION & MULTI-CHANNEL DISPATCH
@@ -362,6 +386,12 @@ const AdminDashboard = () => {
               {item.icon} {item.label}
             </button>
           ))}
+          <button
+            onClick={() => setActiveTab("news_manager")}
+            className={`w-full flex items-center gap-5 p-5 rounded-[1.5rem] font-black text-xs uppercase transition-all ${activeTab === "news_manager" ? "bg-blue-600 text-white shadow-xl scale-105" : "hover:bg-blue-500/10 opacity-60"}`}
+          >
+            <Newspaper size={20} /> News Manager
+          </button>
           <div className="mt-8 p-6 bg-slate-500/5 rounded-3xl border border-slate-500/10">
             <p className="text-[9px] font-black uppercase opacity-50 mb-4 tracking-widest text-center">
               Supervisor Comms
@@ -545,6 +575,84 @@ const AdminDashboard = () => {
                     ) : (
                       <>
                         <QrCode size={20} /> Mint Certificate
+                      </>
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {activeTab === "news_manager" && (
+            <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
+              <div
+                className={`p-8 lg:p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              >
+                <div className="flex items-center gap-4 mb-10">
+                  <div className="p-4 bg-blue-600 text-white rounded-2xl shadow-lg">
+                    <Send size={28} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black italic uppercase tracking-tighter">
+                      Broadcast News Feed
+                    </h3>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">
+                      Tura labarai zuwa Home Page
+                    </p>
+                  </div>
+                </div>
+
+                <form onSubmit={handlePublishNews} className="space-y-6">
+                  <input
+                    required
+                    className="admin-input"
+                    placeholder="News Title (e.g. 2026 Admission Open)"
+                    value={newsData.title}
+                    onChange={(e) =>
+                      setNewsData({ ...newsData, title: e.target.value })
+                    }
+                  />
+                  <div className="grid grid-cols-2 gap-6">
+                    <select
+                      className="admin-input"
+                      value={newsData.category}
+                      onChange={(e) =>
+                        setNewsData({ ...newsData, category: e.target.value })
+                      }
+                    >
+                      <option value="General">General News</option>
+                      <option value="Admission">Admission Update</option>
+                      <option value="Event">Academic Event</option>
+                      <option value="Urgent">Urgent Notice</option>
+                    </select>
+                    <input
+                      className="admin-input"
+                      placeholder="Image URL (Unsplash Link)"
+                      value={newsData.image}
+                      onChange={(e) =>
+                        setNewsData({ ...newsData, image: e.target.value })
+                      }
+                    />
+                  </div>
+                  <textarea
+                    required
+                    className="admin-input min-h-[200px] pt-5"
+                    placeholder="Write your content here..."
+                    value={newsData.content}
+                    onChange={(e) =>
+                      setNewsData({ ...newsData, content: e.target.value })
+                    }
+                  ></textarea>
+
+                  <button
+                    disabled={loading}
+                    className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl hover:bg-slate-900 transition-all flex items-center justify-center gap-4"
+                  >
+                    {loading ? (
+                      <RefreshCcw className="animate-spin" />
+                    ) : (
+                      <>
+                        <Send size={20} /> Publish to Home Page
                       </>
                     )}
                   </button>
