@@ -202,10 +202,6 @@ const Home = () => {
           </div>
         </div>
 
-        <div className="mt-20">
-          <NewsFeed />
-        </div>
-
         {/* Background Decorative Circles */}
         <div className="absolute -top-20 -right-20 w-80 h-80 bg-white/10 rounded-full blur-[80px]"></div>
         <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-blue-400/30 rounded-full blur-[80px]"></div>
@@ -215,6 +211,10 @@ const Home = () => {
       <section id="academy-courses">
         <CourseSection />
       </section>
+
+      <div className="mt-20">
+        <NewsFeed />
+      </div>
 
       {/* --- SERVICES & PRICING --- */}
       <section id="services" className="py-24 bg-gray-50">

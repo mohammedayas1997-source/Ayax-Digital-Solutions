@@ -48,6 +48,7 @@ import {
   RefreshCcw,
   Menu,
   Calendar,
+  Newspaper, // FIXED: Added missing import to prevent blank screen
 } from "lucide-react";
 
 const AdminDashboard = () => {
@@ -67,7 +68,8 @@ const AdminDashboard = () => {
     category: "General",
     image: "",
   });
-  // Manual Certificate State - Ya hada da Date
+
+  // Manual Certificate State
   const [manualCert, setManualCert] = useState({
     name: "",
     course: "",
@@ -267,7 +269,7 @@ const AdminDashboard = () => {
     }
   };
 
-  // 7. MANUAL CERTIFICATE GENERATION PROTOCOL (Sabon Gyara tare da Date)
+  // 7. MANUAL CERTIFICATE GENERATION PROTOCOL
   const handleManualCertGen = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -320,7 +322,7 @@ const AdminDashboard = () => {
     <div
       className={`min-h-screen flex font-sans ${darkMode ? "bg-slate-950 text-white" : "bg-slate-50 text-slate-900"}`}
     >
-      {/* MOBILE HAMBURGER OVERLAY */}
+      {/* MOBILE MENU OVERLAY */}
       {mobileMenuOpen && (
         <div
           className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm lg:hidden"
@@ -328,7 +330,7 @@ const AdminDashboard = () => {
         ></div>
       )}
 
-      {/* SIDEBAR - Responsive */}
+      {/* SIDEBAR */}
       <aside
         className={`fixed inset-y-0 left-0 z-[110] w-80 border-r flex flex-col transform transition-transform duration-300 lg:relative lg:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-2xl"}`}
       >
@@ -374,6 +376,11 @@ const AdminDashboard = () => {
               icon: <History size={20} />,
               label: "System Logs",
             },
+            {
+              id: "news_manager",
+              icon: <Newspaper size={20} />,
+              label: "News Manager",
+            },
           ].map((item) => (
             <button
               key={item.id}
@@ -386,14 +393,9 @@ const AdminDashboard = () => {
               {item.icon} {item.label}
             </button>
           ))}
-          <button
-            onClick={() => setActiveTab("news_manager")}
-            className={`w-full flex items-center gap-5 p-5 rounded-[1.5rem] font-black text-xs uppercase transition-all ${activeTab === "news_manager" ? "bg-blue-600 text-white shadow-xl scale-105" : "hover:bg-blue-500/10 opacity-60"}`}
-          >
-            <Newspaper size={20} /> News Manager
-          </button>
-          <div className="mt-8 p-6 bg-slate-500/5 rounded-3xl border border-slate-500/10">
-            <p className="text-[9px] font-black uppercase opacity-50 mb-4 tracking-widest text-center">
+
+          <div className="mt-8 p-6 bg-slate-500/5 rounded-3xl border border-slate-500/10 text-center">
+            <p className="text-[9px] font-black uppercase opacity-50 mb-4 tracking-widest">
               Supervisor Comms
             </p>
             <div className="flex justify-around">
@@ -416,19 +418,17 @@ const AdminDashboard = () => {
         <div className="p-8 space-y-4">
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className="w-full py-4 flex items-center justify-center gap-4 bg-slate-500/10 rounded-2xl"
+            className="w-full py-4 flex items-center justify-center gap-4 bg-slate-500/10 rounded-2xl font-black text-[10px] uppercase"
           >
             {darkMode ? (
               <Sun size={20} className="text-yellow-400" />
             ) : (
               <Moon size={20} className="text-blue-500" />
-            )}
-            <span className="font-black text-[10px] uppercase">
-              {darkMode ? "Light" : "Dark"}
-            </span>
+            )}{" "}
+            {darkMode ? "Light" : "Dark"} Mode
           </button>
           <button
-            onClick={() => auth.signOut()}
+            onClick={() => signOut(auth)}
             className="w-full py-5 bg-red-600/10 text-red-600 rounded-2xl font-black text-[10px] uppercase border border-red-600/20 hover:bg-red-600 hover:text-white transition-all"
           >
             <LogOut size={20} className="inline mr-2" /> Shutdown
@@ -454,55 +454,100 @@ const AdminDashboard = () => {
                 ₦{totalRevenue.toLocaleString()}
               </div>
             </div>
-            <div className="hidden sm:block w-[1px] h-12 bg-slate-500/20"></div>
             <div className="flex flex-col">
               <span className="text-[10px] font-black uppercase opacity-40 text-blue-500">
-                Registered Talent
+                Talent Pool
               </span>
               <div className="text-xl lg:text-3xl font-black tracking-tighter text-blue-500">
                 {students.length}
               </div>
             </div>
           </div>
-
-          <div className="flex items-center gap-6">
-            <div className="hidden md:flex items-center gap-3 bg-slate-500/5 px-6 py-3 rounded-2xl border border-slate-500/10">
-              <div
-                className={`w-3 h-3 rounded-full ${portalStatus ? "bg-emerald-500" : "bg-red-500"}`}
-              ></div>
-              <span className="text-[11px] font-black uppercase">
-                Portal: {portalStatus ? "Live" : "Locked"}
-              </span>
-            </div>
-            <button
-              onClick={togglePortal}
-              className={`px-6 lg:px-10 py-4 rounded-2xl font-black text-[10px] uppercase transition-all shadow-2xl ${portalStatus ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
-            >
-              {portalStatus ? "Lockdown" : "Open System"}
-            </button>
-          </div>
+          <button
+            onClick={togglePortal}
+            className={`px-6 lg:px-10 py-4 rounded-2xl font-black text-[10px] uppercase transition-all shadow-2xl ${portalStatus ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
+          >
+            {portalStatus ? "Lockdown" : "Open System"}
+          </button>
         </header>
 
         <div className="flex-1 p-4 lg:p-12 overflow-y-auto custom-scrollbar">
-          {/* MANUAL GENERATION TAB */}
+          {/* TAB CONTENT - NEWS MANAGER */}
+          {activeTab === "news_manager" && (
+            <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
+              <div
+                className={`p-8 lg:p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
+              >
+                <h3 className="text-2xl font-black italic uppercase tracking-tighter text-blue-600 mb-8 flex items-center gap-4">
+                  <Newspaper size={28} /> Broadcast News Feed
+                </h3>
+                <form onSubmit={handlePublishNews} className="space-y-6">
+                  <input
+                    required
+                    className="admin-input"
+                    placeholder="News Title"
+                    value={newsData.title}
+                    onChange={(e) =>
+                      setNewsData({ ...newsData, title: e.target.value })
+                    }
+                  />
+                  <div className="grid grid-cols-2 gap-6">
+                    <select
+                      className="admin-input"
+                      value={newsData.category}
+                      onChange={(e) =>
+                        setNewsData({ ...newsData, category: e.target.value })
+                      }
+                    >
+                      <option value="General">General</option>
+                      <option value="Admission">Admission</option>
+                      <option value="Urgent">Urgent</option>
+                    </select>
+                    <input
+                      className="admin-input"
+                      placeholder="Image URL"
+                      value={newsData.image}
+                      onChange={(e) =>
+                        setNewsData({ ...newsData, image: e.target.value })
+                      }
+                    />
+                  </div>
+                  <textarea
+                    required
+                    className="admin-input min-h-[200px] pt-5"
+                    placeholder="Content Body"
+                    value={newsData.content}
+                    onChange={(e) =>
+                      setNewsData({ ...newsData, content: e.target.value })
+                    }
+                  ></textarea>
+                  <button
+                    disabled={loading}
+                    className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase text-xs shadow-2xl flex items-center justify-center gap-4"
+                  >
+                    {loading ? (
+                      <RefreshCcw className="animate-spin" />
+                    ) : (
+                      "Publish to Home Page"
+                    )}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* TAB CONTENT - MANUAL CERT MINTING */}
           {activeTab === "manual_gen" && (
             <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
               <div
                 className={`p-8 lg:p-12 rounded-[2.5rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
               >
-                <div className="flex items-center gap-4 mb-10">
-                  <div className="p-4 bg-blue-600 text-white rounded-2xl shadow-lg">
-                    <Award size={28} />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black italic uppercase tracking-tighter text-blue-600">
-                      Manual Certificate Minting
-                    </h3>
-                  </div>
-                </div>
+                <h3 className="text-2xl font-black italic uppercase text-blue-600 mb-10 flex items-center gap-4">
+                  <PlusCircle size={28} /> Manual Minting Protocol
+                </h3>
                 <form
                   onSubmit={handleManualCertGen}
-                  className="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8"
+                  className="grid grid-cols-1 md:grid-cols-2 gap-6"
                 >
                   <input
                     required
@@ -528,7 +573,7 @@ const AdminDashboard = () => {
                   <input
                     required
                     className="admin-input"
-                    placeholder="Awarded Course"
+                    placeholder="Course"
                     value={manualCert.course}
                     onChange={(e) =>
                       setManualCert({ ...manualCert, course: e.target.value })
@@ -537,7 +582,7 @@ const AdminDashboard = () => {
                   <input
                     required
                     className="admin-input"
-                    placeholder="WhatsApp Number"
+                    placeholder="WhatsApp"
                     value={manualCert.phone}
                     onChange={(e) =>
                       setManualCert({ ...manualCert, phone: e.target.value })
@@ -547,7 +592,7 @@ const AdminDashboard = () => {
                     required
                     type="email"
                     className="admin-input"
-                    placeholder="Email Address"
+                    placeholder="Email"
                     value={manualCert.email}
                     onChange={(e) =>
                       setManualCert({ ...manualCert, email: e.target.value })
@@ -562,9 +607,6 @@ const AdminDashboard = () => {
                   >
                     <option value="Distinction">Distinction</option>
                     <option value="Merit">Merit</option>
-                    <option value="First Class Honors">
-                      First Class Honors
-                    </option>
                   </select>
                   <button
                     disabled={loading}
@@ -573,9 +615,7 @@ const AdminDashboard = () => {
                     {loading ? (
                       <RefreshCcw className="animate-spin" />
                     ) : (
-                      <>
-                        <QrCode size={20} /> Mint Certificate
-                      </>
+                      "Mint & Send Certificate"
                     )}
                   </button>
                 </form>
@@ -583,85 +623,29 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {activeTab === "news_manager" && (
-            <div className="max-w-4xl mx-auto animate-in fade-in duration-700">
-              <div
-                className={`p-8 lg:p-12 rounded-[3rem] border ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
-              >
-                <div className="flex items-center gap-4 mb-10">
-                  <div className="p-4 bg-blue-600 text-white rounded-2xl shadow-lg">
-                    <Send size={28} />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-black italic uppercase tracking-tighter">
-                      Broadcast News Feed
-                    </h3>
-                    <p className="text-[10px] font-black uppercase tracking-widest opacity-40">
-                      Tura labarai zuwa Home Page
-                    </p>
-                  </div>
-                </div>
-
-                <form onSubmit={handlePublishNews} className="space-y-6">
-                  <input
-                    required
-                    className="admin-input"
-                    placeholder="News Title (e.g. 2026 Admission Open)"
-                    value={newsData.title}
-                    onChange={(e) =>
-                      setNewsData({ ...newsData, title: e.target.value })
-                    }
-                  />
-                  <div className="grid grid-cols-2 gap-6">
-                    <select
-                      className="admin-input"
-                      value={newsData.category}
-                      onChange={(e) =>
-                        setNewsData({ ...newsData, category: e.target.value })
-                      }
-                    >
-                      <option value="General">General News</option>
-                      <option value="Admission">Admission Update</option>
-                      <option value="Event">Academic Event</option>
-                      <option value="Urgent">Urgent Notice</option>
-                    </select>
-                    <input
-                      className="admin-input"
-                      placeholder="Image URL (Unsplash Link)"
-                      value={newsData.image}
-                      onChange={(e) =>
-                        setNewsData({ ...newsData, image: e.target.value })
-                      }
-                    />
-                  </div>
-                  <textarea
-                    required
-                    className="admin-input min-h-[200px] pt-5"
-                    placeholder="Write your content here..."
-                    value={newsData.content}
-                    onChange={(e) =>
-                      setNewsData({ ...newsData, content: e.target.value })
-                    }
-                  ></textarea>
-
-                  <button
-                    disabled={loading}
-                    className="w-full py-6 bg-blue-600 text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-xs shadow-2xl hover:bg-slate-900 transition-all flex items-center justify-center gap-4"
-                  >
-                    {loading ? (
-                      <RefreshCcw className="animate-spin" />
-                    ) : (
-                      <>
-                        <Send size={20} /> Publish to Home Page
-                      </>
-                    )}
-                  </button>
-                </form>
+          {/* OTHER TABS - OVERVIEW, ADMISSIONS, SURVEILLANCE, HISTORY */}
+          {activeTab === "overview" && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
+              <div className="stat-card">
+                <Activity className="text-blue-600 mb-6" size={32} />
+                <h4 className="metric-label">System Admissions</h4>
+                <p className="text-6xl font-black">{students.length}</p>
+              </div>
+              <div className="stat-card">
+                <CheckCircle className="text-emerald-500 mb-6" size={32} />
+                <h4 className="metric-label">Revenue Sources</h4>
+                <p className="text-6xl font-black">{formPaidCount}</p>
+              </div>
+              <div className="stat-card">
+                <Fingerprint className="text-purple-500 mb-6" size={32} />
+                <h4 className="metric-label">Security IDs Active</h4>
+                <p className="text-6xl font-black">
+                  {students.filter((s) => s.studentId).length}
+                </p>
               </div>
             </div>
           )}
 
-          {/* ADMISSION FLOW TAB */}
           {activeTab === "admissions" && (
             <div
               className={`rounded-[3rem] border overflow-x-auto ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
@@ -669,7 +653,7 @@ const AdminDashboard = () => {
               <table className="w-full text-left min-w-[800px]">
                 <thead className="bg-slate-500/5 text-[11px] font-black uppercase opacity-60">
                   <tr>
-                    <th className="p-8">Student Identity</th>
+                    <th className="p-8">Identity</th>
                     <th className="p-8">Clearance</th>
                     <th className="p-8">Credentialing</th>
                     <th className="p-8 text-center">Actions</th>
@@ -715,7 +699,7 @@ const AdminDashboard = () => {
                             onClick={() => handleAutomaticIDDispatch(s)}
                             className="px-6 py-3 bg-blue-600 text-white rounded-xl text-[10px] font-black uppercase"
                           >
-                            Verify & Dispatch
+                            Dispatch ID
                           </button>
                         )}
                       </td>
@@ -745,122 +729,6 @@ const AdminDashboard = () => {
               </table>
             </div>
           )}
-
-          {/* CHAT SURVEILLANCE TAB */}
-          {activeTab === "surveillance" && (
-            <div className="flex flex-col lg:flex-row gap-8 h-[75vh]">
-              <div
-                className={`w-full lg:w-1/3 rounded-[2.5rem] border overflow-hidden flex flex-col ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-xl"}`}
-              >
-                <div className="p-6 border-b border-slate-800 font-black text-[10px] uppercase opacity-50">
-                  Active Student Threads
-                </div>
-                <div className="overflow-y-auto flex-1">
-                  {chats.map((c) => (
-                    <div
-                      key={c.id}
-                      onClick={() => setSelectedChat(c)}
-                      className={`p-6 border-b border-slate-800 cursor-pointer transition-all ${selectedChat?.studentId === c.studentId ? "bg-blue-600 text-white" : "hover:bg-blue-500/10"}`}
-                    >
-                      <p className="font-black text-sm uppercase">{c.sender}</p>
-                      <p className="text-[10px] opacity-60 truncate">
-                        {c.text}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div
-                className={`flex-1 rounded-[2.5rem] border flex flex-col overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
-              >
-                {selectedChat ? (
-                  <div className="flex flex-col h-full">
-                    <div className="p-8 border-b border-slate-800 flex justify-between items-center">
-                      <h3 className="font-black italic uppercase text-blue-600">
-                        Intel: {selectedChat.sender}
-                      </h3>
-                      <ShieldAlert className="text-red-500" />
-                    </div>
-                    <div className="flex-1 p-8 overflow-y-auto space-y-4">
-                      {messages.map((m) => (
-                        <div
-                          key={m.id}
-                          className={`max-w-[75%] p-4 rounded-3xl ${m.senderRole === "supervisor" ? "bg-slate-800 text-white self-start" : "bg-blue-600 text-white self-end"}`}
-                        >
-                          <p className="text-[10px] font-black uppercase mb-1 opacity-50">
-                            {m.senderRole}
-                          </p>
-                          <p className="text-sm font-bold">{m.text}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col items-center justify-center opacity-20">
-                    <Eye size={60} />
-                    <p className="font-black text-[10px] uppercase mt-4 tracking-widest">
-                      Select Thread to Audit
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* SYSTEM LOGS TAB */}
-          {activeTab === "history" && (
-            <div
-              className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
-            >
-              <table className="w-full text-left">
-                <thead className="bg-slate-500/5 text-[11px] font-black uppercase opacity-60">
-                  <tr>
-                    <th className="p-8">Audit Time</th>
-                    <th className="p-8">Protocol</th>
-                    <th className="p-8">Operational Data</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800/10">
-                  {historyLogs.map((log) => (
-                    <tr key={log.id} className="text-xs font-bold">
-                      <td className="p-8 opacity-40">
-                        {log.timestamp?.toDate().toLocaleString()}
-                      </td>
-                      <td className="p-8">
-                        <span className="px-3 py-1 bg-blue-600/10 text-blue-600 rounded-lg uppercase text-[10px]">
-                          {log.action}
-                        </span>
-                      </td>
-                      <td className="p-8 italic opacity-70">{log.details}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          {/* OVERVIEW TAB */}
-          {activeTab === "overview" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-              <div className="stat-card">
-                <Activity className="text-blue-600 mb-6" size={32} />
-                <h4 className="metric-label">System Admissions</h4>
-                <p className="text-6xl font-black">{students.length}</p>
-              </div>
-              <div className="stat-card">
-                <CheckCircle className="text-emerald-500 mb-6" size={32} />
-                <h4 className="metric-label">Revenue Sources</h4>
-                <p className="text-6xl font-black">{formPaidCount}</p>
-              </div>
-              <div className="stat-card">
-                <Fingerprint className="text-purple-500 mb-6" size={32} />
-                <h4 className="metric-label">Security IDs Active</h4>
-                <p className="text-6xl font-black">
-                  {students.filter((s) => s.studentId).length}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
       </main>
 
@@ -868,7 +736,7 @@ const AdminDashboard = () => {
         .admin-input { width: 100%; padding: 1.25rem; background: ${darkMode ? "#0f172a" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.25rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
         .admin-input:focus { border-color: #2563eb; }
         .metric-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.15em; }
-        .stat-card { padding: 50px; border-radius: 50px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 25px 50px -12px rgba(0,0,0,0.05); }
+        .stat-card { padding: 50px; border-radius: 50px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); shadow-xl; }
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
       `}</style>
