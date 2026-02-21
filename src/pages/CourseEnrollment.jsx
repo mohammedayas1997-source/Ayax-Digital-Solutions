@@ -178,7 +178,7 @@ const CourseEnrollment = () => {
     emailjs
       .send(
         "service_2wusktt",
-        "template_52e21uo",
+        "template_lfz7bfj",
         templateParams,
         "Zq65aNb8G1g9F7XkY", // IMPORTANT: Replace with your actual Public Key from EmailJS Account tab
       )

@@ -109,6 +109,22 @@ const AdminDashboard = () => {
       },
     );
 
+    // Add this state
+    const [autoReplyText, setAutoReplyText] = useState("");
+
+    // Add this function to save the setting to Firestore
+    const updateAutoReplySettings = async () => {
+      await setDoc(
+        doc(db, "system_settings", "chat_config"),
+        {
+          autoReplyMessage: autoReplyText,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+      alert("Auto-Reply Updated!");
+    };
+
     const unsubChats = onSnapshot(
       query(collection(db, "private_chats"), orderBy("createdAt", "desc")),
       (snap) => {
@@ -634,7 +650,25 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
-
+          // Add this UI inside a new Tab or News Manager
+          <div className="p-8 bg-blue-600/5 rounded-[2rem] border border-blue-600/20 mt-10">
+            <h4 className="text-sm font-black uppercase mb-4 text-blue-600">
+              Smart Auto-Reply Configuration
+            </h4>
+            <textarea
+              className="admin-input h-32 mb-4"
+              placeholder="Write the message students get instantly..."
+              value={autoReplyText}
+              onChange={(e) => setAutoReplyText(e.target.value)}
+            ></textarea>
+            <button
+              onClick={updateAutoReplySettings}
+              className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px]"
+            >
+              Save Bot Logic
+            </button>
+          </div>
+          ;
           {activeTab === "gallery_manager" && (
             <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700">
               <div
@@ -729,7 +763,6 @@ const AdminDashboard = () => {
               </div>
             </div>
           )}
-
           {activeTab === "admissions" && (
             <div
               className={`rounded-[3rem] border overflow-x-auto ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
@@ -813,7 +846,6 @@ const AdminDashboard = () => {
               </table>
             </div>
           )}
-
           {activeTab === "overview" && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
               <div className="stat-card">
