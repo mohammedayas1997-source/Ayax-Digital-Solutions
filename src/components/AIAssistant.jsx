@@ -20,8 +20,9 @@ const AIAssistant = () => {
   const [chatSessionId, setChatSessionId] = useState(null);
   const scrollRef = useRef();
 
-  // Initialize Gemini Engine
-  const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
+  // --- DIRECT API KEY INTEGRATION (UMURNI) ---
+  const API_KEY = "AIzaSyA-p9wWpBXRcdfjlqlkRbvZgm0BggNWirI";
+  const genAI = new GoogleGenerativeAI(API_KEY);
 
   const AYAX_CORE = {
     name: "Ayax",
@@ -85,7 +86,6 @@ const AIAssistant = () => {
     const userText = input;
     const userEmail = auth.currentUser?.email || "Guest_User";
 
-    // Immediate local update for user message
     setInput("");
     setIsTyping(true);
 
@@ -103,22 +103,22 @@ const AIAssistant = () => {
       const model = genAI.getGenerativeModel({
         model: "gemini-1.5-flash",
         systemInstruction: `
-          You are 'Ayax', the official Global AI Ambassador for AYAX Digital Solutions Academy.
-          
-          IDENTITY:
-          - CEO: ${AYAX_CORE.ceo}.
-          - Tone: Professional, high authority, technical precision.
-          
-          LANGUAGES:
-          - You are a master of Hausa, English, and French. 
-          - Always respond in the language used by the user. If they use Hausa, use pure Hausa.
-          
-          KNOWLEDGE:
-          - Expert in ${AYAX_CORE.expertise}.
-          
-          INSTANT RESPONSE:
-          - Provide answers immediately and concisely. Use streaming to show thoughts as they happen.
-        `,
+            You are 'Ayax', the official Global AI Ambassador for AYAX Digital Solutions Academy.
+            
+            IDENTITY:
+            - CEO: ${AYAX_CORE.ceo}.
+            - Tone: Professional, high authority, technical precision.
+            
+            LANGUAGES:
+            - You are a master of Hausa, English, and French. 
+            - Always respond in the language used by the user. If they use Hausa, use pure Hausa.
+            
+            KNOWLEDGE:
+            - Expert in ${AYAX_CORE.expertise}.
+            
+            INSTANT RESPONSE:
+            - Provide answers immediately and concisely. Use streaming to show thoughts as they happen.
+          `,
       });
 
       // 3. Start Content Stream
