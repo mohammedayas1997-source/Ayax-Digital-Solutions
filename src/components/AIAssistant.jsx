@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Bot, Send, X, Sparkles, Globe, ShieldCheck } from "lucide-react";
-
+import { GoogleGenerativeAI } from "@google/generative-ai";
 const AIAssistant = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState([
@@ -13,6 +13,7 @@ const AIAssistant = () => {
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const scrollRef = useRef();
+  const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
 
   // THE GLOBAL KNOWLEDGE BASE
   const AYAX_CORE = {
@@ -37,6 +38,60 @@ const AIAssistant = () => {
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
     setIsTyping(true);
+
+    const handleSendMessage = async (e) => {
+      e.preventDefault();
+      if (!input.trim()) return;
+
+      const userMsg = { role: "user", content: input };
+      setMessages((prev) => [...prev, userMsg]);
+      setInput("");
+      setIsTyping(true);
+
+      try {
+        const model = genAI.getGenerativeModel({
+          model: "gemini-1.5-flash",
+          systemInstruction: `
+        You are 'Ayax', the official Global AI Ambassador for AYAX Digital Solutions Academy.
+        
+        IDENTITY:
+        - Your creator and the CEO of the company is Abdulrahman Mohammed Ayas.
+        - You speak with high professional authority, technical precision, and a helpful tone.
+        
+        KNOWLEDGE DOMAIN:
+        - You are an expert in Web Development, Cybersecurity, AI Automation, and Digital Infrastructure.
+        - You promote AYAX Academy as the world leader in technical training.
+        
+        BEHAVIOR:
+        - If someone asks about the owner, speak about Abdulrahman Mohammed Ayas's vision for global digital transformation.
+        - You can answer in English, Hausa, or any language the user uses.
+        - Keep responses concise but highly informative.
+      `,
+        });
+
+        const result = await model.generateContent(input);
+        const response = await result.response;
+        const text = response.text();
+
+        setMessages((prev) => [...prev, { role: "assistant", content: text }]);
+      } catch (error) {
+        console.error("Gemini Error:", error);
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: "assistant",
+            content:
+              "Ayax global relay is experiencing heavy traffic. Please hold on a moment.",
+          },
+        ]);
+      } finally {
+        setIsTyping(false);
+        setTimeout(
+          () => scrollRef.current?.scrollIntoView({ behavior: "smooth" }),
+          100,
+        );
+      }
+    };
 
     // AI BRAIN LOGIC
     setTimeout(() => {
