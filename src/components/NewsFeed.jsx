@@ -42,6 +42,30 @@ const NewsFeed = () => {
     return () => unsubscribe();
   }, []);
 
+  // --- REAL-LIFE SHARE PROTOCOL ---
+  const handleShare = async (article) => {
+    const shareData = {
+      title: article.title,
+      text: `Check out this update from Ayax Academy: ${article.title}`,
+      url: window.location.href, // Sharing the current page URL
+    };
+
+    try {
+      if (navigator.share) {
+        // Triggers native mobile share menu
+        await navigator.share(shareData);
+      } else {
+        // Fallback for desktop: Copy to clipboard
+        await navigator.clipboard.writeText(
+          `${shareData.text} ${shareData.url}`,
+        );
+        alert("Link copied to clipboard!");
+      }
+    } catch (err) {
+      console.log("Sharing failed", err);
+    }
+  };
+
   if (loading)
     return (
       <div className="flex justify-center p-20">
@@ -191,7 +215,10 @@ const NewsFeed = () => {
                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
                   © 2026 Ayax Digital Solutions Academy
                 </p>
-                <button className="flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all">
+                <button
+                  onClick={() => handleShare(selectedArticle)}
+                  className="flex items-center gap-2 px-6 py-3 bg-slate-100 text-slate-900 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all active:scale-95 transition-transform"
+                >
                   <Share2 size={14} /> Share News
                 </button>
               </div>
