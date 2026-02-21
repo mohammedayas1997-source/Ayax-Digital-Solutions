@@ -43,6 +43,7 @@ import AdminCourseList from "./pages/AdminCourseList";
 import AdminCourseDashboard from "./pages/AdminCourseDashboard";
 import AdminStudentsList from "./pages/AdminStudentsList";
 import SupervisorDashboard from "./pages/SupervisorDashboard";
+import AIAssistant from "./components/AIAssistant";
 
 const midtermQuestions = [
   {
@@ -62,6 +63,7 @@ function App() {
       <div className="App">
         <Navbar />
         <Routes>
+          <AIAssistant />
           {/* --- PUBLIC ACCESS PROTOCOLS --- */}
           <Route path="/" element={<Home />} />
           <Route path="/about" element={<AboutUs />} />
