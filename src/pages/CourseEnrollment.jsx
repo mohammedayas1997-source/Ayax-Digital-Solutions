@@ -229,38 +229,52 @@ const CourseEnrollment = () => {
     handler.openIframe();
   };
   const processFinalSubmission = async (formData, refId) => {
-    // 1. EXECUTIVE ACTION: Kill the loading state immediately to prevent the hang
+    // 1. STOP THE LOADER & SHOW SUCCESS UI
+    // This immediately stops the "Securing Enrollment Data" spinner
     setLoading(false);
     if (typeof setSubmitting === "function") setSubmitting(false);
 
-    // 2. IMMEDIATE RECEIPT PREPARATION
-    // Preparing receipt locally ensures instant availability for the student
-    const receiptInfo = {
+    // Custom state to show a "Success" message/modal on the screen
+    setSuccessMessage("Application Submitted Successfully!");
+
+    // 2. PREPARE DATA FOR DOWNLOADS
+    const studentData = {
       name: formData.get("name") || "Ayax Student",
-      ref: refId,
-      amount: "NGN 100", // Fixed to your updated fee requirement
+      email: formData.get("email"),
+      phone: formData.get("phone"),
+      course: selectedCourse,
+      reference: refId,
+      amount: "NGN 100",
       date: new Date().toLocaleDateString(),
+      // Capture all fields for the filled form download
+      allFields: Object.fromEntries(formData),
     };
 
-    // 3. TRIGGER INSTANT DOWNLOAD & BYPASS
+    // 3. TRIGGER DUAL DOWNLOADS IMMEDIATELY
     try {
-      // Generate and download the PDF on the client side instantly
-      downloadPDFReceipt(receiptInfo);
+      // TRIGGER 1: The Payment Receipt
+      downloadPDFReceipt({
+        name: studentData.name,
+        ref: studentData.reference,
+        amount: studentData.amount,
+        date: studentData.date,
+      });
+
+      // TRIGGER 2: The Filled Application Form
+      // This allows the student to keep a copy of their submitted data
+      downloadFilledForm(studentData);
+
+      alert("Success! Your Receipt and Application Form are downloading.");
     } catch (err) {
-      console.error("Receipt generation failed, proceeding to redirect", err);
+      console.error("Download failed:", err);
     }
 
-    // Use window.location.href for a clean state reset to the dashboard
-    // This physically breaks the "Securing Data" loop
-    window.location.href = "/dashboard?action=download_success";
-
     // 4. SILENT BACKGROUND PERSISTENCE
-    // This syncs with the Admin Dashboard while the student is already redirected
+    // Syncing with Admin Dashboard while student stays on the success screen
     const runBackgroundPersistence = async () => {
       try {
         let passportURL = "";
 
-        // Background upload of the passport image
         if (passportImage) {
           const passportRef = ref(
             storage,
@@ -270,48 +284,32 @@ const CourseEnrollment = () => {
           passportURL = await getDownloadURL(pSnapshot.ref);
         }
 
-        // Sync data to 'course_applications' for Admin Visibility
+        // Final Data Entry for Admin Visibility
         await addDoc(collection(db, "course_applications"), {
-          studentName: formData.get("name"),
-          email: formData.get("email"),
-          phone: formData.get("phone"),
+          ...studentData.allFields,
           course: selectedCourse,
           country: selectedCountry,
           passportUrl: passportURL,
           paymentMethod: "Paystack",
           education: educationList,
-          address: formData.get("address"),
-          currentState: formData.get("currentState"),
-          currentLGA: formData.get("currentLGA"),
-          stateOfOrigin: formData.get("stateOfOrigin"),
-          lgaOfOrigin: formData.get("lgaOfOrigin"),
           appliedAt: serverTimestamp(),
           paymentStatus: "Verified",
           transactionRef: refId,
         });
 
-        // Sync data to 'enrollments' for Student Dashboard access
-        await addDoc(collection(db, "enrollments"), {
-          email: formData.get("email"),
-          reference: refId,
-          status: "Verified",
-          timestamp: serverTimestamp(),
-        });
+        console.log("Admin Dashboard Updated Successfully.");
 
-        console.log("Global Sync: Data locked. Admin Dashboard updated.");
-
-        // Background Email Automation
         sendWelcomeEmail({
-          studentName: formData.get("name"),
-          email: formData.get("email"),
-          course: selectedCourse,
+          studentName: studentData.name,
+          email: studentData.email,
+          course: studentData.course,
         });
       } catch (err) {
-        console.error("Critical Background Failure:", err);
+        console.error("Background Failure:", err);
       }
     };
 
-    // Execute the sync in the "shadow"
+    // Fire persistence in the background
     runBackgroundPersistence();
   };
   if (!portalOpen) {
