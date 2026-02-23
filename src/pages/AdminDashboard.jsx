@@ -75,8 +75,7 @@ const AdminDashboard = () => {
   const [galleryCategory, setGalleryCategory] = useState("Workshop");
   const [galleryItems, setGalleryItems] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [selectedStudent, setSelectedStudent] = useState(null); // Full Form View State
-
+  const [selectedStudent, setSelectedStudent] = useState(null);
   const [autoReplyText, setAutoReplyText] = useState("");
 
   const [newsData, setNewsData] = useState({
@@ -100,14 +99,15 @@ const AdminDashboard = () => {
     phone: "2348000000000",
   };
 
-  // 1. REAL-TIME DATA ENGINE
+  // 1. REAL-TIME DATA ENGINE (Multiple Streams)
   useEffect(() => {
-    const unsubStudents = onSnapshot(
+    const qApplications = query(
       collection(db, "course_applications"),
-      (snap) => {
-        setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-      },
+      orderBy("appliedAt", "desc"),
     );
+    const unsubStudents = onSnapshot(qApplications, (snap) => {
+      setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    });
 
     const unsubGallery = onSnapshot(
       query(collection(db, "gallery"), orderBy("createdAt", "desc")),
@@ -169,20 +169,26 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  // SEARCH & FILTER LOGIC
+  // SEARCH & FILTER LOGIC (Improved for Undefined Statuses)
   const filteredStudents = students.filter((s) => {
-    const matchesSearch =
-      s.studentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.course?.toLowerCase().includes(searchTerm.toLowerCase());
+    const name = s.studentName || "";
+    const email = s.email || "";
+    const course = s.course || "";
 
+    const matchesSearch =
+      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      course.toLowerCase().includes(searchTerm.toLowerCase());
+
+    const currentStatus = s.paymentStatus || "Verified";
     const matchesFilter =
-      filterStatus === "All" || s.paymentStatus === filterStatus;
+      filterStatus === "All" ||
+      currentStatus === filterStatus ||
+      (filterStatus === "Form_Paid" && currentStatus === "Verified");
 
     return matchesSearch && matchesFilter;
   });
 
-  // Admin Actions (Activity Logged)
   const logActivity = async (action, details) => {
     await addDoc(collection(db, "admin_logs"), {
       action,
@@ -206,13 +212,6 @@ const AdminDashboard = () => {
   };
 
   const handleAutomaticIDDispatch = async (student) => {
-    if (
-      student.paymentStatus !== "Form_Paid" &&
-      student.paymentStatus !== "Verified"
-    ) {
-      alert("ERROR: No payment proof found.");
-      return;
-    }
     setLoading(true);
     const generatedID = `AYX-2026-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
     try {
@@ -223,28 +222,13 @@ const AdminDashboard = () => {
       });
       await logActivity(
         "AUTO_ID_DISPATCH",
-        `ID ${generatedID} dispatched to ${student.studentName}`,
+        `ID ${generatedID} issued to ${student.studentName}`,
       );
       alert(`SUCCESS: ID ${generatedID} assigned.`);
     } catch (err) {
       alert("Dispatch failed.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const issueCertificate = async (student) => {
-    const certSerial = `AYX-CERT-${Date.now()}`;
-    try {
-      await updateDoc(doc(db, "course_applications", student.id), {
-        certStatus: "Issued",
-        certSerial: certSerial,
-        certDate: serverTimestamp(),
-      });
-      await logActivity("CERT_ISSUE", `Cert issued to ${student.studentName}`);
-      alert("Certificate Issued.");
-    } catch (err) {
-      alert("Error.");
     }
   };
 
@@ -421,8 +405,8 @@ const AdminDashboard = () => {
                     className="bg-transparent font-black text-[10px] uppercase p-3 outline-none"
                   >
                     <option value="All">All Applications</option>
-                    <option value="Verified">Verified Only</option>
-                    <option value="Form_Paid">Paid Only</option>
+                    <option value="Verified">Verified (₦100)</option>
+                    <option value="Form_Paid">Paid (Old ₦5k)</option>
                   </select>
                 </div>
               </div>
@@ -486,7 +470,7 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* THE STUDENT FORM MODAL */}
+          {/* THE STUDENT FORM MODAL (Full View Integration) */}
           {selectedStudent && (
             <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 backdrop-blur-md bg-black/50">
               <div
@@ -498,7 +482,6 @@ const AdminDashboard = () => {
                 >
                   <X size={24} />
                 </button>
-
                 <div className="flex flex-col md:flex-row gap-10 mb-10 border-b pb-10 border-slate-500/10">
                   <img
                     src={selectedStudent.passportUrl}
@@ -521,7 +504,6 @@ const AdminDashboard = () => {
                     </div>
                   </div>
                 </div>
-
                 <div className="grid md:grid-cols-2 gap-10">
                   <div className="info-box space-y-4">
                     <h4 className="text-[10px] font-black uppercase opacity-40 tracking-widest flex items-center gap-2">
@@ -558,7 +540,6 @@ const AdminDashboard = () => {
                     ))}
                   </div>
                 </div>
-
                 <div className="mt-10 p-8 bg-blue-600/5 rounded-3xl border-2 border-dashed border-blue-600/20 flex flex-col md:flex-row justify-between items-center gap-6">
                   <div>
                     <p className="text-[10px] font-black opacity-40 uppercase tracking-widest">
@@ -581,7 +562,6 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* ... OTHER TABS (manual_gen, surveillance, history, etc.) REMAINS UNCHANGED ... */}
           {activeTab === "history" && (
             <div className="space-y-4">
               {historyLogs.map((log) => (
@@ -599,6 +579,8 @@ const AdminDashboard = () => {
               ))}
             </div>
           )}
+
+          {/* [Other original tabs (manual_gen, gallery_manager, etc.) go here...] */}
         </div>
       </main>
 
