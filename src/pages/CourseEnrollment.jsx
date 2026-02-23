@@ -168,8 +168,12 @@ const CourseEnrollment = () => {
     const handler = window.PaystackPop.setup({
       key: PAYSTACK_PUBLIC_KEY,
       email: formData.get("email"),
-      amount: currencyData[selectedCountry].fee * 100,
+      amount: currencyData[selectedCountry].fee * 100, // 100 * 100 = 10,000 kobo (₦100)
       currency: currencyData[selectedCountry].code,
+
+      // --- HAKAN ZAI KAI KA CIKIN OPAY ---
+      channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
+
       callback: (response) => {
         setLoading(true);
         processFinalSubmission(formData, response.reference);
