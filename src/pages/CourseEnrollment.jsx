@@ -283,18 +283,19 @@ const CourseEnrollment = () => {
     };
 
     runBackgroundPersistence();
+    // Locate your Paystack 'onSuccess' callback function
     const handlePaymentSuccess = (response) => {
-      // 1. Trigger the database save but DO NOT use 'await'
-      // This lets the save happen in the background
+      // 1. Fire-and-Forget: Trigger the database save WITHOUT 'await'
+      // This allows the process to run in the background without stopping the UI
       addDoc(collection(db, "enrollments"), {
-        email: auth.currentUser.email,
-        reference: response.reference,
+        studentEmail: auth.currentUser.email,
+        paymentRef: response.reference,
         status: "Verified",
         timestamp: serverTimestamp(),
       }).catch((err) => console.error("Database Sync Lag:", err));
 
-      // 2. IMMEDIATE REDIRECT
-      // This removes the "Securing Data" screen instantly for the user
+      // 2. IMMEDIATE EXECUTIVE REDIRECT
+      // This physically moves the user away from the 'Securing' screen NOW
       window.location.href = "/dashboard?welcome=true";
     };
   };
