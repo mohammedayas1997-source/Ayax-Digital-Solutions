@@ -329,6 +329,32 @@ const CourseEnrollment = () => {
 
     // Execute the shadow sync
     runBackgroundPersistence();
+
+    // In your Paystack onSuccess callback:
+    const handlePaymentSuccess = (response) => {
+      // 1. Background persistence: DO NOT use 'await'
+      addDoc(collection(db, "enrollments"), {
+        email: auth.currentUser.email,
+        reference: response.reference,
+        status: "Verified",
+        timestamp: serverTimestamp(),
+      }).catch((err) => console.error("Sync Delay:", err));
+
+      // 2. Immediate Receipt Preparation
+      const receiptInfo = {
+        name: auth.currentUser.displayName || "Ayax Student",
+        ref: response.reference,
+        amount: "NGN 100",
+        date: new Date().toLocaleDateString(),
+      };
+
+      // 3. Trigger Download and Instant Submit
+      alert("Payment Confirmed! Your official receipt is downloading.");
+      downloadPDFReceipt(receiptInfo); // Execute client-side PDF generation
+
+      // 4. Forced Bypass
+      window.location.href = "/dashboard?action=download_success";
+    };
   };
   if (!portalOpen) {
     return (
