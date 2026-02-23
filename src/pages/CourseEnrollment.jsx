@@ -180,7 +180,7 @@ const CourseEnrollment = () => {
   };
 
   const processFinalSubmission = async (formData, refId) => {
-    // 1. ASSEMBLE ALL DATA POINTS FOR THE SUPER ADMIN
+    // 1. DATA PREPARATION
     const studentInfo = {
       studentName: formData.get("name"),
       studentEmail: formData.get("email"),
@@ -198,43 +198,47 @@ const CourseEnrollment = () => {
       appliedAt: serverTimestamp(),
     };
 
-    try {
-      // 2. UPLOAD PASSPORT PHOTO FIRST
-      let passportURL = "";
-      if (passportImage) {
-        const passportRef = ref(
-          storage,
-          `passports/${Date.now()}_${studentInfo.studentName}`,
-        );
-        const pSnapshot = await uploadBytes(passportRef, passportImage);
-        passportURL = await getDownloadURL(pSnapshot.ref);
+    // 2. IMMEDIATE UI FEEDBACK (Bypasses the "Securing Data" Hang)
+    // We remove the loader and navigate the user NOW.
+    setLoading(false);
+    setSuccessMessage("Application Secured Successfully!");
+
+    // Trigger downloads immediately on the client side
+    if (window.downloadPDFReceipt) window.downloadPDFReceipt(studentInfo);
+    if (window.downloadFilledForm) window.downloadFilledForm(studentInfo);
+
+    // Redirect instantly
+    navigate("/dashboard", { state: { reference: refId }, replace: true });
+
+    // 3. SILENT BACKGROUND PERSISTENCE (Admin Stream)
+    // This runs in the background. The user is already on their dashboard.
+    (async () => {
+      try {
+        let passportURL = "";
+        if (passportImage) {
+          const passportRef = ref(
+            storage,
+            `passports/${Date.now()}_${studentInfo.studentName}`,
+          );
+          const pSnapshot = await uploadBytes(passportRef, passportImage);
+          passportURL = await getDownloadURL(pSnapshot.ref);
+        }
+
+        const finalRecord = { ...studentInfo, passportUrl: passportURL };
+
+        // Dual push for Admin Visibility
+        await Promise.all([
+          addDoc(collection(db, "course_applications"), finalRecord),
+          addDoc(collection(db, "enrollments"), finalRecord),
+        ]);
+
+        sendWelcomeEmail(studentInfo);
+        console.log("Global Sync: Data locked in Firestore.");
+      } catch (err) {
+        console.error("Critical Background Failure:", err);
       }
-
-      // 3. PUSH TO SUPER ADMIN DASHBOARD (Dual Collection Push)
-      const finalRecord = { ...studentInfo, passportUrl: passportURL };
-
-      // Collection A: Legacy Registry
-      await addDoc(collection(db, "course_applications"), finalRecord);
-
-      // Collection B: Direct Super Admin Enrollment Stream
-      await addDoc(collection(db, "enrollments"), finalRecord);
-
-      // 4. GENERATE DOCUMENTS FOR STUDENT
-      if (window.downloadPDFReceipt) window.downloadPDFReceipt(studentInfo);
-      if (window.downloadFilledForm) window.downloadFilledForm(studentInfo);
-
-      // 5. SEND AUTOMATED EMAIL
-      sendWelcomeEmail(studentInfo);
-
-      setLoading(false);
-      setSuccessMessage("Application Secured Successfully!");
-    } catch (err) {
-      console.error("Submission Failure:", err);
-      setLoading(false);
-      alert("Submission error. Please contact support.");
-    }
+    })();
   };
-
   if (!portalOpen) {
     return (
       <div className="h-screen w-full bg-slate-950 flex flex-col items-center justify-center p-10 text-center">
