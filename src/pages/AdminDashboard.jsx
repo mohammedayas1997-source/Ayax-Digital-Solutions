@@ -118,6 +118,32 @@ const AdminDashboard = () => {
       },
     );
 
+    useEffect(() => {
+      // Mu yi amfani da collection kawai ba tare da orderBy ba domin gudun kuskure
+      const qStudents = collection(db, "course_applications");
+
+      const unsubStudents = onSnapshot(
+        qStudents,
+        (snap) => {
+          if (!snap.empty) {
+            const data = snap.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            }));
+            setStudents(data);
+            console.log("SUPER ADMIN CHECK - Data Count:", data.length);
+          } else {
+            console.log("SUPER ADMIN CHECK - No data in course_applications");
+          }
+        },
+        (error) => {
+          console.error("FIRESTORE ERROR:", error.message);
+        },
+      );
+
+      return () => unsubStudents();
+    }, []);
+
     const unsubChats = onSnapshot(
       query(collection(db, "private_chats"), orderBy("createdAt", "desc")),
       (snap) => {
