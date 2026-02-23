@@ -171,20 +171,20 @@ const AdminDashboard = () => {
 
   // SEARCH & FILTER LOGIC (Improved for Undefined Statuses)
   const filteredStudents = students.filter((s) => {
-    const name = s.studentName || "";
-    const email = s.email || "";
-    const course = s.course || "";
+    // Tabbatar muna duba kowane kalar suna da aka tura
+    const name = (s.studentName || s.name || "").toLowerCase();
+    const email = (s.email || "").toLowerCase();
+    const course = (s.course || "").toLowerCase();
+    const search = searchTerm.toLowerCase();
 
     const matchesSearch =
-      name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      course.toLowerCase().includes(searchTerm.toLowerCase());
+      name.includes(search) ||
+      email.includes(search) ||
+      course.includes(search);
 
-    const currentStatus = s.paymentStatus || "Verified";
-    const matchesFilter =
-      filterStatus === "All" ||
-      currentStatus === filterStatus ||
-      (filterStatus === "Form_Paid" && currentStatus === "Verified");
+    // Tabbatar filter yana gano sabon Verified da tsohon Form_Paid
+    const status = s.paymentStatus || "Verified";
+    const matchesFilter = filterStatus === "All" || status === filterStatus;
 
     return matchesSearch && matchesFilter;
   });
@@ -430,12 +430,20 @@ const AdminDashboard = () => {
                         className="hover:bg-blue-500/5 transition-colors group"
                       >
                         <td className="p-8 flex items-center gap-4">
+                          {/* Duba dukkan sunayen hoto (passportUrl ko passportURL) */}
                           <img
-                            src={s.passportUrl}
+                            src={
+                              s.passportUrl ||
+                              s.passportURL ||
+                              "https://via.placeholder.com/150"
+                            }
                             className="w-12 h-12 rounded-xl object-cover ring-2 ring-blue-600/20"
                           />
                           <div>
-                            <p className="text-sm uppercase">{s.studentName}</p>
+                            {/* Duba dukkan sunayen dalibi (studentName ko name) */}
+                            <p className="text-sm uppercase">
+                              {s.studentName || s.name || "No Name"}
+                            </p>
                             <p className="text-[9px] text-blue-600">
                               {s.course}
                             </p>
