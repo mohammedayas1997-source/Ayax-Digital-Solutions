@@ -228,22 +228,26 @@ const CourseEnrollment = () => {
     });
     handler.openIframe();
   };
-
   const processFinalSubmission = async (formData, refId) => {
-    // 1. EXECUTIVE OVERRIDE: Redirect the student instantly.
-    // We do NOT use 'await' here because we want the UI to switch immediately.
-    navigate("/payment-success", {
-      state: { reference: refId },
-      replace: true,
-    });
+    // 1. EXECUTIVE UI FEEDBACK: Show Success State Immediately
+    // You can use a library like Swal (SweetAlert2) or a simple state-based Modal
+    setSubmitting(false); // Stop the loading spinner
+    setSuccessMessage("Enrollment Secured Successfully!");
 
-    // 2. BACKGROUND DATA ARCHITECTURE
-    // This function runs independently of the User Interface.
+    // 2. IMMEDIATE REDIRECT (Controlled Delay for User Satisfaction)
+    // We wait 1.5 seconds so the student can actually see the success message
+    setTimeout(() => {
+      navigate("/dashboard", {
+        state: { reference: refId, message: "Welcome to Ayax Academy" },
+        replace: true,
+      });
+    }, 1500);
+
+    // 3. BACKGROUND PERSISTENCE (Non-Blocking)
     const runBackgroundPersistence = async () => {
       try {
         let passportURL = "";
 
-        // Upload Passport to Firebase Storage if image exists
         if (passportImage) {
           const passportRef = ref(
             storage,
@@ -253,7 +257,6 @@ const CourseEnrollment = () => {
           passportURL = await getDownloadURL(pSnapshot.ref);
         }
 
-        // Finalize the Academic Enrollment in Firestore
         await addDoc(collection(db, "course_applications"), {
           studentName: formData.get("name"),
           email: formData.get("email"),
@@ -273,14 +276,12 @@ const CourseEnrollment = () => {
           transactionRef: refId,
         });
 
-        console.log("Database Synchronized: Enrollment Secured.");
+        console.log("Global Sync: Data locked in Firestore.");
       } catch (err) {
-        // Logic for Admin Surveillance: Log errors for manual recovery if necessary
-        console.error("Critical Background Sync Failure:", err);
+        console.error("Critical Background Failure:", err);
       }
     };
 
-    // Trigger the background process without 'await' to keep UI free
     runBackgroundPersistence();
   };
   if (!portalOpen) {
