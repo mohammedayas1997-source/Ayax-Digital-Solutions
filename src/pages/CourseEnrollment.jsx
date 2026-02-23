@@ -26,7 +26,7 @@ import {
 import emailjs from "@emailjs/browser";
 
 const currencyData = {
-  Nigeria: { code: "NGN", symbol: "₦", fee: 5000 },
+  Nigeria: { code: "NGN", symbol: "₦", fee: 100 },
   Algeria: { code: "DZD", symbol: "DA", fee: 455 },
   Angola: { code: "AOA", symbol: "Kz", fee: 2800 },
   Benin: { code: "XOF", symbol: "CFA", fee: 2050 },
@@ -334,7 +334,7 @@ const CourseEnrollment = () => {
       const receiptInfo = {
         name: auth.currentUser.displayName || "Ayax Student",
         ref: response.reference,
-        amount: "NGN 5,000",
+        amount: "NGN 100",
         date: new Date().toLocaleDateString(),
       };
 
