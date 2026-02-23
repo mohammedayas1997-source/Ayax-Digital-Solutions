@@ -139,7 +139,7 @@ const CourseEnrollment = () => {
 
   // --- REFINED SUBMISSION LOGIC ---
   const processFinalSubmission = async (formData, refId) => {
-    // 1. ASSEMBLE DATA IMMEDIATELY
+    // 1. ASSEMBLE COMPLETE DATA PACKET FOR ADMIN
     const studentInfo = {
       studentName: formData.get("name"),
       studentEmail: formData.get("email"),
@@ -153,12 +153,20 @@ const CourseEnrollment = () => {
       educationBackground: educationList,
       country: selectedCountry,
       transactionRef: refId,
-      amountPaid: `${currencyData[selectedCountry].symbol}${currencyData[selectedCountry].fee}`, // Fixed dynamic receipt data
+      amountPaid: `NGN ${currencyData[selectedCountry].fee}`, // Fixed dynamic receipt data
       paymentStatus: "Verified",
       appliedAt: serverTimestamp(),
     };
 
-    // 2. TRIGGER BACKGROUND SYNC (Hidden from User for Speed)
+    // 2. IMMEDIATE UI RELEASE (No Redirect to Dashboard)
+    setLoading(false);
+    setSuccessMessage(`Welcome to Ayax Academy, ${studentInfo.studentName}`);
+
+    // 3. GENERATE ACCURATE DOCUMENTS
+    if (downloadPDFReceipt) downloadPDFReceipt(studentInfo);
+    if (downloadFilledForm) downloadFilledForm(studentInfo);
+
+    // 4. ATOMIC BACKGROUND SYNC (Admin Visibility)
     (async () => {
       try {
         let passportURL = "";
@@ -173,28 +181,16 @@ const CourseEnrollment = () => {
 
         const finalRecord = { ...studentInfo, passportUrl: passportURL };
 
-        // DUAL COLLECTION PUSH FOR ADMIN INSTANT VISIBILITY
+        // DUAL PERSISTENCE: Ensures data is locked in both master collections
         await Promise.all([
           addDoc(collection(db, "course_applications"), finalRecord),
           addDoc(collection(db, "enrollments"), finalRecord),
         ]);
 
-        // Email Automation
-        const templateParams = {
-          fullName: studentInfo.studentName,
-          course: studentInfo.course,
-          email: studentInfo.studentEmail,
-          school_name: "AYAX Digital Solutions Academy",
-          submission_date: new Date().toLocaleDateString(),
-        };
-        emailjs.send(
-          "service_2wusktt",
-          "template_lfz7bfj",
-          templateParams,
-          "Zq65aNb8G1g9F7XkY",
-        );
+        sendWelcomeEmail(studentInfo);
+        console.log("Global Admin Sync: Success.");
       } catch (err) {
-        console.error("Critical Background Error:", err);
+        console.error("Critical Admin Sync Failure:", err);
       }
     })();
 
