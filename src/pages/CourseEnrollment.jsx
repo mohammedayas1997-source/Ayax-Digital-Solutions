@@ -229,64 +229,73 @@ const CourseEnrollment = () => {
     handler.openIframe();
   };
   const processFinalSubmission = async (formData, refId) => {
-    // 1. STOP THE LOADER & SHOW SUCCESS UI
-    // This immediately stops the "Securing Enrollment Data" spinner
+    // 1. EXECUTIVE ACTION: Kill the loading hang immediately
     setLoading(false);
     if (typeof setSubmitting === "function") setSubmitting(false);
 
-    // Custom state to show a "Success" message/modal on the screen
-    setSuccessMessage("Application Submitted Successfully!");
-
-    // 2. PREPARE DATA FOR DOWNLOADS
-    const studentData = {
+    // 2. DATA PREPARATION FOR DOWNLOADS
+    const studentInfo = {
       name: formData.get("name") || "Ayax Student",
       email: formData.get("email"),
       phone: formData.get("phone"),
       course: selectedCourse,
-      reference: refId,
+      ref: refId,
       amount: "NGN 100",
       date: new Date().toLocaleDateString(),
-      // Capture all fields for the filled form download
-      allFields: Object.fromEntries(formData),
+      // Capture all form data for the filled form download
+      formData: Object.fromEntries(formData),
     };
 
-    // 3. TRIGGER DUAL DOWNLOADS IMMEDIATELY
+    // 3. TRIGGER INSTANT DOWNLOADS
+    // We do this BEFORE any other logic to ensure the user gets their files
     try {
-      // TRIGGER 1: The Payment Receipt
+      // Download 1: The Payment Receipt
       downloadPDFReceipt({
-        name: studentData.name,
-        ref: studentData.reference,
-        amount: studentData.amount,
-        date: studentData.date,
+        name: studentInfo.name,
+        ref: studentInfo.ref,
+        amount: studentInfo.amount,
+        date: studentInfo.date,
       });
 
-      // TRIGGER 2: The Filled Application Form
-      // This allows the student to keep a copy of their submitted data
-      downloadFilledForm(studentData);
+      // Download 2: The Filled Application Form
+      // Ensure you have a function called downloadFilledForm defined
+      if (typeof downloadFilledForm === "function") {
+        downloadFilledForm(studentInfo);
+      }
 
-      alert("Success! Your Receipt and Application Form are downloading.");
+      alert(
+        "Submission Successful! Your Receipt and Application Form are downloading.",
+      );
+
+      // Set a local success state to show a "Thank You" message on the UI instead of redirecting
+      if (typeof setSuccessMessage === "function") {
+        setSuccessMessage(
+          "Application Secured. Thank you for choosing Ayax Academy.",
+        );
+      }
     } catch (err) {
-      console.error("Download failed:", err);
+      console.error("Download sequence interrupted:", err);
     }
 
-    // 4. SILENT BACKGROUND PERSISTENCE
-    // Syncing with Admin Dashboard while student stays on the success screen
+    // 4. SHADOW PERSISTENCE (Admin Dashboard Sync)
+    // This runs in the background while the student stays on the page
     const runBackgroundPersistence = async () => {
       try {
         let passportURL = "";
 
+        // Background Image Upload
         if (passportImage) {
           const passportRef = ref(
             storage,
-            `passports/${Date.now()}_${formData.get("name")}`,
+            `passports/${Date.now()}_${studentInfo.name}`,
           );
           const pSnapshot = await uploadBytes(passportRef, passportImage);
           passportURL = await getDownloadURL(pSnapshot.ref);
         }
 
-        // Final Data Entry for Admin Visibility
+        // Sync to Admin Collection
         await addDoc(collection(db, "course_applications"), {
-          ...studentData.allFields,
+          ...studentInfo.formData,
           course: selectedCourse,
           country: selectedCountry,
           passportUrl: passportURL,
@@ -297,19 +306,28 @@ const CourseEnrollment = () => {
           transactionRef: refId,
         });
 
-        console.log("Admin Dashboard Updated Successfully.");
+        // Sync to Student Enrollment Collection
+        await addDoc(collection(db, "enrollments"), {
+          email: studentInfo.email,
+          reference: refId,
+          status: "Verified",
+          timestamp: serverTimestamp(),
+        });
 
+        console.log("Admin Dashboard Updated: Record Locked.");
+
+        // Dispatch Automated Email
         sendWelcomeEmail({
-          studentName: studentData.name,
-          email: studentData.email,
-          course: studentData.course,
+          studentName: studentInfo.name,
+          email: studentInfo.email,
+          course: studentInfo.course,
         });
       } catch (err) {
-        console.error("Background Failure:", err);
+        console.error("Background Sync Failure:", err);
       }
     };
 
-    // Fire persistence in the background
+    // Execute the shadow sync
     runBackgroundPersistence();
   };
   if (!portalOpen) {
