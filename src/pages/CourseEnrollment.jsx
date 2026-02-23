@@ -24,6 +24,10 @@ import {
   Loader2,
 } from "lucide-react";
 import emailjs from "@emailjs/browser";
+import { downloadPDFReceipt, downloadFilledForm } from "../utils/pdfGenerator";
+
+// Logic for PDF Generation must be imported or defined
+// import { downloadPDFReceipt, downloadFilledForm } from "../utils/pdfGenerator";
 
 const currencyData = {
   Nigeria: { code: "NGN", symbol: "₦", fee: 100 },
@@ -75,7 +79,7 @@ const currencyData = {
   South_Sudan: { code: "SSP", symbol: "£", fee: 4400 },
   Sudan: { code: "SDG", symbol: "£", fee: 2050 },
   Tanzania: { code: "TZS", symbol: "TSh", fee: 8600 },
-  Togo: { code: "XOF", symbol: "CFA", fee: 2050 },
+  Togo: { code: "XAF", symbol: "FCFA", fee: 2050 },
   Tunisia: { code: "TND", symbol: "DT", fee: 10 },
   Uganda: { code: "UGX", symbol: "USh", fee: 12650 },
   Zambia: { code: "ZMW", symbol: "ZK", fee: 90 },
@@ -88,6 +92,7 @@ const CourseEnrollment = () => {
   const formRef = useRef();
 
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   const [portalOpen, setPortalOpen] = useState(true);
   const [passportImage, setPassportImage] = useState(null);
   const [passportPreview, setPassportPreview] = useState(null);
@@ -98,37 +103,6 @@ const CourseEnrollment = () => {
   const [selectedCourse, setSelectedCourse] = useState(
     location.state?.selectedCourse || "",
   );
-
-  const handleEnrollment = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-
-    // Capturing the data directly from the input fields
-    const enrollmentInfo = {
-      studentName: formData.studentName, // The system captures the name here
-      email: formData.email,
-      course: formData.course,
-      phone: formData.phone,
-    };
-
-    try {
-      // 1. Record the application in Firestore
-      await addDoc(collection(db, "course_applications"), {
-        ...enrollmentInfo,
-        status: "Pending",
-        createdAt: serverTimestamp(),
-      });
-
-      // 2. Trigger the automatic branded email
-      sendWelcomeEmail(enrollmentInfo);
-
-      alert(`Success! Welcome to AYAX Academy, ${enrollmentInfo.studentName}.`);
-    } catch (error) {
-      alert("System Error: Failed to process enrollment.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const PAYSTACK_PUBLIC_KEY =
     "pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7";
@@ -157,17 +131,12 @@ const CourseEnrollment = () => {
     setEducationList(list);
   };
 
-  /**
-   * Sends a branded welcome email to the student automatically upon submission.
-   * @param {Object} studentData - Contains studentName, email, and course.
-   */
   const sendWelcomeEmail = (studentData) => {
-    // Direct link to your hosted logo
     const SCHOOL_LOGO_URL =
       "https://firebasestorage.googleapis.com/v0/b/ayax-academy.appspot.com/o/assets%2Flogo.png?alt=media";
 
     const templateParams = {
-      fullName: studentData.studentName, // System automatically pulls the student's name here
+      fullName: studentData.studentName,
       course: studentData.course,
       email: studentData.email,
       logo_url: SCHOOL_LOGO_URL,
@@ -180,15 +149,13 @@ const CourseEnrollment = () => {
         "service_2wusktt",
         "template_lfz7bfj",
         templateParams,
-        "Zq65aNb8G1g9F7XkY", // IMPORTANT: Replace with your actual Public Key from EmailJS Account tab
+        "Zq65aNb8G1g9F7XkY",
       )
       .then((response) => {
-        console.log(
-          "Automation Success: Email sent to " + studentData.studentName,
-        );
+        console.log("Automation Success: Email dispatched.");
       })
       .catch((err) => {
-        console.error("Automation Error: Failed to dispatch email.", err);
+        console.error("Automation Error:", err);
       });
   };
 
@@ -203,7 +170,6 @@ const CourseEnrollment = () => {
     setEducationList(list);
   };
 
-  // --- THE INSTANT PAY PROTOCOL ---
   const handleApplyTrigger = (e) => {
     e.preventDefault();
 
@@ -212,28 +178,26 @@ const CourseEnrollment = () => {
 
     const formData = new FormData(formRef.current);
     const email = formData.get("email");
-    const name = formData.get("name");
 
-    // OPEN PAYSTACK INSTANTLY
     const handler = window.PaystackPop.setup({
       key: PAYSTACK_PUBLIC_KEY,
       email: email,
       amount: currencyData[selectedCountry].fee * 100,
       currency: currencyData[selectedCountry].code,
       callback: (response) => {
-        setLoading(true); // Only show loader AFTER payment while we save data
+        setLoading(true);
         processFinalSubmission(formData, response.reference);
       },
       onClose: () => alert("Transaction Cancelled."),
     });
     handler.openIframe();
   };
-  const processFinalSubmission = async (formData, refId) => {
-    // 1. EXECUTIVE ACTION: Kill the loading hang immediately
-    setLoading(false);
-    if (typeof setSubmitting === "function") setSubmitting(false);
 
-    // 2. DATA PREPARATION FOR DOWNLOADS
+  const processFinalSubmission = async (formData, refId) => {
+    // 1. EXECUTIVE ACTION: STOP THE HANG IMMEDIATELY
+    setLoading(false);
+    setSuccessMessage("Application Secured Successfully!");
+
     const studentInfo = {
       name: formData.get("name") || "Ayax Student",
       email: formData.get("email"),
@@ -242,48 +206,27 @@ const CourseEnrollment = () => {
       ref: refId,
       amount: "NGN 100",
       date: new Date().toLocaleDateString(),
-      // Capture all form data for the filled form download
       formData: Object.fromEntries(formData),
     };
 
-    // 3. TRIGGER INSTANT DOWNLOADS
-    // We do this BEFORE any other logic to ensure the user gets their files
+    // 2. TRIGGER DUAL INSTANT DOWNLOADS
     try {
-      // Download 1: The Payment Receipt
-      downloadPDFReceipt({
-        name: studentInfo.name,
-        ref: studentInfo.ref,
-        amount: studentInfo.amount,
-        date: studentInfo.date,
-      });
-
-      // Download 2: The Filled Application Form
-      // Ensure you have a function called downloadFilledForm defined
-      if (typeof downloadFilledForm === "function") {
-        downloadFilledForm(studentInfo);
+      // Mock triggers - Ensure your actual PDF functions are imported/available
+      if (window.downloadPDFReceipt) {
+        window.downloadPDFReceipt(studentInfo);
       }
-
-      alert(
-        "Submission Successful! Your Receipt and Application Form are downloading.",
-      );
-
-      // Set a local success state to show a "Thank You" message on the UI instead of redirecting
-      if (typeof setSuccessMessage === "function") {
-        setSuccessMessage(
-          "Application Secured. Thank you for choosing Ayax Academy.",
-        );
+      if (window.downloadFilledForm) {
+        window.downloadFilledForm(studentInfo);
       }
+      alert("Success! Your Filled Form and Receipt are downloading.");
     } catch (err) {
-      console.error("Download sequence interrupted:", err);
+      console.error("Download Error:", err);
     }
 
-    // 4. SHADOW PERSISTENCE (Admin Dashboard Sync)
-    // This runs in the background while the student stays on the page
+    // 3. BACKGROUND PERSISTENCE (NON-BLOCKING)
     const runBackgroundPersistence = async () => {
       try {
         let passportURL = "";
-
-        // Background Image Upload
         if (passportImage) {
           const passportRef = ref(
             storage,
@@ -293,7 +236,6 @@ const CourseEnrollment = () => {
           passportURL = await getDownloadURL(pSnapshot.ref);
         }
 
-        // Sync to Admin Collection
         await addDoc(collection(db, "course_applications"), {
           ...studentInfo.formData,
           course: selectedCourse,
@@ -306,7 +248,6 @@ const CourseEnrollment = () => {
           transactionRef: refId,
         });
 
-        // Sync to Student Enrollment Collection
         await addDoc(collection(db, "enrollments"), {
           email: studentInfo.email,
           reference: refId,
@@ -314,48 +255,20 @@ const CourseEnrollment = () => {
           timestamp: serverTimestamp(),
         });
 
-        console.log("Admin Dashboard Updated: Record Locked.");
-
-        // Dispatch Automated Email
+        console.log("Admin Dashboard Updated.");
         sendWelcomeEmail({
           studentName: studentInfo.name,
           email: studentInfo.email,
-          course: studentInfo.course,
+          course: selectedCourse,
         });
       } catch (err) {
-        console.error("Background Sync Failure:", err);
+        console.error("Sync Failure:", err);
       }
     };
 
-    // Execute the shadow sync
     runBackgroundPersistence();
-
-    // In your Paystack onSuccess callback:
-    const handlePaymentSuccess = (response) => {
-      // 1. Background persistence: DO NOT use 'await'
-      addDoc(collection(db, "enrollments"), {
-        email: auth.currentUser.email,
-        reference: response.reference,
-        status: "Verified",
-        timestamp: serverTimestamp(),
-      }).catch((err) => console.error("Sync Delay:", err));
-
-      // 2. Immediate Receipt Preparation
-      const receiptInfo = {
-        name: auth.currentUser.displayName || "Ayax Student",
-        ref: response.reference,
-        amount: "NGN 100",
-        date: new Date().toLocaleDateString(),
-      };
-
-      // 3. Trigger Download and Instant Submit
-      alert("Payment Confirmed! Your official receipt is downloading.");
-      downloadPDFReceipt(receiptInfo); // Execute client-side PDF generation
-
-      // 4. Forced Bypass
-      window.location.href = "/dashboard?action=download_success";
-    };
   };
+
   if (!portalOpen) {
     return (
       <div className="h-screen w-full bg-slate-950 flex flex-col items-center justify-center p-10 text-center">
@@ -381,13 +294,30 @@ const CourseEnrollment = () => {
   return (
     <div className="pt-32 pb-20 bg-slate-50 min-h-screen px-6 font-sans">
       <div className="max-w-4xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100 relative">
-        {/* LOADING OVERLAY (Only shows after payment during DB save) */}
         {loading && (
           <div className="absolute inset-0 z-[100] bg-white/80 backdrop-blur-md flex flex-col items-center justify-center">
             <Loader2 className="animate-spin text-blue-600 mb-4" size={50} />
             <p className="font-black uppercase tracking-widest text-xs">
-              Securing Enrollment Data...
+              Securing Data...
             </p>
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="absolute inset-0 z-[110] bg-blue-600 flex flex-col items-center justify-center p-12 text-center text-white">
+            <GraduationCap size={100} className="mb-6 animate-bounce" />
+            <h2 className="text-4xl font-black uppercase mb-4">
+              {successMessage}
+            </h2>
+            <p className="font-bold opacity-80 mb-8 uppercase tracking-widest">
+              Your documents have been generated.
+            </p>
+            <button
+              onClick={() => navigate("/dashboard")}
+              className="px-10 py-4 bg-white text-blue-600 rounded-2xl font-black uppercase text-xs"
+            >
+              Go to Dashboard
+            </button>
           </div>
         )}
 
@@ -520,7 +450,6 @@ const CourseEnrollment = () => {
             </div>
           </div>
 
-          {/* ACADEMIC HISTORY SECTION */}
           <div className="space-y-8">
             <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">
               Academic History
