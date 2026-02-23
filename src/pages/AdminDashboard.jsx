@@ -99,14 +99,14 @@ const AdminDashboard = () => {
     phone: "2348000000000",
   };
 
-  // 1. REAL-TIME DATA ENGINE (Multiple Streams)
+  // 1. REAL-TIME DATA ENGINE (MASTER STREAMS)
   useEffect(() => {
-    const qApplications = query(
-      collection(db, "course_applications"),
-      orderBy("appliedAt", "desc"),
-    );
+    // Super Admin Master Query - Cire orderBy don gudun kuskure idan appliedAt babu shi
+    const qApplications = collection(db, "course_applications");
     const unsubStudents = onSnapshot(qApplications, (snap) => {
-      setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const data = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setStudents(data);
+      console.log("SUPER ADMIN DATA SYNCED:", data.length);
     });
 
     const unsubGallery = onSnapshot(
@@ -117,32 +117,6 @@ const AdminDashboard = () => {
         );
       },
     );
-
-    useEffect(() => {
-      // Mu yi amfani da collection kawai ba tare da orderBy ba domin gudun kuskure
-      const qStudents = collection(db, "course_applications");
-
-      const unsubStudents = onSnapshot(
-        qStudents,
-        (snap) => {
-          if (!snap.empty) {
-            const data = snap.docs.map((doc) => ({
-              id: doc.id,
-              ...doc.data(),
-            }));
-            setStudents(data);
-            console.log("SUPER ADMIN CHECK - Data Count:", data.length);
-          } else {
-            console.log("SUPER ADMIN CHECK - No data in course_applications");
-          }
-        },
-        (error) => {
-          console.error("FIRESTORE ERROR:", error.message);
-        },
-      );
-
-      return () => unsubStudents();
-    }, []);
 
     const unsubChats = onSnapshot(
       query(collection(db, "private_chats"), orderBy("createdAt", "desc")),
@@ -195,9 +169,8 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  // SEARCH & FILTER LOGIC (Improved for Undefined Statuses)
+  // SEARCH & FILTER LOGIC
   const filteredStudents = students.filter((s) => {
-    // Tabbatar muna duba kowane kalar suna da aka tura
     const name = (s.studentName || s.name || "").toLowerCase();
     const email = (s.email || "").toLowerCase();
     const course = (s.course || "").toLowerCase();
@@ -207,8 +180,6 @@ const AdminDashboard = () => {
       name.includes(search) ||
       email.includes(search) ||
       course.includes(search);
-
-    // Tabbatar filter yana gano sabon Verified da tsohon Form_Paid
     const status = s.paymentStatus || "Verified";
     const matchesFilter = filterStatus === "All" || status === filterStatus;
 
@@ -233,7 +204,7 @@ const AdminDashboard = () => {
     );
     logActivity(
       "PORTAL_TOGGLE",
-      `Portal state changed to: ${newStatus ? "ACTIVE" : "LOCKDOWN"}`,
+      `System state: ${newStatus ? "ACTIVE" : "LOCKDOWN"}`,
     );
   };
 
@@ -246,13 +217,9 @@ const AdminDashboard = () => {
         status: "Admitted",
         idAssignedAt: serverTimestamp(),
       });
-      await logActivity(
-        "AUTO_ID_DISPATCH",
-        `ID ${generatedID} issued to ${student.studentName}`,
-      );
       alert(`SUCCESS: ID ${generatedID} assigned.`);
     } catch (err) {
-      alert("Dispatch failed.");
+      alert("FAILED!");
     } finally {
       setLoading(false);
     }
@@ -326,10 +293,7 @@ const AdminDashboard = () => {
           ].map((item) => (
             <button
               key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                setMobileMenuOpen(false);
-              }}
+              onClick={() => setActiveTab(item.id)}
               className={`w-full flex items-center gap-5 p-5 rounded-[1.5rem] font-black text-xs uppercase transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-xl scale-105" : "hover:bg-blue-500/10 opacity-60"}`}
             >
               {item.icon} {item.label}
@@ -353,7 +317,7 @@ const AdminDashboard = () => {
             onClick={() => signOut(auth)}
             className="w-full py-5 bg-red-600/10 text-red-600 rounded-2xl font-black text-[10px] uppercase border border-red-600/20"
           >
-            <LogOut size={20} className="inline mr-2" /> Shutdown
+            <LogOut size={20} /> Shutdown
           </button>
         </div>
       </aside>
@@ -417,7 +381,7 @@ const AdminDashboard = () => {
                   />
                   <input
                     type="text"
-                    placeholder="Search by Name, Email or Course..."
+                    placeholder="Search..."
                     className="admin-input pl-16"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -430,9 +394,9 @@ const AdminDashboard = () => {
                     onChange={(e) => setFilterStatus(e.target.value)}
                     className="bg-transparent font-black text-[10px] uppercase p-3 outline-none"
                   >
-                    <option value="All">All Applications</option>
-                    <option value="Verified">Verified (₦100)</option>
-                    <option value="Form_Paid">Paid (Old ₦5k)</option>
+                    <option value="All">All</option>
+                    <option value="Verified">Verified</option>
+                    <option value="Form_Paid">Paid</option>
                   </select>
                 </div>
               </div>
@@ -456,7 +420,6 @@ const AdminDashboard = () => {
                         className="hover:bg-blue-500/5 transition-colors group"
                       >
                         <td className="p-8 flex items-center gap-4">
-                          {/* Duba dukkan sunayen hoto (passportUrl ko passportURL) */}
                           <img
                             src={
                               s.passportUrl ||
@@ -466,9 +429,8 @@ const AdminDashboard = () => {
                             className="w-12 h-12 rounded-xl object-cover ring-2 ring-blue-600/20"
                           />
                           <div>
-                            {/* Duba dukkan sunayen dalibi (studentName ko name) */}
                             <p className="text-sm uppercase">
-                              {s.studentName || s.name || "No Name"}
+                              {s.studentName || s.name || "Unknown"}
                             </p>
                             <p className="text-[9px] text-blue-600">
                               {s.course}
@@ -476,15 +438,17 @@ const AdminDashboard = () => {
                           </div>
                         </td>
                         <td className="p-8 text-[10px]">
-                          <p className="flex items-center gap-2">
-                            <Mail size={12} /> {s.email}
+                          <p>
+                            <Mail size={12} className="inline mr-1" />
+                            {s.email}
                           </p>
-                          <p className="flex items-center gap-2 mt-1">
-                            <Phone size={12} /> {s.phone}
+                          <p>
+                            <Phone size={12} className="inline mr-1" />
+                            {s.phone}
                           </p>
                         </td>
                         <td className="p-8">
-                          <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[9px] uppercase tracking-widest">
+                          <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[9px] uppercase font-black">
                             {s.paymentStatus || "Verified"}
                           </span>
                         </td>
@@ -504,44 +468,46 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          {/* THE STUDENT FORM MODAL (Full View Integration) */}
+          {/* STUDENT FORM MODAL */}
           {selectedStudent && (
             <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 backdrop-blur-md bg-black/50">
               <div
-                className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[3.5rem] p-10 relative shadow-2xl ${darkMode ? "bg-slate-900 border border-slate-800 text-white" : "bg-white text-slate-900"}`}
+                className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[3.5rem] p-10 relative ${darkMode ? "bg-slate-900" : "bg-white"}`}
               >
                 <button
                   onClick={() => setSelectedStudent(null)}
-                  className="absolute top-8 right-8 p-4 bg-red-600 text-white rounded-full hover:scale-110 transition-all"
+                  className="absolute top-8 right-8 p-4 bg-red-600 text-white rounded-full"
                 >
                   <X size={24} />
                 </button>
                 <div className="flex flex-col md:flex-row gap-10 mb-10 border-b pb-10 border-slate-500/10">
                   <img
                     src={selectedStudent.passportUrl}
-                    className="w-48 h-48 object-cover rounded-[2.5rem] border-4 border-blue-600/20 shadow-xl"
+                    className="w-48 h-48 object-cover rounded-[2.5rem] border-4 border-blue-600/20"
                   />
                   <div className="space-y-3">
                     <h2 className="text-4xl font-black uppercase text-blue-600">
                       {selectedStudent.studentName}
                     </h2>
-                    <p className="text-xs font-black uppercase opacity-50 tracking-[0.2em]">
+                    <p className="text-xs font-black uppercase opacity-50">
                       {selectedStudent.course}
                     </p>
                     <div className="flex flex-wrap gap-3 pt-2">
-                      <span className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl text-[10px] font-black flex items-center gap-2 uppercase">
-                        <Mail size={12} /> {selectedStudent.email}
+                      <span className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl text-[10px] font-black">
+                        <Mail size={12} className="inline mr-1" />
+                        {selectedStudent.email}
                       </span>
-                      <span className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl text-[10px] font-black flex items-center gap-2 uppercase">
-                        <Phone size={12} /> {selectedStudent.phone}
+                      <span className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl text-[10px] font-black">
+                        <Phone size={12} className="inline mr-1" />
+                        {selectedStudent.phone}
                       </span>
                     </div>
                   </div>
                 </div>
                 <div className="grid md:grid-cols-2 gap-10">
                   <div className="info-box space-y-4">
-                    <h4 className="text-[10px] font-black uppercase opacity-40 tracking-widest flex items-center gap-2">
-                      <MapPin size={12} /> Geographic Origin
+                    <h4 className="text-[10px] font-black uppercase opacity-40">
+                      <MapPin size={12} /> Origin
                     </h4>
                     <p className="text-sm font-black">
                       Address: {selectedStudent.address}
@@ -550,25 +516,15 @@ const AdminDashboard = () => {
                       State: {selectedStudent.stateOfOrigin} (
                       {selectedStudent.lgaOfOrigin})
                     </p>
-                    <p className="text-sm font-black text-blue-500">
-                      Residence: {selectedStudent.currentState},{" "}
-                      {selectedStudent.currentLGA}
-                    </p>
                   </div>
                   <div className="info-box space-y-4">
-                    <h4 className="text-[10px] font-black uppercase opacity-40 tracking-widest flex items-center gap-2">
-                      <Award size={12} /> Academic Credentials
+                    <h4 className="text-[10px] font-black uppercase opacity-40">
+                      <Award size={12} /> Education
                     </h4>
                     {selectedStudent.education?.map((edu, idx) => (
-                      <div
-                        key={idx}
-                        className="border-b border-slate-500/10 pb-2 last:border-0"
-                      >
-                        <p className="text-[10px] font-black text-blue-600 uppercase">
-                          {edu.qualification}
-                        </p>
+                      <div key={idx} className="border-b pb-2 last:border-0">
                         <p className="text-xs font-bold uppercase">
-                          {edu.institution} ({edu.year})
+                          {edu.qualification} ({edu.year})
                         </p>
                       </div>
                     ))}
@@ -576,8 +532,8 @@ const AdminDashboard = () => {
                 </div>
                 <div className="mt-10 p-8 bg-blue-600/5 rounded-3xl border-2 border-dashed border-blue-600/20 flex flex-col md:flex-row justify-between items-center gap-6">
                   <div>
-                    <p className="text-[10px] font-black opacity-40 uppercase tracking-widest">
-                      Financial Reference
+                    <p className="text-[10px] font-black opacity-40 uppercase">
+                      Reference
                     </p>
                     <p className="font-mono text-lg font-black text-blue-600">
                       {selectedStudent.transactionRef || "PROCESSED"}
@@ -586,9 +542,9 @@ const AdminDashboard = () => {
                   {!selectedStudent.studentId && (
                     <button
                       onClick={() => handleAutomaticIDDispatch(selectedStudent)}
-                      className="px-10 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px] flex items-center gap-3 shadow-xl hover:bg-slate-900 transition-all"
+                      className="px-10 py-5 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs"
                     >
-                      <Zap size={16} /> Dispatch Official ID
+                      <Zap size={16} /> Dispatch ID
                     </button>
                   )}
                 </div>
@@ -606,22 +562,19 @@ const AdminDashboard = () => {
                   <p className="text-xs font-black uppercase">
                     {log.action}: {log.details}
                   </p>
-                  <span className="text-[10px] font-bold opacity-40 tracking-tighter">
+                  <span className="text-[10px] font-bold opacity-40">
                     {new Date(log.timestamp?.seconds * 1000).toLocaleString()}
                   </span>
                 </div>
               ))}
             </div>
           )}
-
-          {/* [Other original tabs (manual_gen, gallery_manager, etc.) go here...] */}
         </div>
       </main>
 
       <style>{`
         .admin-input { width: 100%; padding: 1.25rem; background: ${darkMode ? "#0f172a" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.25rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
         .admin-input:focus { border-color: #2563eb; }
-        .metric-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.15em; }
         .stat-card { padding: 40px; border-radius: 40px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); }
         .info-box { padding: 25px; background: ${darkMode ? "#1e293b" : "#f8fafc"}; border-radius: 1.5rem; border: 1px solid ${darkMode ? "#334155" : "#e2e8f0"}; }
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
