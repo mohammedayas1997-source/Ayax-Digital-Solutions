@@ -123,14 +123,38 @@ const SuperAdmin = () => {
     comment: "",
   });
 
-  // REAL-TIME DATA ENGINE (MASTER SYNC)
+  // REAL-TIME DATA ENGINE (ENROLLMENT SYNC PATCH APPLIED)
   useEffect(() => {
-    const unsubStudents = onSnapshot(
+    // Sync 1: Original applications collection
+    const unsubApps = onSnapshot(
       collection(db, "course_applications"),
       (snap) => {
-        setStudents(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+        const appData = snap.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          source: "course_applications",
+        }));
+        setStudents((prev) => {
+          const filtered = prev.filter(
+            (s) => s.source !== "course_applications",
+          );
+          return [...filtered, ...appData];
+        });
       },
     );
+
+    // Sync 2: New enrollments collection (The "Missing Form" fix)
+    const unsubEnroll = onSnapshot(collection(db, "enrollments"), (snap) => {
+      const enrollData = snap.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        source: "enrollments",
+      }));
+      setStudents((prev) => {
+        const filtered = prev.filter((s) => s.source !== "enrollments");
+        return [...filtered, ...enrollData];
+      });
+    });
 
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
       setSystemUsers(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
@@ -180,8 +204,25 @@ const SuperAdmin = () => {
       },
     );
 
+    const unsubChats = onSnapshot(
+      query(collection(db, "private_chats"), orderBy("createdAt", "desc")),
+      (snap) => {
+        const allMsgs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        const uniqueThreads = [];
+        const seen = new Set();
+        allMsgs.forEach((m) => {
+          if (!seen.has(m.studentId)) {
+            seen.add(m.studentId);
+            uniqueThreads.push(m);
+          }
+        });
+        setChats(uniqueThreads);
+      },
+    );
+
     return () => {
-      unsubStudents();
+      unsubApps();
+      unsubEnroll();
       unsubUsers();
       unsubServices();
       unsubForum();
@@ -189,8 +230,23 @@ const SuperAdmin = () => {
       unsubLogs();
       unsubPortal();
       unsubAi();
+      unsubChats();
     };
   }, []);
+
+  // Sync Chat Messages for Selected Student
+  useEffect(() => {
+    if (!selectedChatStudent) return;
+    const q = query(
+      collection(db, "private_chats"),
+      where("studentId", "==", selectedChatStudent.id),
+      orderBy("createdAt", "asc"),
+    );
+    const unsub = onSnapshot(q, (snap) => {
+      setChatMessages(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+    });
+    return () => unsub();
+  }, [selectedChatStudent]);
 
   const logActivity = async (action, details) => {
     await addDoc(collection(db, "system_logs"), {
@@ -247,9 +303,12 @@ const SuperAdmin = () => {
     }
   };
 
-  const updateStudentStatus = async (id, field, value) => {
-    await updateDoc(doc(db, "course_applications", id), { [field]: value });
+  const updateStudentStatus = async (id, source, field, value) => {
+    const colName =
+      source === "enrollments" ? "enrollments" : "course_applications";
+    await updateDoc(doc(db, colName, id), { [field]: value });
     await logActivity("ADMISSION_MOD", `Set ${field} to ${value} for ${id}`);
+    alert("Record Updated Successfully");
   };
 
   const handleLogout = async () => {
@@ -259,7 +318,106 @@ const SuperAdmin = () => {
     }
   };
 
-  // RENDERING COMPONENTS
+  // RENDER: CHAT MONITOR
+  const renderChatMonitor = () => (
+    <div className="flex gap-6 h-[80vh] animate-in fade-in duration-500">
+      <div
+        className={`w-1/3 p-6 rounded-[2.5rem] border shadow-xl flex flex-col ${darkMode ? "bg-slate-800 border-white/5" : "bg-white border-gray-100"}`}
+      >
+        <h3 className="text-xs font-black uppercase mb-6 flex items-center gap-2">
+          <Eye size={16} className="text-red-500" /> Private Surveillance
+        </h3>
+        <div className="relative mb-4">
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500"
+            size={14}
+          />
+          <input
+            className="admin-input pl-10"
+            placeholder="Search Student..."
+            onChange={(e) => setChatSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+          {chats
+            .filter((c) =>
+              (c.sender || "").toLowerCase().includes(chatSearch.toLowerCase()),
+            )
+            .map((chat) => (
+              <div
+                key={chat.studentId}
+                onClick={() =>
+                  setSelectedChatStudent({
+                    id: chat.studentId,
+                    name: chat.sender,
+                  })
+                }
+                className={`p-4 rounded-2xl cursor-pointer border transition-all ${selectedChatStudent?.id === chat.studentId ? "bg-red-600 border-red-600 text-white shadow-lg" : "hover:bg-gray-50 border-transparent"}`}
+              >
+                <p className="font-black text-[11px] uppercase">
+                  {chat.sender}
+                </p>
+                <p
+                  className={`text-[9px] truncate mt-1 ${selectedChatStudent?.id === chat.studentId ? "text-white/70" : "text-gray-400"}`}
+                >
+                  {chat.text}
+                </p>
+              </div>
+            ))}
+        </div>
+      </div>
+      <div
+        className={`flex-1 rounded-[2.5rem] border shadow-2xl flex flex-col overflow-hidden ${darkMode ? "bg-slate-800 border-white/5" : "bg-white border-gray-100"}`}
+      >
+        {selectedChatStudent ? (
+          <>
+            <header className="p-6 border-b flex justify-between items-center bg-gray-50/30">
+              <div>
+                <h4 className="font-black text-lg italic uppercase">
+                  {selectedChatStudent.name}
+                </h4>
+                <p className="text-[9px] font-black text-red-500 uppercase">
+                  Monitoring Live Session
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedChatStudent(null)}
+                className="p-2 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-lg"
+              >
+                <X size={18} />
+              </button>
+            </header>
+            <div className="flex-1 p-8 overflow-y-auto space-y-4 bg-slate-50/50">
+              {chatMessages.map((m) => (
+                <div
+                  key={m.id}
+                  className={`flex flex-col ${m.senderRole === "student" ? "items-start" : "items-end"}`}
+                >
+                  <div
+                    className={`max-w-[75%] p-4 rounded-2xl font-bold text-xs shadow-sm ${m.senderRole === "student" ? "bg-white text-slate-800" : "bg-red-600 text-white"}`}
+                  >
+                    {m.text}
+                    <p className="text-[7px] mt-2 uppercase opacity-50">
+                      {m.createdAt?.toDate().toLocaleTimeString()} •{" "}
+                      {m.senderRole}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center opacity-20 text-center">
+            <ShieldAlert size={80} className="animate-pulse" />
+            <p className="font-black uppercase tracking-widest text-[10px] mt-4">
+              Select Thread to Audit
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   const renderStudentProfileModal = () => {
     if (!selectedStudentInfo) return null;
     return (
@@ -269,22 +427,25 @@ const SuperAdmin = () => {
         >
           <button
             onClick={() => setSelectedStudentInfo(null)}
-            className="absolute top-8 right-8 p-3 bg-red-500 text-white rounded-2xl hover:bg-black transition-all"
+            className="absolute top-8 right-8 p-3 bg-red-500 text-white rounded-2xl hover:bg-black transition-all z-10"
           >
             <X />
           </button>
           <div className="flex flex-col md:flex-row gap-8 items-center border-b pb-10 mb-10">
             <img
-              src={selectedStudentInfo.passportUrl}
+              src={
+                selectedStudentInfo.passportUrl ||
+                "https://via.placeholder.com/150"
+              }
               className="w-48 h-48 rounded-[2.5rem] object-cover border-4 border-blue-600"
               alt="Passport"
             />
             <div>
               <h2 className="text-4xl font-black uppercase italic tracking-tighter">
-                {selectedStudentInfo.studentName}
+                {selectedStudentInfo.studentName || selectedStudentInfo.name}
               </h2>
               <span className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-black uppercase mt-4 inline-block">
-                {selectedStudentInfo.course}
+                {selectedStudentInfo.course || selectedStudentInfo.courseId}
               </span>
             </div>
           </div>
@@ -297,32 +458,39 @@ const SuperAdmin = () => {
                 className={`p-6 rounded-3xl ${darkMode ? "bg-white/5" : "bg-slate-50"}`}
               >
                 <p className="text-sm font-bold">
-                  Email: {selectedStudentInfo.email}
+                  Email:{" "}
+                  {selectedStudentInfo.email ||
+                    selectedStudentInfo.studentEmail}
                 </p>
                 <p className="text-sm font-bold">
-                  Phone: {selectedStudentInfo.phone}
+                  Phone:{" "}
+                  {selectedStudentInfo.phone ||
+                    selectedStudentInfo.studentPhone}
                 </p>
                 <p className="text-sm font-bold">
-                  Address: {selectedStudentInfo.address},{" "}
-                  {selectedStudentInfo.currentState}
+                  Address: {selectedStudentInfo.address || "N/A"}
                 </p>
               </div>
             </div>
             <div className="space-y-4">
               <h3 className="text-emerald-500 font-black uppercase text-xs tracking-widest flex items-center gap-2">
-                <School size={16} /> Education
+                <School size={16} /> Education History
               </h3>
-              {selectedStudentInfo.educationBackground?.map((edu, idx) => (
-                <div
-                  key={idx}
-                  className="p-4 rounded-2xl border border-gray-100 bg-slate-50/50"
-                >
-                  <p className="text-blue-600 font-black text-[10px] uppercase">
-                    {edu.qualification}
-                  </p>
-                  <h4 className="font-bold text-sm">{edu.institution}</h4>
-                </div>
-              ))}
+              {selectedStudentInfo.educationBackground ? (
+                selectedStudentInfo.educationBackground.map((edu, idx) => (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-2xl border bg-slate-50/50"
+                  >
+                    <p className="text-blue-600 font-black text-[10px] uppercase">
+                      {edu.qualification}
+                    </p>
+                    <h4 className="font-bold text-sm">{edu.institution}</h4>
+                  </div>
+                ))
+              ) : (
+                <p className="text-xs opacity-50">No academic data attached.</p>
+              )}
             </div>
           </div>
         </div>
@@ -336,11 +504,11 @@ const SuperAdmin = () => {
     >
       {/* SIDEBAR */}
       <div
-        className={`w-72 p-8 space-y-10 shrink-0 border-r shadow-2xl ${darkMode ? "bg-[#1e293b] border-white/5" : "bg-[#0f172a] text-white"}`}
+        className={`w-72 p-8 space-y-10 shrink-0 border-r shadow-2xl ${darkMode ? "bg-[#1e293b] border-white/5" : "bg-[#0f172a] text-white border-transparent"}`}
       >
         <div>
-          <h2 className="text-2xl font-black italic text-blue-500 tracking-tighter">
-            AYAX ADMIN
+          <h2 className="text-2xl font-black italic text-blue-500 tracking-tighter uppercase">
+            Ayax Admin
           </h2>
           <p className="text-[10px] text-gray-500 font-bold uppercase tracking-[0.3em] mt-2">
             Authority Portal v2.0
@@ -355,19 +523,19 @@ const SuperAdmin = () => {
             },
             { id: "students", label: "Admissions", icon: <Users size={18} /> },
             {
-              id: "academic",
-              label: "Curriculum",
-              icon: <BookOpen size={18} />,
+              id: "chat_monitor",
+              label: "Chat Monitor",
+              icon: <Eye size={18} />,
+            },
+            {
+              id: "ai_surveillance",
+              label: "AI Monitor",
+              icon: <ShieldCheck size={18} />,
             },
             {
               id: "pdf_manager",
               label: "PDF Library",
               icon: <UploadCloud size={18} />,
-            },
-            {
-              id: "global_forum",
-              label: "Forum",
-              icon: <MessageSquare size={18} />,
             },
             {
               id: "history",
@@ -411,8 +579,8 @@ const SuperAdmin = () => {
               <h3 className="text-2xl font-black">{students.length}</h3>
             </div>
             <div className="stat-card bg-white border-l-4 border-emerald-500">
-              <p className="metric-label">Revenue</p>
-              <h3 className="text-2xl font-black">
+              <p className="metric-label">Revenue (Verified)</p>
+              <h3 className="text-2xl font-black text-emerald-600">
                 ₦
                 {(
                   students.filter((s) => s.paymentStatus === "Verified")
@@ -434,29 +602,67 @@ const SuperAdmin = () => {
           </button>
         </header>
 
-        {activeTab === "overview" && (
+        {activeTab === "students" && (
           <div
-            className={`rounded-[2.5rem] shadow-xl border overflow-hidden ${darkMode ? "bg-slate-800 border-white/5" : "bg-white"}`}
+            className={`rounded-[3rem] shadow-xl border overflow-hidden ${darkMode ? "bg-slate-800" : "bg-white"}`}
           >
             <table className="w-full text-left">
-              <thead className="bg-gray-50/5 text-[10px] font-black uppercase text-gray-400">
+              <thead className="bg-gray-900 text-gray-400 text-[10px] font-black uppercase">
                 <tr>
-                  <th className="p-6">Action</th>
-                  <th className="p-6">Details</th>
-                  <th className="p-6">Timestamp</th>
+                  <th className="p-8">Student Identity</th>
+                  <th className="p-8">Course</th>
+                  <th className="p-8">Status</th>
+                  <th className="p-8 text-center">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100/10">
-                {historyLogs.slice(0, 10).map((log) => (
-                  <tr key={log.id} className="hover:bg-blue-500/5">
-                    <td className="p-6">
-                      <span className="bg-blue-500/10 text-blue-500 px-3 py-1 rounded-lg text-[9px] font-black">
-                        {log.action}
+              <tbody className="divide-y divide-gray-50 font-bold">
+                {students.map((s) => (
+                  <tr key={s.id} className="hover:bg-blue-50/50 transition-all">
+                    <td className="p-8 flex items-center gap-4">
+                      <img
+                        src={s.passportUrl || "https://via.placeholder.com/150"}
+                        className="w-12 h-12 rounded-2xl object-cover ring-2 ring-blue-600/10"
+                        alt=""
+                      />
+                      <div>
+                        <p className="text-sm uppercase tracking-tight">
+                          {s.studentName || s.name}
+                        </p>
+                        <p className="text-[10px] text-gray-400 lowercase">
+                          {s.email || s.studentEmail}
+                        </p>
+                      </div>
+                    </td>
+                    <td className="p-8 text-xs text-blue-600 uppercase font-black">
+                      {s.course || s.courseId}
+                    </td>
+                    <td className="p-8">
+                      <span
+                        className={`px-4 py-1 rounded-lg text-[9px] uppercase font-black ${s.status === "Admitted" ? "bg-green-100 text-green-600" : "bg-amber-100 text-amber-600"}`}
+                      >
+                        {s.status || "Pending"}
                       </span>
                     </td>
-                    <td className="p-6 text-sm font-medium">{log.details}</td>
-                    <td className="p-6 text-[10px] opacity-40">
-                      {log.timestamp?.toDate().toLocaleString()}
+                    <td className="p-8 flex justify-center gap-2">
+                      <button
+                        onClick={() => setSelectedStudentInfo(s)}
+                        className="p-3 bg-slate-900 text-white rounded-xl hover:bg-blue-600"
+                      >
+                        <Eye size={16} />
+                      </button>
+                      <button
+                        onClick={() =>
+                          updateStudentStatus(
+                            s.id,
+                            s.source,
+                            "status",
+                            "Admitted",
+                          )
+                        }
+                        className="p-3 bg-emerald-500 text-white rounded-xl"
+                      >
+                        <CheckCircle size={16} />
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -465,74 +671,37 @@ const SuperAdmin = () => {
           </div>
         )}
 
-        {activeTab === "students" && (
-          <div
-            className={`rounded-[3rem] shadow-xl border overflow-hidden ${darkMode ? "bg-slate-800" : "bg-white"}`}
-          >
-            <table className="w-full text-left">
-              <thead className="bg-gray-50/5 border-b text-[10px] font-black uppercase text-gray-400">
-                <tr>
-                  <th className="p-6">Applicant</th>
-                  <th className="p-6">Course</th>
-                  <th className="p-6">Status</th>
-                  <th className="p-6 text-center">Manage</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100/10">
-                {students.map((s) => (
-                  <tr key={s.id} className="hover:bg-blue-500/5 transition-all">
-                    <td className="p-6 flex items-center gap-4">
-                      <img
-                        src={s.passportUrl}
-                        className="w-12 h-12 rounded-2xl object-cover"
-                        alt="Student"
-                      />
-                      <div>
-                        <p className="font-black text-sm">{s.studentName}</p>
-                        <p className="text-[10px] opacity-50">{s.email}</p>
-                      </div>
-                    </td>
-                    <td className="p-6 font-black text-blue-600 text-xs uppercase">
-                      {s.course}
-                    </td>
-                    <td className="p-6">
-                      <span
-                        className={`px-3 py-1 rounded-full text-[9px] font-black uppercase ${s.status === "Admitted" ? "bg-green-500 text-white" : "bg-amber-100 text-amber-600"}`}
-                      >
-                        {s.status || "Pending"}
-                      </span>
-                    </td>
-                    <td className="p-6 flex justify-center gap-2">
-                      <button
-                        onClick={() => setSelectedStudentInfo(s)}
-                        className="p-3 bg-slate-100 rounded-xl hover:bg-blue-600 hover:text-white transition-all"
-                      >
-                        <Eye size={16} />
-                      </button>
-                      <button
-                        onClick={() =>
-                          updateStudentStatus(s.id, "status", "Admitted")
-                        }
-                        className="p-3 bg-emerald-500 text-white rounded-xl"
-                      >
-                        <CheckCircle size={16} />
-                      </button>
-                      <button
-                        onClick={async () => {
-                          if (window.confirm("Purge student record?"))
-                            await deleteDoc(
-                              doc(db, "course_applications", s.id),
-                            );
-                        }}
-                        className="p-3 bg-red-50 text-red-500 rounded-xl"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        {activeTab === "chat_monitor" && renderChatMonitor()}
+
+        {activeTab === "ai_surveillance" && (
+          <div className="space-y-6 animate-in fade-in duration-500">
+            <h3 className="text-2xl font-black uppercase italic text-blue-600 flex items-center gap-3">
+              <ShieldCheck size={32} /> Intelligence Surveillance
+            </h3>
+            <div className="grid grid-cols-1 gap-4 overflow-y-auto max-h-[70vh] p-2 custom-scrollbar">
+              {aiHistory.map((log) => (
+                <div
+                  key={log.id}
+                  className={`p-6 rounded-[2rem] border transition-all ${log.role === "user" ? "bg-white border-slate-100 shadow-sm" : "bg-blue-600/5 border-blue-600/10"}`}
+                >
+                  <div className="flex justify-between items-center mb-3">
+                    <span className="text-[11px] font-black uppercase tracking-wider">
+                      {log.role === "user"
+                        ? log.userEmail || "Anonymous"
+                        : "Ayax Intelligence System"}
+                    </span>
+                    <span className="text-[9px] font-bold opacity-40">
+                      {log.createdAt?.toDate().toLocaleString()}
+                    </span>
+                  </div>
+                  <p
+                    className={`text-sm leading-relaxed ${log.role === "user" ? "text-slate-700" : "text-blue-900 font-bold"}`}
+                  >
+                    {log.content}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
@@ -564,15 +733,15 @@ const SuperAdmin = () => {
                 }
               />
               <input
-                placeholder="PDF Link (Cloud/Drive URL)"
+                placeholder="PDF URL"
                 className="admin-input"
                 value={pdfData.pdfUrl}
                 onChange={(e) =>
                   setPdfData({ ...pdfData, pdfUrl: e.target.value })
                 }
               />
-              <button className="w-full py-5 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-600 transition-all">
-                Submit Weekly Material
+              <button className="w-full py-5 bg-gray-900 text-white rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-blue-600">
+                Deploy To Students
               </button>
             </form>
           </div>
@@ -583,13 +752,13 @@ const SuperAdmin = () => {
             {historyLogs.map((log) => (
               <div
                 key={log.id}
-                className="p-6 bg-white rounded-3xl border border-gray-100 flex justify-between items-center shadow-sm"
+                className="p-6 bg-white rounded-3xl border flex justify-between items-center shadow-sm"
               >
                 <div>
                   <p className="text-[10px] font-black text-blue-600 uppercase mb-1">
                     {log.action}
                   </p>
-                  <p className="font-bold text-sm">{log.details}</p>
+                  <p className="font-bold text-xs">{log.details}</p>
                 </div>
                 <p className="text-[10px] font-black opacity-30">
                   {log.timestamp?.toDate().toLocaleString()}
