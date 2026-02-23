@@ -283,20 +283,30 @@ const CourseEnrollment = () => {
     };
 
     runBackgroundPersistence();
-    // Locate your Paystack 'onSuccess' callback function
+    // In your Paystack onSuccess callback:
     const handlePaymentSuccess = (response) => {
-      // 1. Fire-and-Forget: Trigger the database save WITHOUT 'await'
-      // This allows the process to run in the background without stopping the UI
+      // 1. Background persistence: DO NOT use 'await'
       addDoc(collection(db, "enrollments"), {
-        studentEmail: auth.currentUser.email,
-        paymentRef: response.reference,
+        email: auth.currentUser.email,
+        reference: response.reference,
         status: "Verified",
         timestamp: serverTimestamp(),
-      }).catch((err) => console.error("Database Sync Lag:", err));
+      }).catch((err) => console.error("Sync Delay:", err));
 
-      // 2. IMMEDIATE EXECUTIVE REDIRECT
-      // This physically moves the user away from the 'Securing' screen NOW
-      window.location.href = "/dashboard?welcome=true";
+      // 2. Immediate Receipt Preparation
+      const receiptInfo = {
+        name: auth.currentUser.displayName || "Ayax Student",
+        ref: response.reference,
+        amount: "NGN 5,000",
+        date: new Date().toLocaleDateString(),
+      };
+
+      // 3. Trigger Download and Instant Submit
+      alert("Payment Confirmed! Your official receipt is downloading.");
+      downloadPDFReceipt(receiptInfo); // Execute client-side PDF generation
+
+      // 4. Forced Bypass
+      window.location.href = "/dashboard?action=download_success";
     };
   };
   if (!portalOpen) {
