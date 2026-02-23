@@ -254,16 +254,17 @@ const CourseEnrollment = () => {
           setLoading(true);
           try {
             // Send data to the "enrollments" collection
-            await addDoc(collection(db, "enrollments"), {
-              studentName: formData.name,
-              studentEmail: formData.email,
-              studentPhone: formData.phone,
-              address: formData.address,
-              courseId: selectedCourse.id, // Critical for AdminDashboard tracking
+            const enrollmentData = {
+              studentName: formData.name || "N/A",
+              studentEmail: formData.email || "N/A",
+              studentPhone: formData.phone || "N/A",
+              address: formData.address || "N/A",
+              courseId: selectedCourse.id,
+              courseName: selectedCourse.name || "Unknown Course",
               enrolledAt: serverTimestamp(),
               paymentStatus: "Verified",
-              studentIdNo: null, // To be assigned by Admin later
-            });
+              studentIdNo: null, // Admin will assign this later
+            };
 
             alert("Your enrollment form has been submitted successfully!");
           } catch (error) {
