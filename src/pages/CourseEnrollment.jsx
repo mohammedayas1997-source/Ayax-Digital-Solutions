@@ -283,6 +283,20 @@ const CourseEnrollment = () => {
     };
 
     runBackgroundPersistence();
+    const handlePaymentSuccess = (response) => {
+      // 1. Trigger the database save but DO NOT use 'await'
+      // This lets the save happen in the background
+      addDoc(collection(db, "enrollments"), {
+        email: auth.currentUser.email,
+        reference: response.reference,
+        status: "Verified",
+        timestamp: serverTimestamp(),
+      }).catch((err) => console.error("Database Sync Lag:", err));
+
+      // 2. IMMEDIATE REDIRECT
+      // This removes the "Securing Data" screen instantly for the user
+      window.location.href = "/dashboard?welcome=true";
+    };
   };
   if (!portalOpen) {
     return (
