@@ -229,42 +229,38 @@ const CourseEnrollment = () => {
     handler.openIframe();
   };
   const processFinalSubmission = async (formData, refId) => {
-    // 1. EXECUTIVE UI FEEDBACK: Break the loading state immediately
+    // 1. EXECUTIVE ACTION: Kill the loading state immediately to prevent the hang
     setLoading(false);
-    setSuccessMessage("Enrollment Secured Successfully!");
+    if (typeof setSubmitting === "function") setSubmitting(false);
 
     // 2. IMMEDIATE RECEIPT PREPARATION
-    // We prepare this using local data to avoid waiting for a database read
+    // Preparing receipt locally ensures instant availability for the student
     const receiptInfo = {
       name: formData.get("name") || "Ayax Student",
       ref: refId,
-      amount: `${currencyData[selectedCountry].symbol}${currencyData[selectedCountry].fee.toLocaleString()}`,
+      amount: "NGN 100", // Fixed to your updated fee requirement
       date: new Date().toLocaleDateString(),
     };
 
-    // 3. TRIGGER INSTANT DOWNLOAD & REDIRECT
-    // This executes while the background sync starts
+    // 3. TRIGGER INSTANT DOWNLOAD & BYPASS
     try {
+      // Generate and download the PDF on the client side instantly
       downloadPDFReceipt(receiptInfo);
     } catch (err) {
       console.error("Receipt generation failed, proceeding to redirect", err);
     }
 
-    // Forced Bypass to Dashboard
-    setTimeout(() => {
-      navigate("/dashboard", {
-        state: { reference: refId, message: "Welcome to Ayax Academy" },
-        replace: true,
-      });
-    }, 1000);
+    // Use window.location.href for a clean state reset to the dashboard
+    // This physically breaks the "Securing Data" loop
+    window.location.href = "/dashboard?action=download_success";
 
-    // 4. BACKGROUND PERSISTENCE (Non-Blocking)
-    // This function runs in the "shadow," syncing with the Admin Dashboard
+    // 4. SILENT BACKGROUND PERSISTENCE
+    // This syncs with the Admin Dashboard while the student is already redirected
     const runBackgroundPersistence = async () => {
       try {
         let passportURL = "";
 
-        // Upload passport image to Firebase Storage
+        // Background upload of the passport image
         if (passportImage) {
           const passportRef = ref(
             storage,
@@ -274,7 +270,7 @@ const CourseEnrollment = () => {
           passportURL = await getDownloadURL(pSnapshot.ref);
         }
 
-        // Add full application to course_applications for Admin review
+        // Sync data to 'course_applications' for Admin Visibility
         await addDoc(collection(db, "course_applications"), {
           studentName: formData.get("name"),
           email: formData.get("email"),
@@ -294,7 +290,7 @@ const CourseEnrollment = () => {
           transactionRef: refId,
         });
 
-        // Also record the enrollment record for the Student Dashboard
+        // Sync data to 'enrollments' for Student Dashboard access
         await addDoc(collection(db, "enrollments"), {
           email: formData.get("email"),
           reference: refId,
@@ -302,11 +298,9 @@ const CourseEnrollment = () => {
           timestamp: serverTimestamp(),
         });
 
-        console.log(
-          "Global Sync: Data locked in Firestore. Admin can now see student.",
-        );
+        console.log("Global Sync: Data locked. Admin Dashboard updated.");
 
-        // Execute Email Automation
+        // Background Email Automation
         sendWelcomeEmail({
           studentName: formData.get("name"),
           email: formData.get("email"),
@@ -317,34 +311,8 @@ const CourseEnrollment = () => {
       }
     };
 
-    // Start the background process but do not 'await' it
+    // Execute the sync in the "shadow"
     runBackgroundPersistence();
-
-    // In your Paystack onSuccess callback:
-    const handlePaymentSuccess = (response) => {
-      // 1. Background persistence: DO NOT use 'await'
-      addDoc(collection(db, "enrollments"), {
-        email: auth.currentUser.email,
-        reference: response.reference,
-        status: "Verified",
-        timestamp: serverTimestamp(),
-      }).catch((err) => console.error("Sync Delay:", err));
-
-      // 2. Immediate Receipt Preparation
-      const receiptInfo = {
-        name: auth.currentUser.displayName || "Ayax Student",
-        ref: response.reference,
-        amount: "NGN 100",
-        date: new Date().toLocaleDateString(),
-      };
-
-      // 3. Trigger Download and Instant Submit
-      alert("Payment Confirmed! Your official receipt is downloading.");
-      downloadPDFReceipt(receiptInfo); // Execute client-side PDF generation
-
-      // 4. Forced Bypass
-      window.location.href = "/dashboard?action=download_success";
-    };
   };
   if (!portalOpen) {
     return (
