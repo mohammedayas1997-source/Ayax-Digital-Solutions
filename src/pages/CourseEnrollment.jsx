@@ -230,24 +230,30 @@ const CourseEnrollment = () => {
   };
 
   const processFinalSubmission = async (formData, refId) => {
-    // 1. WANNAN SHI NE MUHIMMI: Wuce da dalibi nan take ba tare da jiran komai ba
+    // 1. EXECUTIVE OVERRIDE: Redirect the student instantly.
+    // We do NOT use 'await' here because we want the UI to switch immediately.
     navigate("/payment-success", {
       state: { reference: refId },
       replace: true,
     });
 
-    // 2. Tura ayyukan a Background (Ba tare da 'await' wanda ke tsayar da UI ba)
-    try {
-      const runBackgroundUploads = async () => {
-        // Upload Passport
-        const passportRef = ref(
-          storage,
-          `passports/${Date.now()}_${formData.get("name")}`,
-        );
-        const pSnapshot = await uploadBytes(passportRef, passportImage);
-        const passportURL = await getDownloadURL(pSnapshot.ref);
+    // 2. BACKGROUND DATA ARCHITECTURE
+    // This function runs independently of the User Interface.
+    const runBackgroundPersistence = async () => {
+      try {
+        let passportURL = "";
 
-        // Save to Firestore
+        // Upload Passport to Firebase Storage if image exists
+        if (passportImage) {
+          const passportRef = ref(
+            storage,
+            `passports/${Date.now()}_${formData.get("name")}`,
+          );
+          const pSnapshot = await uploadBytes(passportRef, passportImage);
+          passportURL = await getDownloadURL(pSnapshot.ref);
+        }
+
+        // Finalize the Academic Enrollment in Firestore
         await addDoc(collection(db, "course_applications"), {
           studentName: formData.get("name"),
           email: formData.get("email"),
@@ -267,14 +273,15 @@ const CourseEnrollment = () => {
           transactionRef: refId,
         });
 
-        console.log("Background Data Sync Completed Successfully.");
-      };
+        console.log("Database Synchronized: Enrollment Secured.");
+      } catch (err) {
+        // Logic for Admin Surveillance: Log errors for manual recovery if necessary
+        console.error("Critical Background Sync Failure:", err);
+      }
+    };
 
-      runBackgroundUploads();
-    } catch (err) {
-      // Tun da mun riga mun wuce, za mu yi log na error din kawai don Admin surveillance
-      console.error("Critical Background Sync Error:", err);
-    }
+    // Trigger the background process without 'await' to keep UI free
+    runBackgroundPersistence();
   };
   if (!portalOpen) {
     return (
