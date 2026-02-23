@@ -19,13 +19,66 @@ import {
   X,
   Lock,
   Loader2,
+  CreditCard,
 } from "lucide-react";
 import emailjs from "@emailjs/browser";
 import { downloadPDFReceipt, downloadFilledForm } from "../utils/pdfGenerator";
 
 const currencyData = {
   Nigeria: { code: "NGN", symbol: "₦", fee: 100 },
-  // ... rest of your currency data
+  Algeria: { code: "DZD", symbol: "DA", fee: 455 },
+  Angola: { code: "AOA", symbol: "Kz", fee: 2800 },
+  Benin: { code: "XOF", symbol: "CFA", fee: 2050 },
+  Botswana: { code: "BWP", symbol: "P", fee: 45 },
+  Burkina_Faso: { code: "XOF", symbol: "CFA", fee: 2050 },
+  Burundi: { code: "BIF", symbol: "FBu", fee: 9600 },
+  Cameroon: { code: "XAF", symbol: "FCFA", fee: 2050 },
+  Cape_Verde: { code: "CVE", symbol: "Esc", fee: 340 },
+  Central_African_Republic: { code: "XAF", symbol: "FCFA", fee: 2050 },
+  Chad: { code: "XAF", symbol: "FCFA", fee: 2050 },
+  Comoros: { code: "KMF", symbol: "CF", fee: 1550 },
+  Congo_DRC: { code: "CDF", symbol: "FC", fee: 9400 },
+  Congo_Republic: { code: "XAF", symbol: "FCFA", fee: 2050 },
+  Djibouti: { code: "DJF", symbol: "Fdj", fee: 600 },
+  Egypt: { code: "EGP", symbol: "E£", fee: 165 },
+  Equatorial_Guinea: { code: "XAF", symbol: "FCFA", fee: 2050 },
+  Eritrea: { code: "ERN", symbol: "Nfk", fee: 50 },
+  Eswatini: { code: "SZL", symbol: "L", fee: 65 },
+  Ethiopia: { code: "ETB", symbol: "Br", fee: 380 },
+  Gabon: { code: "XAF", symbol: "FCFA", fee: 2050 },
+  Gambia: { code: "GMD", symbol: "D", fee: 230 },
+  Ghana: { code: "GHS", symbol: "GH₵", fee: 50 },
+  Guinea: { code: "GNF", symbol: "FG", fee: 29050 },
+  Guinea_Bissau: { code: "XOF", symbol: "CFA", fee: 2050 },
+  Ivory_Coast: { code: "XOF", symbol: "CFA", fee: 2050 },
+  Kenya: { code: "KES", symbol: "KSh", fee: 440 },
+  Lesotho: { code: "LSL", symbol: "L", fee: 65 },
+  Liberia: { code: "LRD", symbol: "L$", fee: 650 },
+  Libya: { code: "LYD", symbol: "LD", fee: 15 },
+  Madagascar: { code: "MGA", symbol: "Ar", fee: 15250 },
+  Malawi: { code: "MWK", symbol: "MK", fee: 5750 },
+  Mali: { code: "XOF", symbol: "CFA", fee: 2050 },
+  Mauritania: { code: "MRU", symbol: "UM", fee: 135 },
+  Mauritius: { code: "MUR", symbol: "₨", fee: 155 },
+  Morocco: { code: "MAD", symbol: "DH", fee: 35 },
+  Mozambique: { code: "MZN", symbol: "MT", fee: 215 },
+  Namibia: { code: "NAD", symbol: "N$", fee: 65 },
+  Niger: { code: "XOF", symbol: "CFA", fee: 2050 },
+  Rwanda: { code: "RWF", symbol: "RF", fee: 4300 },
+  Sao_Tome: { code: "STN", symbol: "Db", fee: 75 },
+  Senegal: { code: "XOF", symbol: "CFA", fee: 2050 },
+  Seychelles: { code: "SCR", symbol: "SR", fee: 45 },
+  Sierra_Leone: { code: "SLE", symbol: "Le", fee: 75 },
+  Somalia: { code: "SOS", symbol: "Sh", fee: 1900 },
+  South_Africa: { code: "ZAR", symbol: "R", fee: 65 },
+  South_Sudan: { code: "SSP", symbol: "£", fee: 4400 },
+  Sudan: { code: "SDG", symbol: "£", fee: 2050 },
+  Tanzania: { code: "TZS", symbol: "TSh", fee: 8600 },
+  Togo: { code: "XAF", symbol: "FCFA", fee: 2050 },
+  Tunisia: { code: "TND", symbol: "DT", fee: 10 },
+  Uganda: { code: "UGX", symbol: "USh", fee: 12650 },
+  Zambia: { code: "ZMW", symbol: "ZK", fee: 90 },
+  Zimbabwe: { code: "ZWG", symbol: "ZiG", fee: 450 },
 };
 
 const CourseEnrollment = () => {
@@ -78,16 +131,37 @@ const CourseEnrollment = () => {
       ...educationList,
       { qualification: "", institution: "", course: "", year: "" },
     ]);
+
   const removeEducation = (index) => {
     const list = [...educationList];
     list.splice(index, 1);
     setEducationList(list);
   };
 
-  // --- EXECUTIVE SUBMISSION LOGIC ---
+  const sendWelcomeEmail = (studentData) => {
+    const SCHOOL_LOGO_URL =
+      "https://firebasestorage.googleapis.com/v0/b/ayax-academy.appspot.com/o/assets%2Flogo.png?alt=media";
+    const templateParams = {
+      fullName: studentData.studentName,
+      course: studentData.course,
+      email: studentData.studentEmail,
+      logo_url: SCHOOL_LOGO_URL,
+      school_name: "AYAX Digital Solutions Academy",
+      submission_date: new Date().toLocaleDateString(),
+    };
+    emailjs
+      .send(
+        "service_2wusktt",
+        "template_lfz7bfj",
+        templateParams,
+        "Zq65aNb8G1g9F7XkY",
+      )
+      .catch((err) => console.error("Email Error:", err));
+  };
+
+  // --- SUBMISSION LOGIC ---
   const processFinalSubmission = async (formData, refId) => {
     try {
-      // 1. DATA PACKET ASSEMBLY
       const studentInfo = {
         studentName: formData.get("name"),
         studentEmail: formData.get("email"),
@@ -101,12 +175,11 @@ const CourseEnrollment = () => {
         educationBackground: educationList,
         country: selectedCountry,
         transactionRef: refId,
-        amountPaid: `₦100`,
+        amountPaid: `${currencyData[selectedCountry].symbol}${currencyData[selectedCountry].fee}`,
         paymentStatus: "Verified",
         appliedAt: serverTimestamp(),
       };
 
-      // 2. FIREBASE STORAGE (Passport)
       let passportURL = "";
       if (passportImage) {
         const passportRef = ref(
@@ -119,36 +192,22 @@ const CourseEnrollment = () => {
 
       const finalRecord = { ...studentInfo, passportUrl: passportURL };
 
-      // 3. FIRESTORE SYNC (Wait for success so Admin sees it)
       await Promise.all([
         addDoc(collection(db, "course_applications"), finalRecord),
         addDoc(collection(db, "enrollments"), finalRecord),
       ]);
 
-      // 4. UI UPDATE & DOCUMENT GENERATION
+      sendWelcomeEmail(studentInfo);
+
       setLoading(false);
       setSuccessMessage(`Welcome to Ayax Academy, ${studentInfo.studentName}`);
 
       if (downloadPDFReceipt) downloadPDFReceipt(finalRecord);
       if (downloadFilledForm) downloadFilledForm(finalRecord);
-
-      // Email dispatch
-      emailjs.send(
-        "service_2wusktt",
-        "template_lfz7bfj",
-        {
-          fullName: studentInfo.studentName,
-          course: studentInfo.course,
-          email: studentInfo.studentEmail,
-          school_name: "AYAX Digital Solutions Academy",
-          submission_date: new Date().toLocaleDateString(),
-        },
-        "Zq65aNb8G1g9F7XkY",
-      );
     } catch (err) {
-      console.error("Critical Failure:", err);
+      console.error("Submission Error:", err);
       setLoading(false);
-      alert("Registration failed. Data saved locally, please contact support.");
+      alert("Submission error. Please contact Admin.");
     }
   };
 
@@ -156,24 +215,26 @@ const CourseEnrollment = () => {
     e.preventDefault();
     if (!portalOpen) return alert("Portal Locked.");
     if (!passportImage) return alert("Upload Passport First.");
+
     const formData = new FormData(formRef.current);
 
-    const handler = window.PaystackPop.setup({
+    if (!window.PaystackPop) {
+      return alert("Paystack system loading. Please wait 5 seconds.");
+    }
+
+    const paystack = new window.PaystackPop();
+    paystack.newTransaction({
       key: PAYSTACK_PUBLIC_KEY,
       email: formData.get("email"),
       amount: currencyData[selectedCountry].fee * 100,
       currency: currencyData[selectedCountry].code,
-
-      // FORCES OPAY AND MOBILE MONEY CHANNELS
       channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
-
-      callback: (response) => {
+      onSuccess: (transaction) => {
         setLoading(true);
-        processFinalSubmission(formData, response.reference);
+        processFinalSubmission(formData, transaction.reference);
       },
-      onClose: () => alert("Transaction Cancelled."),
+      onCancel: () => alert("Payment Cancelled."),
     });
-    handler.openIframe();
   };
 
   if (!portalOpen) {
@@ -184,12 +245,12 @@ const CourseEnrollment = () => {
             size={100}
             className="text-red-500 mx-auto mb-8 animate-bounce"
           />
-          <h1 className="text-5xl font-black uppercase text-white tracking-tighter">
+          <h1 className="text-5xl font-black uppercase text-white tracking-tighter text-wrap">
             Portal <span className="text-red-500">Locked</span>
           </h1>
           <button
             onClick={() => navigate("/")}
-            className="mt-10 px-10 py-4 bg-white text-black rounded-2xl font-black uppercase text-xs hover:bg-red-500 hover:text-white transition-all"
+            className="mt-10 px-10 py-4 bg-white text-black rounded-2xl font-black uppercase text-xs hover:bg-red-500 transition-all"
           >
             Return Home
           </button>
@@ -199,13 +260,13 @@ const CourseEnrollment = () => {
   }
 
   return (
-    <div className="pt-32 pb-20 bg-slate-50 min-h-screen px-6 font-sans text-slate-900">
-      <div className="max-w-4xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100 relative">
+    <div className="pt-32 pb-20 bg-slate-50 min-h-screen px-6 font-sans">
+      <div className="max-w-4xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100 relative text-slate-900">
         {loading && (
           <div className="absolute inset-0 z-[100] bg-white/80 backdrop-blur-md flex flex-col items-center justify-center">
             <Loader2 className="animate-spin text-blue-600 mb-4" size={50} />
             <p className="font-black uppercase tracking-widest text-xs">
-              Finalizing Enrollment...
+              Securing Data...
             </p>
           </div>
         )}
@@ -217,7 +278,7 @@ const CourseEnrollment = () => {
               {successMessage}
             </h2>
             <p className="font-bold opacity-80 mb-8 uppercase tracking-widest text-xs">
-              Payment Verified (₦100). Data synced to Admin.
+              Your documents have been generated.
             </p>
             <button
               onClick={() => window.location.reload()}
@@ -240,7 +301,6 @@ const CourseEnrollment = () => {
           onSubmit={handleApplyTrigger}
           className="p-8 lg:p-16 space-y-16"
         >
-          {/* PASSPORT */}
           <div className="flex flex-col items-center space-y-6">
             <div className="relative w-48 h-48 bg-slate-50 rounded-[2.5rem] border-4 border-dashed border-slate-200 flex items-center justify-center overflow-hidden group hover:border-blue-400">
               {passportPreview ? (
@@ -270,7 +330,6 @@ const CourseEnrollment = () => {
             </div>
           </div>
 
-          {/* CREDENTIALS */}
           <div className="space-y-8">
             <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase">
               Student Credentials
@@ -317,7 +376,10 @@ const CourseEnrollment = () => {
                   </span>
                 </div>
                 <div className="text-right">
-                  <h2 className="text-3xl font-black">₦100</h2>
+                  <h2 className="text-3xl font-black">
+                    {currencyData[selectedCountry].symbol}
+                    {currencyData[selectedCountry].fee.toLocaleString()}
+                  </h2>
                 </div>
               </div>
               <select
@@ -347,7 +409,6 @@ const CourseEnrollment = () => {
             </div>
           </div>
 
-          {/* ACADEMIC HISTORY */}
           <div className="space-y-8">
             <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase">
               Academic History
@@ -429,41 +490,46 @@ const CourseEnrollment = () => {
               onClick={addEducation}
               className="w-full py-4 border-2 border-dashed border-blue-200 text-blue-600 rounded-2xl font-black uppercase text-[10px] hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
             >
-              <Plus size={16} /> Add Credentials
+              <Plus size={16} /> Add More Credentials
             </button>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            <input
-              name="address"
-              required
-              className="input-style md:col-span-2"
-              placeholder="Street Address"
-            />
-            <input
-              name="currentState"
-              required
-              className="input-style"
-              placeholder="Current State"
-            />
-            <input
-              name="currentLGA"
-              required
-              className="input-style"
-              placeholder="Current LGA"
-            />
-            <input
-              name="stateOfOrigin"
-              required
-              className="input-style"
-              placeholder="State of Origin"
-            />
-            <input
-              name="lgaOfOrigin"
-              required
-              className="input-style"
-              placeholder="LGA of Origin"
-            />
+          <div className="space-y-8">
+            <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase">
+              Resident & Origin
+            </h3>
+            <div className="grid md:grid-cols-2 gap-6">
+              <input
+                name="address"
+                required
+                className="input-style md:col-span-2"
+                placeholder="Street Address"
+              />
+              <input
+                name="currentState"
+                required
+                className="input-style"
+                placeholder="Current State"
+              />
+              <input
+                name="currentLGA"
+                required
+                className="input-style"
+                placeholder="Current LGA"
+              />
+              <input
+                name="stateOfOrigin"
+                required
+                className="input-style"
+                placeholder="State of Origin"
+              />
+              <input
+                name="lgaOfOrigin"
+                required
+                className="input-style"
+                placeholder="LGA of Origin"
+              />
+            </div>
           </div>
 
           <button
