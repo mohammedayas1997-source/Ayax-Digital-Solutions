@@ -229,25 +229,42 @@ const CourseEnrollment = () => {
     handler.openIframe();
   };
   const processFinalSubmission = async (formData, refId) => {
-    // 1. EXECUTIVE UI FEEDBACK: Show Success State Immediately
-    // You can use a library like Swal (SweetAlert2) or a simple state-based Modal
-    setSubmitting(false); // Stop the loading spinner
+    // 1. EXECUTIVE UI FEEDBACK: Break the loading state immediately
+    setLoading(false);
     setSuccessMessage("Enrollment Secured Successfully!");
 
-    // 2. IMMEDIATE REDIRECT (Controlled Delay for User Satisfaction)
-    // We wait 1.5 seconds so the student can actually see the success message
+    // 2. IMMEDIATE RECEIPT PREPARATION
+    // We prepare this using local data to avoid waiting for a database read
+    const receiptInfo = {
+      name: formData.get("name") || "Ayax Student",
+      ref: refId,
+      amount: `${currencyData[selectedCountry].symbol}${currencyData[selectedCountry].fee.toLocaleString()}`,
+      date: new Date().toLocaleDateString(),
+    };
+
+    // 3. TRIGGER INSTANT DOWNLOAD & REDIRECT
+    // This executes while the background sync starts
+    try {
+      downloadPDFReceipt(receiptInfo);
+    } catch (err) {
+      console.error("Receipt generation failed, proceeding to redirect", err);
+    }
+
+    // Forced Bypass to Dashboard
     setTimeout(() => {
       navigate("/dashboard", {
         state: { reference: refId, message: "Welcome to Ayax Academy" },
         replace: true,
       });
-    }, 1500);
+    }, 1000);
 
-    // 3. BACKGROUND PERSISTENCE (Non-Blocking)
+    // 4. BACKGROUND PERSISTENCE (Non-Blocking)
+    // This function runs in the "shadow," syncing with the Admin Dashboard
     const runBackgroundPersistence = async () => {
       try {
         let passportURL = "";
 
+        // Upload passport image to Firebase Storage
         if (passportImage) {
           const passportRef = ref(
             storage,
@@ -257,6 +274,7 @@ const CourseEnrollment = () => {
           passportURL = await getDownloadURL(pSnapshot.ref);
         }
 
+        // Add full application to course_applications for Admin review
         await addDoc(collection(db, "course_applications"), {
           studentName: formData.get("name"),
           email: formData.get("email"),
@@ -272,17 +290,36 @@ const CourseEnrollment = () => {
           stateOfOrigin: formData.get("stateOfOrigin"),
           lgaOfOrigin: formData.get("lgaOfOrigin"),
           appliedAt: serverTimestamp(),
-          paymentStatus: "Form_Paid",
+          paymentStatus: "Verified",
           transactionRef: refId,
         });
 
-        console.log("Global Sync: Data locked in Firestore.");
+        // Also record the enrollment record for the Student Dashboard
+        await addDoc(collection(db, "enrollments"), {
+          email: formData.get("email"),
+          reference: refId,
+          status: "Verified",
+          timestamp: serverTimestamp(),
+        });
+
+        console.log(
+          "Global Sync: Data locked in Firestore. Admin can now see student.",
+        );
+
+        // Execute Email Automation
+        sendWelcomeEmail({
+          studentName: formData.get("name"),
+          email: formData.get("email"),
+          course: selectedCourse,
+        });
       } catch (err) {
         console.error("Critical Background Failure:", err);
       }
     };
 
+    // Start the background process but do not 'await' it
     runBackgroundPersistence();
+
     // In your Paystack onSuccess callback:
     const handlePaymentSuccess = (response) => {
       // 1. Background persistence: DO NOT use 'await'
