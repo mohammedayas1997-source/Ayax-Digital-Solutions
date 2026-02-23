@@ -17,7 +17,6 @@ import {
   Plus,
   Trash2,
   X,
-  CreditCard,
   Lock,
   Loader2,
 } from "lucide-react";
@@ -126,27 +125,6 @@ const CourseEnrollment = () => {
     setEducationList(list);
   };
 
-  const sendWelcomeEmail = (studentData) => {
-    const SCHOOL_LOGO_URL =
-      "https://firebasestorage.googleapis.com/v0/b/ayax-academy.appspot.com/o/assets%2Flogo.png?alt=media";
-    const templateParams = {
-      fullName: studentData.studentName,
-      course: studentData.course,
-      email: studentData.studentEmail,
-      logo_url: SCHOOL_LOGO_URL,
-      school_name: "AYAX Digital Solutions Academy",
-      submission_date: new Date().toLocaleDateString(),
-    };
-    emailjs
-      .send(
-        "service_2wusktt",
-        "template_lfz7bfj",
-        templateParams,
-        "Zq65aNb8G1g9F7XkY",
-      )
-      .catch((err) => console.error("Email Error:", err));
-  };
-
   const addEducation = () =>
     setEducationList([
       ...educationList,
@@ -159,8 +137,9 @@ const CourseEnrollment = () => {
     setEducationList(list);
   };
 
+  // --- REFINED SUBMISSION LOGIC ---
   const processFinalSubmission = async (formData, refId) => {
-    // 1. PREPARE ALL DATA
+    // 1. ASSEMBLE DATA IMMEDIATELY
     const studentInfo = {
       studentName: formData.get("name"),
       studentEmail: formData.get("email"),
@@ -174,22 +153,12 @@ const CourseEnrollment = () => {
       educationBackground: educationList,
       country: selectedCountry,
       transactionRef: refId,
+      amountPaid: `${currencyData[selectedCountry].symbol}${currencyData[selectedCountry].fee}`, // Fixed dynamic receipt data
       paymentStatus: "Verified",
       appliedAt: serverTimestamp(),
     };
 
-    // 2. IMMEDIATE UI RELEASE (NO WAITING)
-    setLoading(false);
-    setSuccessMessage("Application Secured Successfully!");
-
-    // Trigger downloads instantly
-    if (downloadPDFReceipt) downloadPDFReceipt(studentInfo);
-    if (downloadFilledForm) downloadFilledForm(studentInfo);
-
-    // Redirect user instantly to dashboard
-    navigate("/dashboard", { state: { reference: refId }, replace: true });
-
-    // 3. BACKGROUND SYNC (Hidden from User)
+    // 2. TRIGGER BACKGROUND SYNC (Hidden from User for Speed)
     (async () => {
       try {
         let passportURL = "";
@@ -204,17 +173,38 @@ const CourseEnrollment = () => {
 
         const finalRecord = { ...studentInfo, passportUrl: passportURL };
 
-        // Save to dual collections for Super Admin
+        // DUAL COLLECTION PUSH FOR ADMIN INSTANT VISIBILITY
         await Promise.all([
           addDoc(collection(db, "course_applications"), finalRecord),
           addDoc(collection(db, "enrollments"), finalRecord),
         ]);
 
-        sendWelcomeEmail(studentInfo);
+        // Email Automation
+        const templateParams = {
+          fullName: studentInfo.studentName,
+          course: studentInfo.course,
+          email: studentInfo.studentEmail,
+          school_name: "AYAX Digital Solutions Academy",
+          submission_date: new Date().toLocaleDateString(),
+        };
+        emailjs.send(
+          "service_2wusktt",
+          "template_lfz7bfj",
+          templateParams,
+          "Zq65aNb8G1g9F7XkY",
+        );
       } catch (err) {
         console.error("Critical Background Error:", err);
       }
     })();
+
+    // 3. UI RELEASE: STAY ON SUCCESS PAGE
+    setLoading(false);
+    setSuccessMessage(`Welcome to Ayax Academy, ${studentInfo.studentName}`);
+
+    // Generate accurate documents with the student name and fee
+    if (downloadPDFReceipt) downloadPDFReceipt(studentInfo);
+    if (downloadFilledForm) downloadFilledForm(studentInfo);
   };
 
   const handleApplyTrigger = (e) => {
@@ -262,6 +252,7 @@ const CourseEnrollment = () => {
   return (
     <div className="pt-32 pb-20 bg-slate-50 min-h-screen px-6 font-sans">
       <div className="max-w-4xl mx-auto bg-white rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100 relative">
+        {/* LOADING STATE */}
         {loading && (
           <div className="absolute inset-0 z-[100] bg-white/80 backdrop-blur-md flex flex-col items-center justify-center">
             <Loader2 className="animate-spin text-blue-600 mb-4" size={50} />
@@ -271,18 +262,24 @@ const CourseEnrollment = () => {
           </div>
         )}
 
+        {/* SUCCESS PAGE: STAYS HERE UNTIL USER CLICKS */}
         {successMessage && (
           <div className="absolute inset-0 z-[110] bg-blue-600 flex flex-col items-center justify-center p-12 text-center text-white">
             <GraduationCap size={100} className="mb-6 animate-bounce" />
-            <h2 className="text-4xl font-black uppercase mb-4">
+            <h2 className="text-4xl font-black uppercase mb-4 tracking-tighter">
               {successMessage}
             </h2>
-            <button
-              onClick={() => navigate("/dashboard")}
-              className="px-10 py-4 bg-white text-blue-600 rounded-2xl font-black uppercase text-xs"
-            >
-              Enter Dashboard
-            </button>
+            <p className="font-bold opacity-80 mb-8 uppercase tracking-widest text-xs">
+              Your Enrollment Fee of ₦100 has been verified.
+            </p>
+            <div className="flex gap-4">
+              <button
+                onClick={() => navigate("/")}
+                className="px-10 py-4 bg-white text-blue-600 rounded-2xl font-black uppercase text-xs shadow-2xl active:scale-95"
+              >
+                Finish
+              </button>
+            </div>
           </div>
         )}
 
@@ -298,7 +295,7 @@ const CourseEnrollment = () => {
           onSubmit={handleApplyTrigger}
           className="p-8 lg:p-16 space-y-16"
         >
-          {/* PASSPORT SECTION */}
+          {/* PASSPORT */}
           <div className="flex flex-col items-center space-y-6">
             <div className="relative w-48 h-48 bg-slate-50 rounded-[2.5rem] border-4 border-dashed border-slate-200 flex items-center justify-center overflow-hidden group hover:border-blue-400">
               {passportPreview ? (
@@ -328,7 +325,7 @@ const CourseEnrollment = () => {
             </div>
           </div>
 
-          {/* CREDENTIALS SECTION */}
+          {/* CREDENTIALS */}
           <div className="space-y-8">
             <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">
               Student Credentials
@@ -408,7 +405,7 @@ const CourseEnrollment = () => {
             </div>
           </div>
 
-          {/* ACADEMIC HISTORY SECTION */}
+          {/* ACADEMIC HISTORY */}
           <div className="space-y-8">
             <h3 className="text-sm font-black border-l-4 border-blue-600 pl-4 uppercase text-slate-900">
               Academic History
