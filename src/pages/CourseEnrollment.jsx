@@ -230,42 +230,52 @@ const CourseEnrollment = () => {
   };
 
   const processFinalSubmission = async (formData, refId) => {
+    // 1. WANNAN SHI NE MUHIMMI: Wuce da dalibi nan take ba tare da jiran komai ba
+    navigate("/payment-success", {
+      state: { reference: refId },
+      replace: true,
+    });
+
+    // 2. Tura ayyukan a Background (Ba tare da 'await' wanda ke tsayar da UI ba)
     try {
-      // 1. Upload Passport
-      const passportRef = ref(
-        storage,
-        `passports/${Date.now()}_${formData.get("name")}`,
-      );
-      const pSnapshot = await uploadBytes(passportRef, passportImage);
-      const passportURL = await getDownloadURL(pSnapshot.ref);
+      const runBackgroundUploads = async () => {
+        // Upload Passport
+        const passportRef = ref(
+          storage,
+          `passports/${Date.now()}_${formData.get("name")}`,
+        );
+        const pSnapshot = await uploadBytes(passportRef, passportImage);
+        const passportURL = await getDownloadURL(pSnapshot.ref);
 
-      // 2. Save to Firestore
-      await addDoc(collection(db, "course_applications"), {
-        studentName: formData.get("name"),
-        email: formData.get("email"),
-        phone: formData.get("phone"),
-        course: selectedCourse,
-        country: selectedCountry,
-        passportUrl: passportURL,
-        paymentMethod: "Paystack",
-        education: educationList,
-        address: formData.get("address"),
-        currentState: formData.get("currentState"),
-        currentLGA: formData.get("currentLGA"),
-        stateOfOrigin: formData.get("stateOfOrigin"),
-        lgaOfOrigin: formData.get("lgaOfOrigin"),
-        appliedAt: serverTimestamp(),
-        paymentStatus: "Form_Paid",
-        transactionRef: refId,
-      });
+        // Save to Firestore
+        await addDoc(collection(db, "course_applications"), {
+          studentName: formData.get("name"),
+          email: formData.get("email"),
+          phone: formData.get("phone"),
+          course: selectedCourse,
+          country: selectedCountry,
+          passportUrl: passportURL,
+          paymentMethod: "Paystack",
+          education: educationList,
+          address: formData.get("address"),
+          currentState: formData.get("currentState"),
+          currentLGA: formData.get("currentLGA"),
+          stateOfOrigin: formData.get("stateOfOrigin"),
+          lgaOfOrigin: formData.get("lgaOfOrigin"),
+          appliedAt: serverTimestamp(),
+          paymentStatus: "Form_Paid",
+          transactionRef: refId,
+        });
 
-      navigate("/payment-success", { state: { reference: refId } });
+        console.log("Background Data Sync Completed Successfully.");
+      };
+
+      runBackgroundUploads();
     } catch (err) {
-      alert("Payment successful but data save failed. Contact Support.");
-      setLoading(false);
+      // Tun da mun riga mun wuce, za mu yi log na error din kawai don Admin surveillance
+      console.error("Critical Background Sync Error:", err);
     }
   };
-
   if (!portalOpen) {
     return (
       <div className="h-screen w-full bg-slate-950 flex flex-col items-center justify-center p-10 text-center">
