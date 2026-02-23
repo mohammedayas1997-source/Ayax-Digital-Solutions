@@ -60,8 +60,8 @@ import {
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState("overview");
   const [students, setStudents] = useState([]);
-  const [searchTerm, setSearchTerm] = useState(""); // Search State
-  const [filterStatus, setFilterStatus] = useState("All"); // Filter State
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("All");
   const [chats, setChats] = useState([]);
   const [newsFeed, setNewsFeed] = useState([]);
   const [selectedChat, setSelectedChat] = useState(null);
@@ -76,7 +76,6 @@ const AdminDashboard = () => {
   const [galleryItems, setGalleryItems] = useState([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
-
   const [autoReplyText, setAutoReplyText] = useState("");
 
   const [newsData, setNewsData] = useState({
@@ -94,11 +93,6 @@ const AdminDashboard = () => {
     grade: "Distinction",
     issueDate: new Date().toISOString().split("T")[0],
   });
-
-  const SUPERVISOR_INFO = {
-    email: "supervisor@ayaxacademy.com",
-    phone: "2348000000000",
-  };
 
   // 1. REAL-TIME DATA ENGINE
   useEffect(() => {
@@ -155,10 +149,6 @@ const AdminDashboard = () => {
       },
     );
 
-    getDoc(doc(db, "system_settings", "chat_config")).then((docSnap) => {
-      if (docSnap.exists()) setAutoReplyText(docSnap.data().autoReplyMessage);
-    });
-
     return () => {
       unsubStudents();
       unsubGallery();
@@ -169,73 +159,15 @@ const AdminDashboard = () => {
     };
   }, []);
 
-  // SEARCH & FILTER LOGIC
+  // Filter Logic
   const filteredStudents = students.filter((s) => {
     const matchesSearch =
       s.studentName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.course?.toLowerCase().includes(searchTerm.toLowerCase());
-
+      s.email?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter =
       filterStatus === "All" || s.paymentStatus === filterStatus;
-
     return matchesSearch && matchesFilter;
   });
-
-  // Admin Actions
-  const updateAutoReplySettings = async () => {
-    try {
-      setLoading(true);
-      await setDoc(
-        doc(db, "system_settings", "chat_config"),
-        { autoReplyMessage: autoReplyText, updatedAt: serverTimestamp() },
-        { merge: true },
-      );
-      alert("Auto-Reply Updated!");
-    } catch (err) {
-      alert("Error updating settings");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGalleryUpload = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      await addDoc(collection(db, "gallery"), {
-        title: galleryTitle,
-        url: galleryUrl,
-        category: galleryCategory,
-        createdAt: serverTimestamp(),
-      });
-      alert("GALLERY UPDATED!");
-      setGalleryTitle("");
-      setGalleryUrl("");
-    } catch (err) {
-      alert("Upload failed");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleDeleteGalleryItem = async (id, title) => {
-    if (
-      window.confirm(
-        `Are you sure you want to delete "${title}" from the gallery?`,
-      )
-    ) {
-      try {
-        setLoading(true);
-        await deleteDoc(doc(db, "gallery", id));
-        await logActivity("GALLERY_DELETE", `Deleted image: ${title}`);
-      } catch (err) {
-        alert("Error deleting image.");
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
 
   const logActivity = async (action, details) => {
     await addDoc(collection(db, "admin_logs"), {
@@ -255,8 +187,34 @@ const AdminDashboard = () => {
     );
     logActivity(
       "PORTAL_TOGGLE",
-      `Portal system state: ${newStatus ? "ACTIVE" : "LOCKDOWN"}`,
+      `Portal state: ${newStatus ? "ACTIVE" : "LOCKDOWN"}`,
     );
+  };
+
+  const handleGalleryUpload = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await addDoc(collection(db, "gallery"), {
+        title: galleryTitle,
+        url: galleryUrl,
+        category: galleryCategory,
+        createdAt: serverTimestamp(),
+      });
+      setGalleryTitle("");
+      setGalleryUrl("");
+    } catch (err) {
+      alert("Upload failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteGalleryItem = async (id, title) => {
+    if (window.confirm(`Delete ${title}?`)) {
+      await deleteDoc(doc(db, "gallery", id));
+      logActivity("GALLERY_DELETE", `Deleted image: ${title}`);
+    }
   };
 
   const handlePublishNews = async (e) => {
@@ -266,11 +224,8 @@ const AdminDashboard = () => {
       await addDoc(collection(db, "news_feed"), {
         ...newsData,
         createdAt: serverTimestamp(),
-        adminEmail: auth.currentUser?.email,
       });
-      alert("NEWS PUBLISHED!");
       setNewsData({ title: "", content: "", category: "General", image: "" });
-      logActivity("NEWS_PUBLISH", `Published news: ${newsData.title}`);
     } catch (err) {
       alert("Error publishing news.");
     } finally {
@@ -278,64 +233,27 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleDeleteNews = async (newsId, title) => {
-    if (window.confirm(`Are you sure you want to delete: "${title}"?`)) {
-      try {
-        await deleteDoc(doc(db, "news_feed", newsId));
-        logActivity("NEWS_DELETE", `Deleted news article: ${title}`);
-      } catch (err) {
-        alert("Failed to delete news.");
-      }
+  const handleDeleteNews = async (id, title) => {
+    if (window.confirm(`Delete news: ${title}?`)) {
+      await deleteDoc(doc(db, "news_feed", id));
     }
   };
 
   const handleAutomaticIDDispatch = async (student) => {
-    if (student.paymentStatus !== "Form_Paid") {
-      alert("ERROR: No payment proof found.");
-      return;
-    }
     setLoading(true);
     const generatedID = `AYX-2026-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
-    try {
-      await updateDoc(doc(db, "course_applications", student.id), {
-        studentId: generatedID,
-        status: "Admitted",
-        idAssignedAt: serverTimestamp(),
-      });
-      await logActivity(
-        "AUTO_ID_DISPATCH",
-        `Generated ID ${generatedID} for ${student.studentName}`,
-      );
-      alert(`SUCCESS: ID ${generatedID} dispatched.`);
-    } catch (err) {
-      alert("CRITICAL ERROR: ID dispatch failed.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const issueCertificate = async (student) => {
-    const certSerial = `AYX-CERT-${Date.now()}`;
-    try {
-      await updateDoc(doc(db, "course_applications", student.id), {
-        certStatus: "Issued",
-        certSerial: certSerial,
-        certDate: serverTimestamp(),
-      });
-      await logActivity(
-        "CERT_ISSUE",
-        `Certificate issued to ${student.studentName}`,
-      );
-      alert("Certificate Issued.");
-    } catch (err) {
-      alert("Error issuing certificate.");
-    }
+    await updateDoc(doc(db, "course_applications", student.id), {
+      studentId: generatedID,
+      status: "Admitted",
+    });
+    alert(`ID Dispatched: ${generatedID}`);
+    setLoading(false);
   };
 
   const formPaidCount = students.filter(
-    (s) => s.paymentStatus === "Form_Paid",
+    (s) => s.paymentStatus === "Verified" || s.paymentStatus === "Form_Paid",
   ).length;
-  const totalRevenue = formPaidCount * 5000;
+  const totalRevenue = formPaidCount * 100; // Updated to 100 NGN
 
   return (
     <div
@@ -345,13 +263,7 @@ const AdminDashboard = () => {
       <aside
         className={`fixed inset-y-0 left-0 z-[110] w-80 border-r flex flex-col transform transition-transform duration-300 lg:relative lg:translate-x-0 ${mobileMenuOpen ? "translate-x-0" : "-translate-x-full"} ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-200 shadow-2xl"}`}
       >
-        <div className="p-10 text-center relative">
-          <button
-            onClick={() => setMobileMenuOpen(false)}
-            className="absolute top-4 right-4 p-2 lg:hidden"
-          >
-            <X size={20} />
-          </button>
+        <div className="p-10 text-center">
           <h2 className="text-3xl font-black italic tracking-tighter text-blue-600">
             AYAX GLOBAL
           </h2>
@@ -359,338 +271,315 @@ const AdminDashboard = () => {
             Control Infrastructure
           </p>
         </div>
-
-        <nav className="flex-1 px-6 space-y-3 overflow-y-auto">
+        <nav className="flex-1 px-6 space-y-3">
           {[
-            {
-              id: "overview",
-              icon: <LayoutDashboard size={20} />,
-              label: "Command Center",
-            },
-            {
-              id: "admissions",
-              icon: <Users size={20} />,
-              label: "Admission Flow",
-            },
-            {
-              id: "manual_gen",
-              icon: <PlusCircle size={20} />,
-              label: "Manual Minting",
-            },
-            {
-              id: "surveillance",
-              icon: <Eye size={20} />,
-              label: "Chat Intelligence",
-            },
-            {
-              id: "history",
-              icon: <History size={20} />,
-              label: "System Logs",
-            },
-            {
-              id: "gallery_manager",
-              icon: <Camera size={20} />,
-              label: "Media Gallery",
-            },
-            {
-              id: "news_manager",
-              icon: <Newspaper size={20} />,
-              label: "News Manager",
-            },
-          ].map((item) => (
+            "overview",
+            "admissions",
+            "manual_gen",
+            "surveillance",
+            "history",
+            "gallery_manager",
+            "news_manager",
+          ].map((tab) => (
             <button
-              key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                setMobileMenuOpen(false);
-              }}
-              className={`w-full flex items-center gap-5 p-5 rounded-[1.5rem] font-black text-xs uppercase transition-all ${activeTab === item.id ? "bg-blue-600 text-white shadow-xl scale-105" : "hover:bg-blue-500/10 opacity-60"}`}
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`w-full flex items-center gap-5 p-5 rounded-[1.5rem] font-black text-xs uppercase transition-all ${activeTab === tab ? "bg-blue-600 text-white shadow-xl scale-105" : "hover:bg-blue-500/10 opacity-60"}`}
             >
-              {item.icon} {item.label}
+              {tab.replace("_", " ")}
             </button>
           ))}
         </nav>
-
-        <div className="p-8 mt-auto space-y-4">
+        <div className="p-8 mt-auto">
           <button
             onClick={() => setDarkMode(!darkMode)}
-            className="w-full py-4 flex items-center justify-center gap-4 bg-slate-500/10 rounded-2xl font-black text-[10px] uppercase"
+            className="w-full py-4 bg-slate-500/10 rounded-2xl font-black text-[10px] uppercase mb-4"
           >
-            {darkMode ? (
-              <Sun size={20} className="text-yellow-400" />
-            ) : (
-              <Moon size={20} className="text-blue-500" />
-            )}{" "}
-            {darkMode ? "Light" : "Dark"} Mode
+            Toggle {darkMode ? "Light" : "Dark"}
           </button>
           <button
             onClick={() => signOut(auth)}
-            className="w-full py-5 bg-red-600/10 text-red-600 rounded-2xl font-black text-[10px] uppercase border border-red-600/20"
+            className="w-full py-5 bg-red-600/10 text-red-600 rounded-2xl font-black text-[10px] uppercase"
           >
-            <LogOut size={20} className="inline mr-2" /> Shutdown
+            Shutdown
           </button>
         </div>
       </aside>
 
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="h-28 border-b flex items-center justify-between px-6 lg:px-12 bg-white/5 backdrop-blur-3xl shrink-0">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setMobileMenuOpen(true)}
-              className="p-3 bg-blue-600 text-white rounded-xl lg:hidden"
-            >
-              <Menu size={24} />
-            </button>
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black uppercase opacity-40 text-emerald-500">
-                Revenue
-              </span>
-              <div className="text-xl font-black text-emerald-500">
-                ₦{totalRevenue.toLocaleString()}
-              </div>
+        <header className="h-28 border-b flex items-center justify-between px-12 bg-white/5 backdrop-blur-3xl shrink-0">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black uppercase opacity-40 text-emerald-500">
+              Revenue
+            </span>
+            <div className="text-xl font-black text-emerald-500">
+              ₦{totalRevenue.toLocaleString()}
             </div>
           </div>
           <button
             onClick={togglePortal}
-            className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase shadow-2xl ${portalStatus ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
+            className={`px-6 py-4 rounded-2xl font-black text-[10px] uppercase ${portalStatus ? "bg-red-600 text-white" : "bg-emerald-600 text-white"}`}
           >
             {portalStatus ? "Lockdown" : "Open System"}
           </button>
         </header>
 
-        <div className="flex-1 p-4 lg:p-12 overflow-y-auto custom-scrollbar">
+        <div className="flex-1 p-12 overflow-y-auto custom-scrollbar">
           {activeTab === "overview" && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="stat-card">
-                <Activity className="text-blue-600 mb-4" size={32} />
+                <Activity size={32} />
                 <h4 className="metric-label">Applications</h4>
                 <p className="text-5xl font-black">{students.length}</p>
-              </div>
-              <div className="stat-card">
-                <CheckCircle className="text-emerald-500 mb-4" size={32} />
-                <h4 className="metric-label">Paid Forms</h4>
-                <p className="text-5xl font-black">{formPaidCount}</p>
-              </div>
-              <div className="stat-card">
-                <Zap className="text-purple-500 mb-4" size={32} />
-                <h4 className="metric-label">Smart IDs</h4>
-                <p className="text-5xl font-black">
-                  {students.filter((s) => s.studentId).length}
-                </p>
               </div>
             </div>
           )}
 
           {activeTab === "admissions" && (
             <div className="space-y-8">
-              {/* SURVEILLANCE SEARCH & FILTER BAR */}
-              <div className="flex flex-col md:flex-row gap-4">
-                <div className="flex-1 relative">
-                  <Search
-                    className="absolute left-6 top-1/2 -translate-y-1/2 opacity-30"
-                    size={20}
-                  />
-                  <input
-                    type="text"
-                    placeholder="Search Name, Email, or Course..."
-                    className="admin-input pl-16"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <div className="flex items-center gap-4 bg-blue-600/5 p-2 rounded-2xl border border-blue-600/10">
-                  <Filter size={18} className="ml-4 opacity-40" />
-                  <select
-                    value={filterStatus}
-                    onChange={(e) => setFilterStatus(e.target.value)}
-                    className="bg-transparent font-black text-[10px] uppercase p-3 outline-none"
-                  >
-                    <option value="All">All Applications</option>
-                    <option value="Form_Paid">Paid Students</option>
-                    <option value="Unpaid">Unpaid</option>
-                  </select>
-                </div>
+              <div className="flex gap-4">
+                <input
+                  placeholder="Search Students..."
+                  className="admin-input flex-1"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
               </div>
-
-              <div
-                className={`rounded-[3rem] border overflow-hidden ${darkMode ? "bg-slate-900 border-slate-800" : "bg-white border-slate-100 shadow-2xl"}`}
-              >
+              <div className="bg-white rounded-[3rem] shadow-xl overflow-hidden border">
                 <table className="w-full text-left">
-                  <thead className="bg-slate-500/5 text-[10px] font-black uppercase opacity-60">
+                  <thead className="bg-slate-50 text-[10px] font-black uppercase">
                     <tr>
-                      <th className="p-8">Student Detail</th>
-                      <th className="p-8">Contact</th>
+                      <th className="p-8">Student</th>
+                      <th className="p-8">Course</th>
                       <th className="p-8">Status</th>
-                      <th className="p-8 text-center">View</th>
+                      <th className="p-8">View Form</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800/10 font-bold">
-                    {filteredStudents.length > 0 ? (
-                      filteredStudents.map((s) => (
-                        <tr
-                          key={s.id}
-                          className="hover:bg-blue-500/5 transition-colors group"
-                        >
-                          <td className="p-8 flex items-center gap-4">
-                            <img
-                              src={s.passportUrl}
-                              className="w-12 h-12 rounded-xl object-cover ring-2 ring-blue-600/20"
-                            />
-                            <div>
-                              <p className="text-sm uppercase">
-                                {s.studentName}
-                              </p>
-                              <p className="text-[9px] text-blue-600">
-                                {s.course}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="p-8">
-                            <div className="text-[10px] space-y-1">
-                              <p className="flex items-center gap-2">
-                                <Mail size={12} /> {s.email}
-                              </p>
-                              <p className="flex items-center gap-2">
-                                <Phone size={12} /> {s.phone}
-                              </p>
-                            </div>
-                          </td>
-                          <td className="p-8">
-                            <span
-                              className={`px-3 py-1 rounded-lg text-[9px] uppercase ${s.paymentStatus === "Form_Paid" ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-600"}`}
-                            >
-                              {s.paymentStatus || "Unpaid"}
-                            </span>
-                          </td>
-                          <td className="p-8 text-center">
-                            <button
-                              onClick={() => setSelectedStudent(s)}
-                              className="p-4 bg-slate-500/10 rounded-2xl group-hover:bg-blue-600 group-hover:text-white transition-all"
-                            >
-                              <Eye size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))
-                    ) : (
-                      <tr>
-                        <td
-                          colSpan="4"
-                          className="p-20 text-center opacity-40 font-black uppercase text-xs"
-                        >
-                          No records found matching your query
+                  <tbody className="divide-y">
+                    {filteredStudents.map((s) => (
+                      <tr key={s.id}>
+                        <td className="p-8 flex items-center gap-4">
+                          <img
+                            src={s.passportUrl}
+                            className="w-12 h-12 rounded-xl"
+                          />
+                          {s.studentName}
+                        </td>
+                        <td className="p-8 text-xs">{s.course}</td>
+                        <td className="p-8">
+                          <span className="px-3 py-1 bg-emerald-100 text-emerald-600 rounded-lg text-[9px] font-black uppercase">
+                            {s.paymentStatus || "Verified"}
+                          </span>
+                        </td>
+                        <td className="p-8">
+                          <button
+                            onClick={() => setSelectedStudent(s)}
+                            className="p-4 bg-blue-600 text-white rounded-2xl"
+                          >
+                            <FileText size={18} />
+                          </button>
                         </td>
                       </tr>
-                    )}
+                    ))}
                   </tbody>
                 </table>
               </div>
             </div>
           )}
 
-          {/* STUDENT DETAIL MODAL */}
+          {/* STUDENT FORM MODAL (New Feature Integrated) */}
           {selectedStudent && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 backdrop-blur-md bg-black/40">
+            <div className="fixed inset-0 z-[200] bg-black/80 flex items-center justify-center p-6 backdrop-blur-sm">
               <div
-                className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-[3.5rem] p-10 relative shadow-2xl ${darkMode ? "bg-slate-900 border border-slate-800" : "bg-white"}`}
+                className={`w-full max-w-3xl max-h-[90vh] overflow-y-auto rounded-[3.5rem] p-10 relative ${darkMode ? "bg-slate-900" : "bg-white"}`}
               >
                 <button
                   onClick={() => setSelectedStudent(null)}
-                  className="absolute top-8 right-8 p-4 bg-red-600/10 text-red-600 rounded-full"
+                  className="absolute top-8 right-8 p-4 bg-red-500/10 text-red-600 rounded-full"
                 >
                   <X size={24} />
                 </button>
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                  <div className="space-y-6 text-center lg:text-left">
-                    <img
-                      src={selectedStudent.passportUrl}
-                      className="w-48 h-64 object-cover rounded-[2rem] mx-auto lg:mx-0 shadow-2xl border-4 border-blue-600/20"
-                    />
-                    <div>
-                      <h2 className="text-3xl font-black uppercase">
-                        {selectedStudent.studentName}
-                      </h2>
-                      <p className="text-blue-600 font-bold tracking-widest uppercase text-sm mt-2">
-                        {selectedStudent.course}
-                      </p>
+                <div className="flex gap-8 mb-10 border-b pb-10">
+                  <img
+                    src={selectedStudent.passportUrl}
+                    className="w-40 h-40 rounded-[2.5rem] object-cover"
+                  />
+                  <div className="space-y-2">
+                    <h2 className="text-4xl font-black uppercase">
+                      {selectedStudent.studentName}
+                    </h2>
+                    <p className="text-blue-600 font-bold uppercase text-xs">
+                      {selectedStudent.course}
+                    </p>
+                    <div className="flex gap-2 pt-4">
+                      <span className="p-2 bg-slate-100 rounded-xl text-[10px] font-black">
+                        {selectedStudent.email}
+                      </span>
+                      <span className="p-2 bg-slate-100 rounded-xl text-[10px] font-black">
+                        {selectedStudent.phone}
+                      </span>
                     </div>
                   </div>
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="info-box">
-                        <MapPin size={16} className="mb-2 opacity-40" />
-                        <p className="text-[9px] uppercase opacity-40">
-                          State of Origin
-                        </p>
-                        <p className="text-sm font-black">
-                          {selectedStudent.stateOfOrigin}
-                        </p>
-                      </div>
-                      <div className="info-box">
-                        <CreditCard size={16} className="mb-2 opacity-40" />
-                        <p className="text-[9px] uppercase opacity-40">
-                          Payment Ref
-                        </p>
-                        <p className="text-[10px] font-black break-all">
-                          {selectedStudent.transactionRef || "N/A"}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <p className="text-xs font-black uppercase opacity-40 border-b pb-2">
-                        Academic Profile
-                      </p>
-                      <div className="grid grid-cols-1 gap-2">
-                        {selectedStudent.education &&
-                          selectedStudent.education.map((edu, idx) => (
-                            <div
-                              key={idx}
-                              className="p-4 bg-slate-500/5 rounded-2xl flex justify-between items-center"
-                            >
-                              <span className="text-sm">{edu.school}</span>
-                              <span className="px-3 py-1 bg-blue-600/10 text-blue-600 rounded-lg text-[9px]">
-                                {edu.year}
-                              </span>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                    <div className="flex gap-4 pt-6">
-                      {!selectedStudent.studentId && (
-                        <button
-                          onClick={() =>
-                            handleAutomaticIDDispatch(selectedStudent)
-                          }
-                          className="flex-1 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2"
-                        >
-                          <Zap size={16} /> Dispatch ID
-                        </button>
-                      )}
-                      <button
-                        onClick={() => issueCertificate(selectedStudent)}
-                        className="flex-1 py-4 bg-amber-500 text-white rounded-2xl font-black uppercase text-xs flex items-center justify-center gap-2"
-                      >
-                        <Award size={16} /> Issue Cert
-                      </button>
-                    </div>
+                </div>
+                <div className="grid md:grid-cols-2 gap-10">
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase opacity-40 mb-4 tracking-widest">
+                      Resident Details
+                    </h4>
+                    <p className="text-sm font-bold">
+                      {selectedStudent.address}
+                    </p>
+                    <p className="text-sm">
+                      {selectedStudent.currentLGA},{" "}
+                      {selectedStudent.currentState}
+                    </p>
                   </div>
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase opacity-40 mb-4 tracking-widest">
+                      Academic Data
+                    </h4>
+                    {selectedStudent.education?.map((edu, i) => (
+                      <p key={i} className="text-xs font-bold border-b py-2">
+                        {edu.qualification} - {edu.institution}
+                      </p>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-10 p-6 bg-blue-50 rounded-3xl flex justify-between items-center">
+                  <p className="font-mono text-sm font-black text-blue-600">
+                    {selectedStudent.transactionRef}
+                  </p>
+                  <button
+                    onClick={() => handleAutomaticIDDispatch(selectedStudent)}
+                    className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black uppercase text-[10px]"
+                  >
+                    Dispatch ID
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-          {/* ... [GALLERY & NEWS SECTIONS REMAIN EXACTLY AS PROVIDED] ... */}
+          {activeTab === "gallery_manager" && (
+            <div className="space-y-8">
+              <form
+                onSubmit={handleGalleryUpload}
+                className="grid grid-cols-1 md:grid-cols-3 gap-6"
+              >
+                <input
+                  placeholder="Image Title"
+                  className="admin-input"
+                  value={galleryTitle}
+                  onChange={(e) => setGalleryTitle(e.target.value)}
+                  required
+                />
+                <input
+                  placeholder="Image URL"
+                  className="admin-input"
+                  value={galleryUrl}
+                  onChange={(e) => setGalleryUrl(e.target.value)}
+                  required
+                />
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white rounded-2xl font-black uppercase text-xs"
+                >
+                  Upload to Gallery
+                </button>
+              </form>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                {galleryItems.map((item) => (
+                  <div key={item.id} className="relative group">
+                    <img
+                      src={item.url}
+                      className="rounded-3xl h-40 w-full object-cover"
+                    />
+                    <button
+                      onClick={() =>
+                        handleDeleteGalleryItem(item.id, item.title)
+                      }
+                      className="absolute top-2 right-2 p-2 bg-red-600 text-white rounded-xl opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "news_manager" && (
+            <div className="space-y-8">
+              <form
+                onSubmit={handlePublishNews}
+                className="space-y-4 bg-white p-10 rounded-[3rem] border"
+              >
+                <input
+                  placeholder="News Title"
+                  className="admin-input"
+                  value={newsData.title}
+                  onChange={(e) =>
+                    setNewsData({ ...newsData, title: e.target.value })
+                  }
+                />
+                <textarea
+                  placeholder="News Content"
+                  className="admin-input h-32"
+                  value={newsData.content}
+                  onChange={(e) =>
+                    setNewsData({ ...newsData, content: e.target.value })
+                  }
+                />
+                <button className="w-full py-5 bg-blue-600 text-white rounded-2xl font-black uppercase">
+                  Publish Official News
+                </button>
+              </form>
+              <div className="space-y-4">
+                {newsFeed.map((news) => (
+                  <div
+                    key={news.id}
+                    className="flex justify-between items-center bg-white p-6 rounded-2xl border"
+                  >
+                    <h5 className="font-black text-sm uppercase">
+                      {news.title}
+                    </h5>
+                    <button
+                      onClick={() => handleDeleteNews(news.id, news.title)}
+                      className="text-red-600"
+                    >
+                      <Trash2 />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "history" && (
+            <div className="space-y-4">
+              {historyLogs.map((log) => (
+                <div
+                  key={log.id}
+                  className="p-6 bg-white rounded-2xl border flex justify-between"
+                >
+                  <p className="text-xs font-bold uppercase">
+                    {log.action}: {log.details}
+                  </p>
+                  <span className="text-[10px] opacity-40">
+                    {new Date(log.timestamp?.seconds * 1000).toLocaleString()}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </main>
 
       <style>{`
         .admin-input { width: 100%; padding: 1.25rem; background: ${darkMode ? "#0f172a" : "#f8fafc"}; border: 2px solid transparent; border-radius: 1.25rem; font-weight: 800; font-size: 0.8rem; outline: none; transition: 0.3s; color: inherit; }
         .admin-input:focus { border-color: #2563eb; }
-        .metric-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; letter-spacing: 0.15em; }
         .stat-card { padding: 40px; border-radius: 40px; background: ${darkMode ? "#0f172a" : "white"}; border: 1px solid rgba(0,0,0,0.05); }
-        .info-box { padding: 20px; background: ${darkMode ? "#1e293b" : "#f8fafc"}; border-radius: 1.5rem; border: 1px solid ${darkMode ? "#334155" : "#e2e8f0"}; }
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #2563eb; border-radius: 10px; }
+        .metric-label { font-size: 11px; font-weight: 900; color: #94a3b8; text-transform: uppercase; margin-bottom: 10px; }
       `}</style>
     </div>
   );
