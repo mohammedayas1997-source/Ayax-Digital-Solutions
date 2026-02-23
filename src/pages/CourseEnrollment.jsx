@@ -26,9 +26,6 @@ import {
 import emailjs from "@emailjs/browser";
 import { downloadPDFReceipt, downloadFilledForm } from "../utils/pdfGenerator";
 
-// Logic for PDF Generation must be imported or defined
-// import { downloadPDFReceipt, downloadFilledForm } from "../utils/pdfGenerator";
-
 const currencyData = {
   Nigeria: { code: "NGN", symbol: "₦", fee: 100 },
   Algeria: { code: "DZD", symbol: "DA", fee: 455 },
@@ -134,7 +131,6 @@ const CourseEnrollment = () => {
   const sendWelcomeEmail = (studentData) => {
     const SCHOOL_LOGO_URL =
       "https://firebasestorage.googleapis.com/v0/b/ayax-academy.appspot.com/o/assets%2Flogo.png?alt=media";
-
     const templateParams = {
       fullName: studentData.studentName,
       course: studentData.course,
@@ -143,7 +139,6 @@ const CourseEnrollment = () => {
       school_name: "AYAX Digital Solutions Academy",
       submission_date: new Date().toLocaleDateString(),
     };
-
     emailjs
       .send(
         "service_2wusktt",
@@ -151,12 +146,7 @@ const CourseEnrollment = () => {
         templateParams,
         "Zq65aNb8G1g9F7XkY",
       )
-      .then((response) => {
-        console.log("Automation Success: Email dispatched.");
-      })
-      .catch((err) => {
-        console.error("Automation Error:", err);
-      });
+      .catch((err) => console.error("Email Error:", err));
   };
 
   const addEducation = () =>
@@ -172,16 +162,12 @@ const CourseEnrollment = () => {
 
   const handleApplyTrigger = (e) => {
     e.preventDefault();
-
     if (!portalOpen) return alert("Portal Locked.");
     if (!passportImage) return alert("Upload Passport First.");
-
     const formData = new FormData(formRef.current);
-    const email = formData.get("email");
-
     const handler = window.PaystackPop.setup({
       key: PAYSTACK_PUBLIC_KEY,
-      email: email,
+      email: formData.get("email"),
       amount: currencyData[selectedCountry].fee * 100,
       currency: currencyData[selectedCountry].code,
       callback: (response) => {
@@ -194,98 +180,59 @@ const CourseEnrollment = () => {
   };
 
   const processFinalSubmission = async (formData, refId) => {
-    // 1. EXECUTIVE ACTION: STOP THE HANG IMMEDIATELY
-    setLoading(false);
-    setSuccessMessage("Application Secured Successfully!");
-
+    // 1. ASSEMBLE ALL DATA POINTS FOR THE SUPER ADMIN
     const studentInfo = {
-      name: formData.get("name") || "Ayax Student",
-      email: formData.get("email"),
-      phone: formData.get("phone"),
+      studentName: formData.get("name"),
+      studentEmail: formData.get("email"),
+      studentPhone: formData.get("phone"),
+      address: formData.get("address"),
+      currentState: formData.get("currentState"),
+      currentLGA: formData.get("currentLGA"),
+      stateOfOrigin: formData.get("stateOfOrigin"),
+      lgaOfOrigin: formData.get("lgaOfOrigin"),
       course: selectedCourse,
-      ref: refId,
-      amount: "NGN 100",
-      date: new Date().toLocaleDateString(),
-      formData: Object.fromEntries(formData),
+      educationBackground: educationList,
+      country: selectedCountry,
+      transactionRef: refId,
+      paymentStatus: "Verified",
+      appliedAt: serverTimestamp(),
     };
 
-    // 2. TRIGGER DUAL INSTANT DOWNLOADS
     try {
-      // Mock triggers - Ensure your actual PDF functions are imported/available
-      if (window.downloadPDFReceipt) {
-        window.downloadPDFReceipt(studentInfo);
+      // 2. UPLOAD PASSPORT PHOTO FIRST
+      let passportURL = "";
+      if (passportImage) {
+        const passportRef = ref(
+          storage,
+          `passports/${Date.now()}_${studentInfo.studentName}`,
+        );
+        const pSnapshot = await uploadBytes(passportRef, passportImage);
+        passportURL = await getDownloadURL(pSnapshot.ref);
       }
-      if (window.downloadFilledForm) {
-        window.downloadFilledForm(studentInfo);
-      }
-      alert("Success! Your Filled Form and Receipt are downloading.");
+
+      // 3. PUSH TO SUPER ADMIN DASHBOARD (Dual Collection Push)
+      const finalRecord = { ...studentInfo, passportUrl: passportURL };
+
+      // Collection A: Legacy Registry
+      await addDoc(collection(db, "course_applications"), finalRecord);
+
+      // Collection B: Direct Super Admin Enrollment Stream
+      await addDoc(collection(db, "enrollments"), finalRecord);
+
+      // 4. GENERATE DOCUMENTS FOR STUDENT
+      if (window.downloadPDFReceipt) window.downloadPDFReceipt(studentInfo);
+      if (window.downloadFilledForm) window.downloadFilledForm(studentInfo);
+
+      // 5. SEND AUTOMATED EMAIL
+      sendWelcomeEmail(studentInfo);
+
+      setLoading(false);
+      setSuccessMessage("Application Secured Successfully!");
     } catch (err) {
-      console.error("Download Error:", err);
+      console.error("Submission Failure:", err);
+      setLoading(false);
+      alert("Submission error. Please contact support.");
     }
-
-    // 3. BACKGROUND PERSISTENCE (NON-BLOCKING)
-    const runBackgroundPersistence = async () => {
-      try {
-        let passportURL = "";
-        if (passportImage) {
-          const passportRef = ref(
-            storage,
-            `passports/${Date.now()}_${studentInfo.name}`,
-          );
-          const pSnapshot = await uploadBytes(passportRef, passportImage);
-          passportURL = await getDownloadURL(pSnapshot.ref);
-        }
-
-        await addDoc(collection(db, "course_applications"), {
-          ...studentInfo.formData,
-          course: selectedCourse,
-          country: selectedCountry,
-          passportUrl: passportURL,
-          paymentMethod: "Paystack",
-          education: educationList,
-          appliedAt: serverTimestamp(),
-          paymentStatus: "Verified",
-          transactionRef: refId,
-        });
-
-        // Optimized submission function for the Student Enrollment page
-        const handleSubmit = async (e) => {
-          e.preventDefault();
-          setLoading(true);
-          try {
-            // Send data to the "enrollments" collection
-            const enrollmentData = {
-              studentName: formData.name || "N/A",
-              studentEmail: formData.email || "N/A",
-              studentPhone: formData.phone || "N/A",
-              address: formData.address || "N/A",
-              courseId: selectedCourse.id,
-              courseName: selectedCourse.name || "Unknown Course",
-              enrolledAt: serverTimestamp(),
-              paymentStatus: "Verified",
-              studentIdNo: null, // Admin will assign this later
-            };
-
-            alert("Your enrollment form has been submitted successfully!");
-          } catch (error) {
-            console.error("Error submitting enrollment form:", error);
-            alert("Submission failed. Please try again.");
-          } finally {
-            setLoading(false);
-          }
-        };
-        console.log("Admin Dashboard Updated.");
-        sendWelcomeEmail({
-          studentName: studentInfo.name,
-          email: studentInfo.email,
-          course: selectedCourse,
-        });
-      } catch (err) {
-        console.error("Sync Failure:", err);
-      }
-    };
-
-    runBackgroundPersistence();
   };
 
   if (!portalOpen) {
@@ -301,7 +248,7 @@ const CourseEnrollment = () => {
           </h1>
           <button
             onClick={() => navigate("/")}
-            className="mt-10 px-10 py-4 bg-white text-black rounded-2xl font-black uppercase text-[10px] hover:bg-red-500 hover:text-white transition-all"
+            className="mt-10 px-10 py-4 bg-white text-black rounded-2xl font-black uppercase text-[10px] hover:bg-red-500 transition-all"
           >
             Return to Home
           </button>
@@ -332,20 +279,13 @@ const CourseEnrollment = () => {
               Your documents have been generated.
             </p>
             <button
-              onClick={() => navigate("/dashboard")}
+              onClick={() => navigate("/")}
               className="px-10 py-4 bg-white text-blue-600 rounded-2xl font-black uppercase text-xs"
             >
-              Go to Dashboard
+              Return Home
             </button>
           </div>
         )}
-
-        <button
-          onClick={() => navigate("/")}
-          className="absolute top-8 right-8 z-10 p-3 bg-slate-100 hover:bg-red-500 hover:text-white text-slate-500 rounded-2xl transition-all"
-        >
-          <X size={24} />
-        </button>
 
         <div className="bg-slate-900 p-12 text-center">
           <GraduationCap className="w-16 h-16 mx-auto mb-4 text-blue-500 animate-pulse" />
@@ -426,7 +366,6 @@ const CourseEnrollment = () => {
                   </option>
                 ))}
               </select>
-
               <div className="md:col-span-2 p-6 bg-blue-600 rounded-[2rem] text-white flex justify-between items-center shadow-xl">
                 <div className="flex items-center gap-3">
                   <Globe size={24} className="opacity-70" />
@@ -441,7 +380,6 @@ const CourseEnrollment = () => {
                   </h2>
                 </div>
               </div>
-
               <select
                 name="course"
                 required
@@ -548,7 +486,7 @@ const CourseEnrollment = () => {
             <button
               type="button"
               onClick={addEducation}
-              className="w-full py-4 border-2 border-dashed border-blue-200 text-blue-600 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
+              className="w-full py-4 border-2 border-dashed border-blue-200 text-blue-600 rounded-2xl font-black uppercase text-[10px] hover:bg-blue-50 transition-all flex items-center justify-center gap-2"
             >
               <Plus size={16} /> Add More Credentials
             </button>
@@ -592,20 +530,6 @@ const CourseEnrollment = () => {
             </div>
           </div>
 
-          <div className="p-8 bg-blue-50 rounded-[2rem] border-2 border-dashed border-blue-200 flex items-center gap-6">
-            <div className="p-4 bg-blue-600 text-white rounded-2xl shadow-lg">
-              <CreditCard size={32} />
-            </div>
-            <div>
-              <h4 className="font-black text-sm uppercase text-blue-900">
-                Secure Payment via Paystack
-              </h4>
-              <p className="text-[10px] font-bold text-blue-600/70 uppercase tracking-widest">
-                Pay now to unlock your 2026 Academic ID.
-              </p>
-            </div>
-          </div>
-
           <button
             type="submit"
             className="w-full py-8 bg-blue-600 text-white rounded-[2.5rem] font-black uppercase tracking-[0.3em] text-xs hover:bg-slate-900 transition-all flex items-center justify-center gap-4 shadow-xl active:scale-95"
@@ -614,7 +538,6 @@ const CourseEnrollment = () => {
           </button>
         </form>
       </div>
-
       <style>{`
         .input-style { width: 100%; padding: 1.25rem 1.5rem; background: #f8fafc; border: 2px solid transparent; border-radius: 1.5rem; outline: none; font-weight: 800; font-size: 0.85rem; color: #0f172a; transition: all 0.3s ease; }
         .input-style:focus { border-color: #2563eb; background: white; box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.1); }
