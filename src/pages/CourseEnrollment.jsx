@@ -248,13 +248,31 @@ const CourseEnrollment = () => {
           transactionRef: refId,
         });
 
-        await addDoc(collection(db, "enrollments"), {
-          email: studentInfo.email,
-          reference: refId,
-          status: "Verified",
-          timestamp: serverTimestamp(),
-        });
+        // Optimized submission function for the Student Enrollment page
+        const handleSubmit = async (e) => {
+          e.preventDefault();
+          setLoading(true);
+          try {
+            // Send data to the "enrollments" collection
+            await addDoc(collection(db, "enrollments"), {
+              studentName: formData.name,
+              studentEmail: formData.email,
+              studentPhone: formData.phone,
+              address: formData.address,
+              courseId: selectedCourse.id, // Critical for AdminDashboard tracking
+              enrolledAt: serverTimestamp(),
+              paymentStatus: "Verified",
+              studentIdNo: null, // To be assigned by Admin later
+            });
 
+            alert("Your enrollment form has been submitted successfully!");
+          } catch (error) {
+            console.error("Error submitting enrollment form:", error);
+            alert("Submission failed. Please try again.");
+          } finally {
+            setLoading(false);
+          }
+        };
         console.log("Admin Dashboard Updated.");
         sendWelcomeEmail({
           studentName: studentInfo.name,
