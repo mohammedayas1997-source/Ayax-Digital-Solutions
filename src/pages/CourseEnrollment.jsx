@@ -212,29 +212,49 @@ const CourseEnrollment = () => {
   };
 
   const handleApplyTrigger = (e) => {
-    e.preventDefault();
+    e.preventDefault(); // Kare form daga yin refresh
+
+    // 1. Duba idan portal a bude yake
     if (!portalOpen) return alert("Portal Locked.");
-    if (!passportImage) return alert("Upload Passport First.");
 
+    // 2. Duba idan an saka hoto
+    if (!passportImage)
+      return alert("Please upload your passport photo first.");
+
+    // 3. Dauko bayanan form
     const formData = new FormData(formRef.current);
+    const userEmail = formData.get("email");
 
-    if (!window.PaystackPop) {
-      return alert("Paystack system loading. Please wait 5 seconds.");
+    // 4. KIRAN PAYSTACK (Modern Way)
+    if (window.PaystackPop) {
+      const paystack = new window.PaystackPop();
+      paystack.newTransaction({
+        key: PAYSTACK_PUBLIC_KEY,
+        email: userEmail,
+        amount: currencyData[selectedCountry].fee * 100, // Misali 100 * 100 = 10,000 kobo (₦100)
+        currency: currencyData[selectedCountry].code,
+
+        // Wannan zai tilasta OPay da Bank Transfer su nuna
+        channels: [
+          "card",
+          "bank",
+          "ussd",
+          "qr",
+          "mobile_money",
+          "bank_transfer",
+        ],
+
+        onSuccess: (transaction) => {
+          setLoading(true);
+          processFinalSubmission(formData, transaction.reference);
+        },
+        onCancel: () => {
+          alert("Transaction Cancelled.");
+        },
+      });
+    } else {
+      alert("Payment system is loading, please wait a second and try again.");
     }
-
-    const paystack = new window.PaystackPop();
-    paystack.newTransaction({
-      key: PAYSTACK_PUBLIC_KEY,
-      email: formData.get("email"),
-      amount: currencyData[selectedCountry].fee * 100,
-      currency: currencyData[selectedCountry].code,
-      channels: ["card", "bank", "ussd", "qr", "mobile_money", "bank_transfer"],
-      onSuccess: (transaction) => {
-        setLoading(true);
-        processFinalSubmission(formData, transaction.reference);
-      },
-      onCancel: () => alert("Payment Cancelled."),
-    });
   };
 
   if (!portalOpen) {
