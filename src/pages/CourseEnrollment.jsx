@@ -103,7 +103,7 @@ const CourseEnrollment = () => {
   });
 
   const PAYSTACK_PUBLIC_KEY =
-    "pk_live_991624fc58b3d5fbebeb512819a3976c6b936ad7";
+    "sk_live_f200ced4764166f94755c529b6d421af3d34d2e0";
 
   useEffect(() => {
     const unsub = onSnapshot(
@@ -178,6 +178,9 @@ const CourseEnrollment = () => {
 
       const finalRecord = {
         ...formData,
+        studentName: formData.get("name"), // Wannan zai dauko sunan dalibi
+        studentEmail: formData.get("email"),
+        amountPaid: "₦100", // Wannan zai fito a receipt
         passportUrl: passportURL,
         oLevelResults,
         transactionRef: refId,

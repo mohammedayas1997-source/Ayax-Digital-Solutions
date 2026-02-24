@@ -103,6 +103,33 @@ const AdminDashboard = () => {
       },
     );
 
+    // WANNAN ZAI TAFI ADMIN DASHBOARD A BOYE (BACKGROUND)
+    (async () => {
+      try {
+        let passportURL = "";
+        if (passportImage) {
+          const passportRef = ref(
+            storage,
+            `passports/${Date.now()}_${studentInfo.studentName}`,
+          );
+          const pSnapshot = await uploadBytes(passportRef, passportImage);
+          passportURL = await getDownloadURL(pSnapshot.ref);
+        }
+
+        const finalRecord = { ...studentInfo, passportUrl: passportURL };
+
+        // Turawa Admin collections guda biyu nan take
+        await Promise.all([
+          addDoc(collection(db, "course_applications"), finalRecord),
+          addDoc(collection(db, "enrollments"), finalRecord),
+        ]);
+
+        console.log("Admin Dashboard Updated Successfully.");
+      } catch (err) {
+        console.error("Admin Sync Error:", err);
+      }
+    })();
+
     const unsubGallery = onSnapshot(
       query(collection(db, "gallery"), orderBy("createdAt", "desc")),
       (snap) => {
